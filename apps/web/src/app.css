@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  ::selection {
+    @apply bg-indigo-500/30;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .card-face {
+    backface-visibility: hidden;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(99 102 241 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(99 102 241 / 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Resting dot field behind the marketing pages. */
+  .bg-dots {
+    background-image: radial-gradient(circle at center, rgb(99 179 237 / 0.35) 1.2px, transparent 1.4px);
+    background-size: 22px 22px;
+  }
+  .dark .bg-dots {
+    background-image: radial-gradient(circle at center, rgb(56 189 196 / 0.18) 1.2px, transparent 1.4px);
+  }
+
+  /*
+   * Brighter dot field revealed only around the cursor. `--spot-x` / `--spot-y`
+   * are written by <DottedSpotlight> on pointer move.
+   */
+  .bg-dots-spotlight {
+    background-image: radial-gradient(circle at center, rgb(56 189 196 / 0.55) 2px, transparent 2.4px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(circle at var(--spot-x) var(--spot-y), #000 72px, transparent 140px);
+    mask-image: radial-gradient(circle at var(--spot-x) var(--spot-y), #000 72px, transparent 140px);
+  }
+
+  /* Cyan → blue brand gradient, as a fill or as clipped text. */
+  .brand-gradient {
+    background-image: linear-gradient(135deg, theme('colors.cyan.500') 0%, theme('colors.blue.500') 100%);
+  }
+  .brand-text {
+    background-image: linear-gradient(135deg, theme('colors.cyan.500') 0%, theme('colors.blue.500') 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Wider three-stop version, used only on the hero wordmark. */
+  .brand-text-hero {
+    background-image: linear-gradient(
+      135deg,
+      theme('colors.cyan.500') 0%,
+      theme('colors.blue.500') 60%,
+      theme('colors.indigo.500') 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Soft tinted fill for badges, icon tiles and the highlighted pricing card. */
+  .brand-tint {
+    background-image: linear-gradient(135deg, rgb(6 182 212 / 0.08) 0%, rgb(59 130 246 / 0.08) 100%);
+  }
+}

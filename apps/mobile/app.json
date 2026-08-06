@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Auto Cards",
+    "slug": "autocards",
+    "scheme": "autocards",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#4f46e5"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.autocards.mobile"
+    },
+    "android": {
+      "package": "app.autocards.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#4f46e5"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"]
+  }
+}

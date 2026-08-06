@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.env
+.env.local
+coverage/
+.vite/
+web-build/
+android/
+ios/
+.playwright-mcp/

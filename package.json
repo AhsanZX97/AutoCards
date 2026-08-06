@@ -1,0 +1,23 @@
+{
+  "name": "autocards",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Auto Cards — turn PDFs into smart flashcards. Web + mobile SaaS.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @autocards/web",
+    "dev:web": "npm run dev --workspace @autocards/web",
+    "dev:mobile": "npm run start --workspace @autocards/mobile",
+    "build": "npm run build --workspace @autocards/core && npm run build --workspace @autocards/web",
+    "build:core": "npm run build --workspace @autocards/core",
+    "test": "npm run test --workspace @autocards/core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "clean": "node -e \"['node_modules','packages/core/dist','apps/web/dist'].forEach(p=>require('fs').rmSync(p,{recursive:true,force:true}))\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
