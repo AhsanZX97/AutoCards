@@ -17,7 +17,7 @@ export function Slider({ value, min, max, step = 1, onChange, label, formatValue
       {label && (
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
-          <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+          <span className="text-sm font-semibold text-brand-700 dark:text-brand-400">
             {formatValue ? formatValue(value) : value}
           </span>
         </div>
@@ -30,7 +30,7 @@ export function Slider({ value, min, max, step = 1, onChange, label, formatValue
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className={cn(
-          'h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-indigo-600 dark:bg-slate-700',
+          'h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-600 dark:bg-slate-700',
         )}
       />
     </div>

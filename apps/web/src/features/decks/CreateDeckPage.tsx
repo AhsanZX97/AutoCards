@@ -127,8 +127,8 @@ export function CreateDeckPage() {
               onClick={() => fileInputRef.current?.click()}
               className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-colors ${
                 dragActive
-                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
-                  : 'border-slate-300 hover:border-indigo-400 dark:border-slate-700'
+                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                  : 'border-slate-300 hover:border-brand-400 dark:border-slate-700'
               }`}
             >
               <span className="text-4xl">📄</span>
@@ -283,7 +283,7 @@ function StepIndicator({ step }: { step: Step }) {
         <div key={s.id} className="flex flex-1 items-center gap-2">
           <div
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-              i <= activeIndex ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'
+              i <= activeIndex ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'
             }`}
           >
             {i + 1}

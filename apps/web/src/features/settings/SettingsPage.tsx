@@ -89,7 +89,7 @@ function AppearanceTab() {
               onClick={() => setTheme(option)}
               className={`rounded-xl border p-4 text-center text-sm font-medium capitalize transition-colors ${
                 theme === option
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400'
+                  ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
                   : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
               }`}
             >
@@ -188,7 +188,7 @@ function BillingTab() {
         const limits = PLAN_LIMITS[plan];
         const isCurrent = user.plan === plan;
         return (
-          <Card key={plan} className={isCurrent ? 'border-2 border-indigo-600 dark:border-indigo-500' : undefined}>
+          <Card key={plan} className={isCurrent ? 'border-2 border-brand-600 dark:border-brand-500' : undefined}>
             <CardBody>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold capitalize text-slate-900 dark:text-white">{plan}</h3>

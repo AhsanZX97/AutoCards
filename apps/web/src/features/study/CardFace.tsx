@@ -33,10 +33,10 @@ export function CardFace({ card, flipped, promptText, answerText, onFlip }: Card
 
         {/* Back */}
         <div
-          className="card-face absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-indigo-500/40 bg-gradient-to-br from-indigo-950 to-slate-900 p-8 text-center shadow-glow"
+          className="card-face absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-brand-500/40 bg-gradient-to-br from-brand-950 to-slate-900 p-8 text-center shadow-glow"
           style={{ transform: 'rotateY(180deg)' }}
         >
-          <span className="mb-4 text-xs font-medium uppercase tracking-wide text-indigo-400">Answer</span>
+          <span className="mb-4 text-xs font-medium uppercase tracking-wide text-brand-400">Answer</span>
           <p className="text-lg font-semibold leading-snug text-white sm:text-xl">{answerText}</p>
         </div>
       </div>

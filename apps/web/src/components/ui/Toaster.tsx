@@ -4,7 +4,7 @@ import { useToastStore } from './toastStore';
 const VARIANT_CLASSES = {
   success: 'border-emerald-200 dark:border-emerald-500/30',
   error: 'border-rose-200 dark:border-rose-500/30',
-  info: 'border-indigo-200 dark:border-indigo-500/30',
+  info: 'border-brand-200 dark:border-brand-500/30',
 };
 
 const VARIANT_ICON = {

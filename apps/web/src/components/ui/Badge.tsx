@@ -10,7 +10,7 @@ const VARIANT_CLASSES: Record<NonNullable<BadgeProps['variant']>, string> = {
   success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
   warning: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
   danger: 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
-  info: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400',
+  info: 'bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400',
 };
 
 export function Badge({ variant = 'neutral', className, ...rest }: BadgeProps) {

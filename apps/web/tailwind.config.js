@@ -4,6 +4,30 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      colors: {
+        /*
+         * Brand identity from the Figma file: a cyan → blue gradient. `brand` is
+         * the solid-accent scale (Tailwind's cyan, so `brand-500`/`brand-600`
+         * are the exact accent values the design uses); the two-hue gradient
+         * itself lives in `.brand-gradient` in app.css.
+         *
+         * For text on a light background use `brand-700` — `brand-600` is only
+         * 3.7:1 against white and misses WCAG AA.
+         */
+        brand: {
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#22d3ee',
+          500: '#06b6d4',
+          600: '#0891b2',
+          700: '#0e7490',
+          800: '#155e75',
+          900: '#164e63',
+          950: '#083344',
+        },
+      },
       fontFamily: {
         sans: [
           'Inter var',
@@ -17,7 +41,7 @@ export default {
       },
       boxShadow: {
         soft: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.10)',
-        glow: '0 0 0 1px rgb(99 102 241 / 0.15), 0 8px 30px -6px rgb(99 102 241 / 0.35)',
+        glow: '0 0 0 1px rgb(6 182 212 / 0.15), 0 8px 30px -6px rgb(6 182 212 / 0.35)',
         brand: '0 4px 24px rgb(6 182 212 / 0.3)',
       },
       keyframes: {

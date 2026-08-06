@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
-import { Avatar } from '../ui';
+import { Avatar, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
 
 const NAV_ITEMS = [
@@ -57,6 +57,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <div className="hidden lg:block" />
+          <ThemeToggle className="ml-auto mr-1" />
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
@@ -98,9 +99,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   return (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-6 dark:border-slate-800">
-        <span className="text-xl">🧠</span>
-        <span className="font-display text-lg font-bold text-slate-900 dark:text-white">Auto Cards</span>
+      <div className="flex h-16 items-center border-b border-slate-200 px-6 dark:border-slate-800">
+        <Wordmark className="text-lg" />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {NAV_ITEMS.map((item) => (
@@ -113,7 +113,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
               cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400'
+                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
               )
             }
@@ -127,7 +127,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
         <NavLink
           to="/app/decks/new"
           onClick={onNavigate}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500"
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-opacity brand-gradient hover:opacity-90"
         >
           <span>+</span> New deck
         </NavLink>

@@ -88,7 +88,7 @@ export function DeckLibraryPage() {
                     />
                   </div>
                   <Link to={`/app/decks/${deck.id}`} className="mt-3 flex-1">
-                    <h3 className="font-semibold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
+                    <h3 className="font-semibold text-slate-900 hover:text-brand-700 dark:text-white dark:hover:text-brand-400">
                       {deck.title}
                     </h3>
                     <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{deck.description}</p>

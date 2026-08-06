@@ -17,8 +17,8 @@ export function Switch({ checked, onChange, label, description, disabled }: Swit
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950',
-        checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700',
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950',
+        checked ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700',
         disabled && 'cursor-not-allowed opacity-50',
       )}
     >

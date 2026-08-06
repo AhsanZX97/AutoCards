@@ -63,7 +63,7 @@ export function SignUpPage() {
       </form>
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         Already have an account?{' '}
-        <Link to="/sign-in" className="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+        <Link to="/sign-in" className="font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
           Sign in
         </Link>
       </p>

@@ -73,14 +73,14 @@ export function SignInPage() {
       <button
         type="button"
         onClick={fillDemo}
-        className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-500 hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+        className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-500 hover:border-brand-400 hover:text-brand-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-400"
       >
         Fill demo credentials
       </button>
 
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         Don&apos;t have an account?{' '}
-        <Link to="/sign-up" className="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+        <Link to="/sign-up" className="font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
           Sign up
         </Link>
       </p>

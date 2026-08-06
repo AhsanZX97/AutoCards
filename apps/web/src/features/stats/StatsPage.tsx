@@ -74,7 +74,7 @@ export function StatsPage() {
                       <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{deck.deckTitle}</p>
                       <p className="text-xs text-slate-400">{deck.sessions} sessions · {Math.round(deck.accuracy * 100)}% accuracy</p>
                     </div>
-                    <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{deck.xp} XP</span>
+                    <span className="text-sm font-semibold text-brand-700 dark:text-brand-400">{deck.xp} XP</span>
                   </div>
                 ))}
               </div>
@@ -91,7 +91,7 @@ export function StatsPage() {
                   key={achievement.id}
                   className={`rounded-xl border p-3 text-center ${
                     achievement.unlocked
-                      ? 'border-indigo-200 bg-indigo-50 dark:border-indigo-500/30 dark:bg-indigo-500/10'
+                      ? 'border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10'
                       : 'border-slate-200 bg-slate-50 opacity-60 dark:border-slate-800 dark:bg-slate-800/40'
                   }`}
                 >

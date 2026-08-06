@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
-import { BrandButton, ThemeToggle } from '../ui';
+import { BrandButton, ThemeToggle, Wordmark } from '../ui';
 import { DottedSpotlight } from './DottedSpotlight';
 
 const NAV_LINKS = [
@@ -10,15 +10,6 @@ const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
 ];
 
-function Wordmark({ tailClassName }: { tailClassName: string }) {
-  return (
-    <span className="font-display font-bold tracking-tight">
-      <span className="brand-text">Auto</span>
-      <span className={tailClassName}>Cards</span>
-    </span>
-  );
-}
-
 export function MarketingLayout({ children }: { children: ReactNode }) {
   const app = useApp();
   const isAuthed = app.authStore((s) => s.status === 'authenticated');
@@ -26,8 +17,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <DottedSpotlight>
       <nav className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-8 py-5">
-        <Link to="/" className="text-lg">
-          <Wordmark tailClassName="text-slate-800 dark:text-slate-100" />
+        <Link to="/">
+          <Wordmark className="text-lg" tailClassName="text-slate-800 dark:text-slate-100" />
         </Link>
 
         <div className="hidden items-center gap-8 text-sm font-medium text-slate-500 dark:text-slate-400 md:flex">
@@ -67,9 +58,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       <main className="relative z-10">{children}</main>
 
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 border-t border-slate-100 px-8 py-8 dark:border-slate-800 sm:flex-row">
-        <span className="text-sm">
-          <Wordmark tailClassName="text-slate-500 dark:text-slate-400" />
-        </span>
+        <Wordmark className="text-sm" tailClassName="text-slate-500 dark:text-slate-400" />
         <p className="text-xs text-slate-400 dark:text-slate-500">
           © {new Date().getFullYear()} Auto Cards. All rights reserved.
         </p>

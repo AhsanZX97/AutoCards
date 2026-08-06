@@ -16,7 +16,7 @@ export function Chip({ active, onClick, children, className }: ChipProps) {
       className={cn(
         'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
         active
-          ? 'border-indigo-600 bg-indigo-600 text-white'
+          ? 'border-brand-600 bg-brand-600 text-white'
           : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600',
         className,
       )}

@@ -12,7 +12,7 @@ export function Progress({ value, max = 1, className, barClassName }: ProgressPr
   return (
     <div className={cn('h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800', className)}>
       <div
-        className={cn('h-full rounded-full bg-indigo-600 transition-all duration-300 ease-out', barClassName)}
+        className={cn('h-full rounded-full bg-brand-600 transition-all duration-300 ease-out', barClassName)}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -41,7 +41,7 @@ export function CircularProgress({ value, size = 44, strokeWidth = 4 }: { value:
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap="round"
-        className="fill-none stroke-indigo-600 transition-all duration-300 ease-out"
+        className="fill-none stroke-brand-600 transition-all duration-300 ease-out"
       />
     </svg>
   );

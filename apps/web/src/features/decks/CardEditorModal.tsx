@@ -106,7 +106,7 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Choices</p>
               {draft.type === 'multiple-choice' && (
-                <button onClick={addChoice} className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                <button onClick={addChoice} className="text-xs font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
                   + Add choice
                 </button>
               )}
@@ -118,7 +118,7 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
                     type="checkbox"
                     checked={choice.correct}
                     onChange={(e) => updateChoice(choice.id, { correct: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500"
                   />
                   <Input
                     className="flex-1"

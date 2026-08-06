@@ -45,7 +45,7 @@ export function DeckDetailPage() {
       <Card>
         <CardBody className="py-16 text-center">
           <p className="text-slate-500 dark:text-slate-400">Deck not found.</p>
-          <Link to="/app/decks" className="mt-3 inline-block text-sm font-medium text-indigo-600 dark:text-indigo-400">
+          <Link to="/app/decks" className="mt-3 inline-block text-sm font-medium text-brand-700 dark:text-brand-400">
             Back to decks
           </Link>
         </CardBody>
@@ -122,7 +122,7 @@ export function DeckDetailPage() {
             onClick={() => setCategoryFilter(null)}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
               categoryFilter === null
-                ? 'border-indigo-600 bg-indigo-600 text-white'
+                ? 'border-brand-600 bg-brand-600 text-white'
                 : 'border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300'
             }`}
           >
@@ -134,7 +134,7 @@ export function DeckDetailPage() {
               onClick={() => setCategoryFilter(cat.id)}
               className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
                 categoryFilter === cat.id
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  ? 'border-brand-600 bg-brand-600 text-white'
                   : 'border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300'
               }`}
             >

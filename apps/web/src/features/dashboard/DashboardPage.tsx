@@ -56,7 +56,7 @@ export function DashboardPage() {
           <CardBody>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-semibold text-slate-900 dark:text-white">Your decks</h2>
-              <Link to="/app/decks" className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+              <Link to="/app/decks" className="text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-400">
                 View all
               </Link>
             </div>

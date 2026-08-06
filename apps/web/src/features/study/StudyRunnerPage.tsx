@@ -134,7 +134,7 @@ export function StudyRunnerPage() {
           ✕
         </button>
         <div className="flex-1">
-          <Progress value={position} max={total} className="bg-slate-800" barClassName="bg-indigo-500" />
+          <Progress value={position} max={total} className="bg-slate-800" barClassName="bg-brand-500" />
         </div>
         <span className="text-sm font-medium text-slate-400">
           {position + 1} / {total}
@@ -304,7 +304,7 @@ function AutoGradedCard({
                 onClick={() => onChoiceSelect(choice.id)}
                 className={cn(
                   'w-full rounded-xl border px-4 py-3 text-sm font-medium transition-colors',
-                  !showState && 'border-slate-700 text-slate-200 hover:border-indigo-500 hover:bg-slate-800',
+                  !showState && 'border-slate-700 text-slate-200 hover:border-brand-500 hover:bg-slate-800',
                   showState && choice.correct && 'border-emerald-500 bg-emerald-500/10 text-emerald-400',
                   showState && isSelected && !choice.correct && 'border-rose-500 bg-rose-500/10 text-rose-400',
                   showState && !isSelected && !choice.correct && 'border-slate-800 text-slate-500',
@@ -327,7 +327,7 @@ function AutoGradedCard({
             onKeyDown={(e) => e.key === 'Enter' && onTypeInSubmit()}
             placeholder="Type your answer…"
             className={cn(
-              'w-full rounded-xl border bg-slate-800 px-4 py-3 text-center text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500',
+              'w-full rounded-xl border bg-slate-800 px-4 py-3 text-center text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500',
               revealed === null
                 ? 'border-slate-700'
                 : revealed.correct

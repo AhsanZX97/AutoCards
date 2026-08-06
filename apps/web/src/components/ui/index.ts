@@ -1,6 +1,7 @@
 export * from './Button';
 export * from './BrandButton';
 export * from './ThemeToggle';
+export * from './Wordmark';
 export * from './Card';
 export * from './Badge';
 export * from './Input';

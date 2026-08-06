@@ -16,10 +16,10 @@ function levelFor(cards: number): number {
 
 const LEVEL_CLASSES = [
   'bg-slate-100 dark:bg-slate-800',
-  'bg-indigo-200 dark:bg-indigo-900',
-  'bg-indigo-400 dark:bg-indigo-700',
-  'bg-indigo-600 dark:bg-indigo-500',
-  'bg-indigo-800 dark:bg-indigo-300',
+  'bg-brand-200 dark:bg-brand-900',
+  'bg-brand-400 dark:bg-brand-700',
+  'bg-brand-600 dark:bg-brand-500',
+  'bg-brand-800 dark:bg-brand-300',
 ];
 
 export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {

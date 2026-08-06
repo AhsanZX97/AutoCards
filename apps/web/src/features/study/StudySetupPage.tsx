@@ -99,7 +99,7 @@ export function StudySetupPage() {
                   onClick={() => setMode(mode)}
                   className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                     active
-                      ? 'border-indigo-600 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-500/10'
+                      ? 'border-brand-600 bg-brand-50 dark:border-brand-500 dark:bg-brand-500/10'
                       : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
                   }`}
                 >
