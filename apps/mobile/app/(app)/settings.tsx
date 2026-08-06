@@ -76,7 +76,8 @@ export default function SettingsScreen() {
       <Card style={{ marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '700', color: theme.text }}>Plan: {user.plan}</Text>
         <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-          Generation is mocked in this preview.
+          Uploads produce a sample deck. Reading text out of a PDF is not available on mobile yet,
+          so decks generated from your own files are web-only for now.
         </Text>
       </Card>
 

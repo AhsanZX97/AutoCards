@@ -26,6 +26,10 @@ export function CreateDeckPage() {
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
 
+  // Read per render rather than cached: the generator is chosen from the key in
+  // Settings, which the user can change without reloading the app.
+  const isMock = app.services.llm.isMock;
+
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -44,7 +48,26 @@ export function CreateDeckPage() {
   const [instructions, setInstructions] = useState('');
 
   useEffect(() => {
-    app.services.llm.listModels().then(setModels).catch(() => setModels([]));
+    let cancelled = false;
+    app.services.llm
+      .listModels()
+      .then((available) => {
+        if (cancelled) return;
+        setModels(available);
+        // The saved default can name a model OpenRouter no longer serves, which
+        // would fail the whole generation with a 404. Snap to a live one.
+        setModel((current) =>
+          available.some((m) => m.id === current)
+            ? current
+            : available.find((m) => m.recommended)?.id ?? available[0]?.id ?? current,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [app]);
 
   const handleFile = useCallback((selected: File | null) => {
@@ -109,6 +132,13 @@ export function CreateDeckPage() {
       </div>
 
       <StepIndicator step={step} />
+
+      {isMock && step !== 'generating' && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <span className="font-medium">Preview mode.</span> You'll get a sample deck to try out —
+          building decks from your own PDFs isn't switched on yet.
+        </div>
+      )}
 
       {step === 'upload' && (
         <Card>
@@ -248,7 +278,11 @@ export function CreateDeckPage() {
             </p>
             {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
             <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-            <p className="mt-6 text-xs text-slate-400">This is running on mocked generation — no API calls are made yet.</p>
+            <p className="mt-6 text-xs text-slate-400">
+              {isMock
+                ? 'Running on mocked generation — add an OpenRouter key in Settings to use your own PDF.'
+                : `Calling ${model} via OpenRouter. Larger decks take a minute.`}
+            </p>
           </CardBody>
         </Card>
       )}

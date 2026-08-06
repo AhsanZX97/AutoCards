@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "pdfjs-dist": "^6.2.108",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

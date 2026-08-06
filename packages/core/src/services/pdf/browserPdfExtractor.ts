@@ -1,84 +1,98 @@
+import * as pdfjsLib from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { ExtractedDocument } from '../../types';
 import { PdfExtractionError, type PdfExtractor, type PdfSource } from './types';
 
+// Vite resolves this to a hashed worker asset URL at build time; the bare
+// specifier form (rather than a relative path) is pdf.js's documented recipe
+// for bundlers that support `new URL(..., import.meta.url)` asset imports.
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
+
 /**
- * Minimal browser PDF text extractor. Reads the file as text and pulls
- * parenthesized runs out of PDF `Tj`/`TJ` show-text operators — good enough
- * for uncompressed, non-encrypted PDFs without pulling in pdf.js. Falls back
- * to a synthetic page if nothing recognizable is found.
+ * Browser PDF text extractor backed by pdf.js. Unlike a raw Tj/TJ operator
+ * scan, this handles Flate-compressed content streams — the vast majority of
+ * real-world PDFs — and reports the document's actual page count and title.
+ * Falls back to a synthetic page when a document has no text layer at all
+ * (scanned/image-only PDFs).
  */
 export class BrowserPdfExtractor implements PdfExtractor {
-  readonly id = 'browser-naive';
+  readonly id = 'pdfjs';
 
   async extract(source: PdfSource): Promise<ExtractedDocument> {
     const buffer = await source.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const raw = bytesToLatin1(bytes);
 
-    if (!raw.startsWith('%PDF-')) {
-      throw new PdfExtractionError(`${source.name} does not look like a PDF file.`);
+    let pdfDocument: PDFDocumentProxy;
+    try {
+      pdfDocument = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    } catch (error) {
+      throw new PdfExtractionError(describeLoadError(source.name, error));
     }
 
-    const pageCount = Math.max(1, countPages(raw));
-    const text = extractShowTextRuns(raw).trim();
+    try {
+      const extracted = await extractPages(pdfDocument);
+      const title = await readTitle(pdfDocument);
+      const hasText = extracted.some((page) => page.trim().length > 0);
+      const pages = hasText
+        ? extracted
+        : [`[No extractable text found in ${source.name}. It may be a scanned/image-only PDF.]`];
 
-    const pages = text
-      ? splitAcrossPages(text, pageCount)
-      : [`[No extractable text found in ${source.name}. It may be a scanned/image-only PDF.]`];
-
-    return {
-      filename: source.name,
-      size: source.size,
-      pageCount,
-      pages,
-      text: pages.join('\n\n'),
-    };
+      return {
+        filename: source.name,
+        size: source.size,
+        pageCount: pdfDocument.numPages,
+        pages,
+        text: pages.join('\n\n'),
+        ...(title ? { title } : {}),
+        // Nothing came out of any page's text content: the PDF is image-only
+        // (no text layer), which pdf.js cannot read without OCR.
+        ...(hasText ? {} : { synthetic: true }),
+      };
+    } finally {
+      await pdfDocument.cleanup();
+    }
   }
 }
 
-function bytesToLatin1(bytes: Uint8Array): string {
-  let out = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    out += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return out;
-}
-
-function countPages(raw: string): number {
-  const matches = raw.match(/\/Type\s*\/Page(?!s)/g);
-  return matches ? matches.length : 1;
-}
-
-/** Pulls literal-string operands out of `(...) Tj` and `[(...) ...] TJ` operators. */
-function extractShowTextRuns(raw: string): string {
-  const runs: string[] = [];
-  const pattern = /\(((?:\\.|[^()\\])*)\)\s*(?:Tj|TJ)?/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(raw)) !== null) {
-    const decoded = decodePdfString(match[1] ?? '');
-    if (decoded.trim()) runs.push(decoded);
-  }
-  return runs.join(' ');
-}
-
-function decodePdfString(value: string): string {
-  return value
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\(/g, '(')
-    .replace(/\\\)/g, ')')
-    .replace(/\\\\/g, '\\')
-    .replace(/\\(\d{1,3})/g, (_m, oct: string) => String.fromCharCode(parseInt(oct, 8)));
-}
-
-function splitAcrossPages(text: string, pageCount: number): string[] {
-  if (pageCount <= 1) return [text];
-  const chunkSize = Math.ceil(text.length / pageCount);
+async function extractPages(pdfDocument: PDFDocumentProxy): Promise<string[]> {
   const pages: string[] = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    pages.push(text.slice(i, i + chunkSize));
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    const page = await pdfDocument.getPage(pageNumber);
+    try {
+      const { items } = await page.getTextContent();
+      let pageText = '';
+      for (const item of items) {
+        if (!('str' in item)) continue;
+        pageText += item.str + (item.hasEOL ? '\n' : ' ');
+      }
+      pages.push(pageText.trim());
+    } finally {
+      page.cleanup();
+    }
   }
   return pages;
+}
+
+async function readTitle(pdfDocument: PDFDocumentProxy): Promise<string | undefined> {
+  try {
+    const { info } = await pdfDocument.getMetadata();
+    const title = (info as { Title?: string }).Title?.trim();
+    return title || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function describeLoadError(filename: string, error: unknown): string {
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'PasswordException') {
+    return `${filename} is password-protected and cannot be read.`;
+  }
+  if (name === 'InvalidPDFException') {
+    return `${filename} does not look like a valid PDF file.`;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return `Could not read ${filename}: ${message}`;
 }

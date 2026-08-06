@@ -12,6 +12,13 @@ export interface ExtractedDocument {
   text: string;
   /** PDF metadata title, when the file declares one. */
   title?: string;
+  /**
+   * True when `text` is a placeholder rather than the document's real contents
+   * — an image-only PDF, or a platform with no extractor. Harmless for the
+   * mock generator, which ignores the text; a live model must refuse it rather
+   * than bill for cards written about a placeholder.
+   */
+  synthetic?: boolean;
 }
 
 export interface GenerationOptions {

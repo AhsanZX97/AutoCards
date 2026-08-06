@@ -1,7 +1,9 @@
 export * from './types';
 export * from './models';
 export * from './mockLlm';
+export * from './normalizeCards';
 export * from './openRouter';
+export * from './routingLlm';
 export {
   DEFAULT_CARDS,
   DEFAULT_CATEGORIES,

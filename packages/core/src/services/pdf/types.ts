@@ -24,8 +24,9 @@ export class PdfExtractionError extends Error {
 
 /**
  * Used where real PDF parsing is not available (React Native has no pdf.js).
- * Reports the file's real name and size but synthesises the page text, which
- * is harmless while the generator ignores document text anyway.
+ * Reports the file's real name and size but synthesises the page text, so the
+ * document is flagged `synthetic` — the mock generator ignores the text, and a
+ * live model refuses it rather than writing cards about a placeholder.
  */
 export class StubPdfExtractor implements PdfExtractor {
   readonly id = 'stub';
@@ -44,6 +45,7 @@ export class StubPdfExtractor implements PdfExtractor {
       pageCount,
       pages,
       text: pages.join('\n\n'),
+      synthetic: true,
     };
   }
 }

@@ -54,13 +54,27 @@ export function findModel(id: string): ModelInfo | undefined {
   return MODEL_CATALOG.find((model) => model.id === id);
 }
 
-/** Rough USD cost for a job, used by the mock usage meter. */
+/** Rough USD cost for a job, priced off the bundled catalog. */
 export function estimateCost(
   modelId: string,
   promptTokens: number,
   completionTokens: number,
 ): number {
-  const model = findModel(modelId);
+  return costOf(undefined, modelId, promptTokens, completionTokens);
+}
+
+/**
+ * USD cost for a job. Prices against `catalog` when one is supplied — the live
+ * OpenRouter catalog, whose prices move — and against the bundled list
+ * otherwise. Returns 0 for a model neither list knows.
+ */
+export function costOf(
+  catalog: readonly ModelInfo[] | undefined,
+  modelId: string,
+  promptTokens: number,
+  completionTokens: number,
+): number {
+  const model = catalog?.find((entry) => entry.id === modelId) ?? findModel(modelId);
   if (!model) return 0;
   return (
     (promptTokens / 1_000_000) * model.inputPrice +

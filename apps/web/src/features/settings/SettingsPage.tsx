@@ -105,43 +105,11 @@ function AppearanceTab() {
 
 function GenerationTab() {
   const app = useApp();
-  const apiKey = app.settingsStore((s) => s.openRouterApiKey);
-  const setApiKey = app.settingsStore((s) => s.setApiKey);
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
-  const [keyInput, setKeyInput] = useState(apiKey);
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardBody className="space-y-4">
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white">OpenRouter API key</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Generation is currently mocked. Adding a key here won't switch it over yet — that's a follow-up.
-            </p>
-          </div>
-          <Field label="API key">
-            <Input
-              type="password"
-              placeholder="sk-or-…"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-            />
-          </Field>
-          <div className="flex justify-end">
-            <Button
-              onClick={() => {
-                setApiKey(keyInput);
-                toast({ variant: 'info', title: 'Key saved locally', description: 'Still using mocked generation for now.' });
-              }}
-            >
-              Save key
-            </Button>
-          </div>
-        </CardBody>
-      </Card>
-
       <Card>
         <CardBody className="space-y-4">
           <h3 className="font-semibold text-slate-900 dark:text-white">Default generation settings</h3>
