@@ -2,19 +2,24 @@
 
 Turn PDFs into customizable, gamified flashcards. Web + mobile, sharing one core.
 
-**Flashcard generation is real** — add an OpenRouter key and uploads produce cards written from your own PDF. Without a key the app falls back to a curated demo deck, so the whole product — customization, study modes, scoring, spaced repetition, stats — can still be exercised end to end. **Authentication is still mocked**: sign-in accepts any well-formed email.
+**Flashcard generation is real** — an OpenRouter key (configured by the app owner, not per-user) turns every upload into cards written from your own PDF. **Authentication is real too**, via Supabase — sign-in/sign-up create real accounts, and decks sync across devices.
 
 ## Structure
 
 ```
-packages/core/     Framework-agnostic domain logic, mocked services, zustand stores
+packages/core/     Framework-agnostic domain logic, services, zustand stores
 apps/web/          Vite + React + Tailwind SaaS app
 apps/mobile/       Expo Router (React Native) app
 ```
 
-`@autocards/core` is the single source of truth for both apps: types, the SRS scheduler, scoring engine, study-queue builder, mock auth/LLM/PDF services, and the zustand stores. Neither app duplicates business logic — they wire the same stores to platform-specific storage (`localStorage` vs `AsyncStorage`) and platform-specific UI.
+`@autocards/core` is the single source of truth for both apps: types, the SRS scheduler, scoring engine, study-queue builder, auth/LLM/PDF services, and the zustand stores. Neither app duplicates business logic — they wire the same stores to platform-specific storage (`localStorage` vs `AsyncStorage`) and platform-specific UI.
 
 ## Getting started
+
+Both apps require a Supabase project and an OpenRouter key — there is no mocked fallback. Copy the
+`.env.example` in each app to `.env.local` and fill in `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`
+(or the `EXPO_PUBLIC_` equivalents) and `VITE_OPENROUTER_API_KEY`/`EXPO_PUBLIC_OPENROUTER_API_KEY`.
+The Supabase schema lives in `supabase/schema.sql`.
 
 ```bash
 npm install
@@ -27,29 +32,16 @@ npm run typecheck       # typecheck every workspace
 npm run build           # production build of core + web
 ```
 
-Sign in with any valid-looking email (8+ character password), or tap **"Fill demo credentials"** on the sign-in screen for a pre-seeded demo account.
-
-### Turning on real generation
-
-Paste an [OpenRouter key](https://openrouter.ai/keys) into **Settings → Generation**. It is stored in
-your browser and takes effect on the next deck — no reload, and clearing it drops straight back to
-the demo deck.
-
-For local development you can skip the UI and put the key in `apps/web/.env.local` instead:
-
-```bash
-cp apps/web/.env.example apps/web/.env.local   # then fill in VITE_OPENROUTER_API_KEY
-```
-
-⚠️ **Do not set that variable for a deployed build.** Vite inlines it into the client bundle, where
-anyone can read it. A shipped build should have no key of its own — each user supplies theirs in
-Settings, or you put a server in front that holds the key and proxies the call.
+⚠️ Vite/Expo inline the OpenRouter key into the client bundle, where anyone who loads the app can
+read it. That's expected here — every user's generation goes through the same app-owned key, not a
+per-user one — but put a server in front that holds the key and proxies the call instead if that's
+not acceptable for your deployment.
 
 ## What's implemented
 
 **Flashcards** — six types (basic, reversed, cloze deletion, multiple choice, true/false, type-the-answer), each with difficulty, priority, categories, tags, hints, explanations, starring, suspension, and manual weighting.
 
-**Generation** — upload a PDF, tune card count/types/difficulty/instructions, watch a staged progress indicator, land on a generated deck. `RoutingLlmService` picks the implementation per call from the key currently in settings: `OpenRouterLlmService` when there is one, `MockLlmService` (a curated 16-card deck, ignoring the PDF) when there isn't.
+**Generation** — upload a PDF, tune card count/types/difficulty/instructions, watch a staged progress indicator, land on a generated deck. `RoutingLlmService` resolves the OpenRouter key at call time and hands off to `OpenRouterLlmService`; without a usable key it throws `LlmConfigError` rather than degrading to canned content.
 
 Model output is never trusted. `normalizeGeneratedCards` repairs what a model actually returns — assigning choice ids, marking the correct answer from a `correctIndex` or a matching `back`, defaulting `acceptedAnswers`, filling cloze front/back from the `{{c1::}}` markers — demotes a card to `basic` when its claimed type can't be honoured, and drops it only when even that fails. Invented card types, missing choices and unparseable JSON therefore produce a plainer deck rather than cards the study runner can't render or grade.
 
@@ -61,13 +53,29 @@ Model output is never trusted. `normalizeGeneratedCards` repairs what a model ac
 
 **Stats** — streaks (with "at risk today" detection), a 12-week activity heatmap, per-deck performance, and an achievements grid.
 
-## Mocked today, real tomorrow
+**Sharing & import/export** — decks leave one account and re-enter another as a self-contained
+`DeckExport` (`packages/core/src/lib/deckTransfer.ts`). A deck can be **exported** as a
+`.autocards.json` file or **shared** as a link whose `?deck=` query parameter carries a URL-safe
+base64 code of the same payload. Opening that link prompts the receiver to import it. On import the
+deck, category and card ids are all remapped to fresh ones — so nothing collides with ids the
+receiving account already owns — and cards start on a new SRS schedule: the export deliberately
+carries card *content* (the `CardDraft`), never the sharer's mastery or review state.
+
+The export format is versioned (`format: "autocards-deck"`, `version: 1`) and, like model output,
+parse-time normalization repairs what it can (bad enum values, unmarked choice ids, cloze markers
+that need filling in) and drops only cards that can't be salvaged — a hand-edited or third-party
+file degrades into a plainer deck rather than a broken one. Large decks are warned about on the web
+(some chat apps truncate very long URLs) and a file export is offered as the reliable alternative.
+Web wiring lives in the deck detail share modal, the library's import button, and
+`ImportSharedDeck`; mobile uses the native share sheet and `expo-document-picker`.
+
+## What's still mocked
 
 | Concern | Current | Swap-in point |
 |---|---|---|
-| Flashcard generation | **Real**, via OpenRouter, whenever a key is present | — |
-| Auth | `MockAuthService` — any email/8+ char password | Implement the `AuthService` interface (`packages/core/src/services/auth`) |
-| PDF text extraction | `pdf.js` on web — handles compressed content streams; a stub on mobile | Native parser (mobile) behind the same `PdfExtractor` interface |
+| Flashcard generation | **Real**, via OpenRouter | — |
+| Auth | **Real**, via Supabase | — |
+| PDF text extraction | `pdf.js` on web — handles compressed content streams; a stub on mobile, so deck creation is disabled there for now | Native parser (mobile) behind the same `PdfExtractor` interface |
 
 ### The PDF extractor
 
@@ -81,9 +89,11 @@ you for cards written about a placeholder.
 
 ## Testing
 
-`packages/core` has 157 vitest unit tests covering the shuffle/filter engine, scoring math, SRS
-scheduling, stats aggregation, model-output normalization, and the OpenRouter client (against a
+`packages/core` has 200 vitest unit tests covering the shuffle/filter engine, scoring math, SRS
+scheduling, stats aggregation, model-output normalization, the OpenRouter client (against a
 stubbed `fetch` — request shape, error mapping, cancellation, and the fenced/prose JSON a model
-actually returns). The web app was smoke-tested end to end in a real browser. The mobile app
-typechecks cleanly against the same core but hasn't been run in a simulator in this environment —
-review before shipping.
+actually returns), Supabase auth, and deck sync. Deck transfer is covered too: export/parse
+round-trips, lenient normalization of malformed input, and lossless unicode base64 share-code
+round-trips. The web app was smoke-tested end to end in a real browser. The mobile app typechecks
+cleanly against the same core but hasn't been run in a simulator in this environment — review
+before shipping.

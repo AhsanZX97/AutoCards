@@ -50,18 +50,6 @@ export function DeckRow({ deck, stats, onPress }: DeckRowProps) {
           <Text style={{ fontSize: 11, color: theme.textFaint }}>{stats.averageMastery}%</Text>
         </View>
       </View>
-      {stats.due > 0 && (
-        <View
-          style={{
-            backgroundColor: theme.warningSoft,
-            paddingHorizontal: spacing.sm,
-            paddingVertical: 3,
-            borderRadius: radius.full,
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.warning }}>{stats.due} due</Text>
-        </View>
-      )}
     </Pressable>
   );
 }

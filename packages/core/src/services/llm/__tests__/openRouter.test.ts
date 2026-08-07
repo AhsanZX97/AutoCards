@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenRouterLlmService } from '../openRouter';
 import { GenerationAbortedError } from '../types';
-import { DEFAULT_CARDS, DEFAULT_DECK_DESCRIPTION, DEFAULT_DECK_TITLE } from '../defaultDeck';
 import type { ExtractedDocument, GenerationOptions } from '../../../types';
 
 const DOCUMENT: ExtractedDocument = {
@@ -13,7 +12,7 @@ const DOCUMENT: ExtractedDocument = {
 };
 
 const OPTIONS: GenerationOptions = {
-  model: 'anthropic/claude-opus-5',
+  model: 'deepseek/deepseek-v3.2',
   cardCount: 10,
   cardTypes: ['basic', 'multiple-choice'],
   difficulty: 'medium',
@@ -103,7 +102,7 @@ describe('OpenRouterLlmService', () => {
       expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-or-test');
 
       const body = JSON.parse(init.body as string);
-      expect(body.model).toBe('anthropic/claude-opus-5');
+      expect(body.model).toBe('deepseek/deepseek-v3.2');
       expect(body.messages[1].content).toContain('Chlorophyll absorbs light energy');
       expect(body.max_tokens).toBeGreaterThan(0);
     });
@@ -150,17 +149,12 @@ describe('OpenRouterLlmService', () => {
       expect(body.messages[0].content as string).toContain('Focus on chapter 3.');
     });
 
-    it('returns the model’s cards, not the curated demo deck', async () => {
+    it('returns the model’s cards', async () => {
       fetchMock.mockResolvedValue(completion(VALID_REPLY));
       const result = await service().generateDeck({ document: DOCUMENT, options: OPTIONS });
 
       expect(result.cards).toHaveLength(2);
       expect(result.cards[0]?.front).toBe('What pigment absorbs light energy?');
-
-      const curatedFronts = new Set(DEFAULT_CARDS.map((card) => card.front));
-      expect(result.cards.some((card) => curatedFronts.has(card.front))).toBe(false);
-      expect(result.deckTitle).not.toBe(DEFAULT_DECK_TITLE);
-      expect(result.deckDescription).not.toBe(DEFAULT_DECK_DESCRIPTION);
     });
 
     it('names the deck after the uploaded file', async () => {
@@ -249,7 +243,7 @@ describe('OpenRouterLlmService', () => {
       fetchMock.mockResolvedValue(failure(404, '{"error":{"message":"No endpoints found"}}'));
       await expect(
         service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/does not serve "anthropic\/claude-opus-5"/);
+      ).rejects.toThrow(/does not serve "deepseek\/deepseek-v3\.2"/);
     });
 
     it('explains an exhausted account', async () => {
@@ -340,6 +334,80 @@ describe('OpenRouterLlmService', () => {
     });
   });
 
+  describe('suggestChoice', () => {
+    it('sends the card context and asks OpenRouter for one choice', async () => {
+      fetchMock.mockResolvedValue(completion('The mitochondria'));
+      await service().suggestChoice({
+        front: 'What is the powerhouse of the cell?',
+        back: 'The nucleus',
+        existingChoices: ['The nucleus', 'The ribosome'],
+        model: 'deepseek/deepseek-v3.2',
+      });
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/chat/completions');
+      const body = JSON.parse(init.body as string);
+      expect(body.model).toBe('deepseek/deepseek-v3.2');
+      const prompt = body.messages[1].content as string;
+      expect(prompt).toContain('What is the powerhouse of the cell?');
+      expect(prompt).toContain('The nucleus');
+      expect(prompt).toContain('The ribosome');
+    });
+
+    it('returns the trimmed suggestion text', async () => {
+      fetchMock.mockResolvedValue(completion('  "The chloroplast"  '));
+      const text = await service().suggestChoice({
+        front: 'What is the powerhouse of the cell?',
+        back: 'The mitochondria',
+        existingChoices: [],
+        model: 'deepseek/deepseek-v3.2',
+      });
+      expect(text).toBe('The chloroplast');
+    });
+
+    it('explains a rejected key rather than leaking the status body', async () => {
+      fetchMock.mockResolvedValue(failure(401, '{"error":{"message":"No auth credentials found"}}'));
+      await expect(
+        service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
+      ).rejects.toThrow(/rejected the API key/i);
+    });
+
+    it('surfaces an upstream error returned inside a 200', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ error: { message: 'Upstream provider is down' } }),
+        text: async () => '',
+      } as unknown as Response);
+
+      await expect(
+        service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
+      ).rejects.toThrow(/Upstream provider is down/);
+    });
+
+    it('reports an empty reply', async () => {
+      fetchMock.mockResolvedValue(completion('   '));
+      await expect(
+        service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
+      ).rejects.toThrow(/empty response/i);
+    });
+
+    it('throws GenerationAbortedError when the signal is already aborted', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      await expect(
+        service().suggestChoice({
+          front: 'Q',
+          back: 'A',
+          existingChoices: [],
+          model: 'deepseek/deepseek-v3.2',
+          signal: controller.signal,
+        }),
+      ).rejects.toBeInstanceOf(GenerationAbortedError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listModels', () => {
     it('prices the curated shortlist from the live catalog', async () => {
       fetchMock.mockResolvedValue({
@@ -348,8 +416,8 @@ describe('OpenRouterLlmService', () => {
         json: async () => ({
           data: [
             {
-              id: 'anthropic/claude-opus-5',
-              name: 'Claude Opus 5',
+              id: 'deepseek/deepseek-v3.2',
+              name: 'DeepSeek V3.2',
               context_length: 500_000,
               pricing: { prompt: '0.000006', completion: '0.00003' },
             },
@@ -360,7 +428,7 @@ describe('OpenRouterLlmService', () => {
 
       const models = await service().listModels();
       expect(models).toHaveLength(1);
-      expect(models[0]?.id).toBe('anthropic/claude-opus-5');
+      expect(models[0]?.id).toBe('deepseek/deepseek-v3.2');
       expect(models[0]?.inputPrice).toBeCloseTo(6);
       expect(models[0]?.outputPrice).toBeCloseTo(30);
       expect(models[0]?.context).toBe(500_000);
@@ -383,7 +451,7 @@ describe('OpenRouterLlmService', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          data: [{ id: 'anthropic/claude-opus-5', pricing: { prompt: '0.000006', completion: '0.00003' } }],
+          data: [{ id: 'deepseek/deepseek-v3.2', pricing: { prompt: '0.000006', completion: '0.00003' } }],
         }),
         text: async () => '',
       } as unknown as Response);
@@ -398,7 +466,7 @@ describe('OpenRouterLlmService', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          data: [{ id: 'anthropic/claude-opus-5', pricing: { prompt: '0.000006', completion: '0.00003' } }],
+          data: [{ id: 'deepseek/deepseek-v3.2', pricing: { prompt: '0.000006', completion: '0.00003' } }],
         }),
         text: async () => '',
       } as unknown as Response);

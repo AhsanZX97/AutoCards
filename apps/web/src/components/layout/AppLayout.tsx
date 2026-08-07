@@ -63,9 +63,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
               onClick={() => setMenuOpen((v) => !v)}
               className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              {user && <Avatar name={user.name} initials={user.initials} avatarUrl={user.avatarUrl} size="sm" />}
+              {user && <Avatar name={user.username} initials={user.initials} avatarUrl={user.avatarUrl} size="sm" />}
               <span className="hidden text-sm font-medium text-slate-700 dark:text-slate-200 sm:block">
-                {user?.name}
+                @{user?.username}
               </span>
             </button>
             {menuOpen && (

@@ -14,7 +14,7 @@ import { useApp } from '../../lib/appContext';
 import { Button, Card, CardBody, Chip, Field, Input, Progress, Select, Slider, Switch, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 
-type Step = 'upload' | 'configure' | 'generating' | 'error';
+type Step = 'idle' | 'generating' | 'error';
 
 export function CreateDeckPage() {
   const app = useApp();
@@ -26,11 +26,7 @@ export function CreateDeckPage() {
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
 
-  // Read per render rather than cached: the generator is chosen from the key in
-  // Settings, which the user can change without reloading the app.
-  const isMock = app.services.llm.isMock;
-
-  const [step, setStep] = useState<Step>('upload');
+  const [step, setStep] = useState<Step>('idle');
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -77,7 +73,6 @@ export function CreateDeckPage() {
       return;
     }
     setFile(selected);
-    setStep('configure');
   }, []);
 
   function toggleCardType(type: CardType) {
@@ -124,6 +119,11 @@ export function CreateDeckPage() {
     }
   }
 
+  function tryAgain() {
+    setErrorMessage('');
+    setStep('idle');
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -131,41 +131,78 @@ export function CreateDeckPage() {
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload a PDF and Auto Cards will write the flashcards for you.</p>
       </div>
 
-      <StepIndicator step={step} />
-
-      {isMock && step !== 'generating' && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <span className="font-medium">Preview mode.</span> You'll get a sample deck to try out —
-          building decks from your own PDFs isn't switched on yet.
-        </div>
+      {step === 'error' && (
+        <Card>
+          <CardBody className="flex flex-col items-center py-14 text-center">
+            <span className="text-4xl">⚠️</span>
+            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">Generation failed</p>
+            <p className="mt-1 max-w-sm text-sm text-slate-400">{errorMessage}</p>
+            <Button className="mt-6" onClick={tryAgain}>
+              Try again
+            </Button>
+          </CardBody>
+        </Card>
       )}
 
-      {step === 'upload' && (
+      {step === 'generating' && (
         <Card>
-          <CardBody>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                handleFile(e.dataTransfer.files[0] ?? null);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-colors ${
-                dragActive
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-                  : 'border-slate-300 hover:border-brand-400 dark:border-slate-700'
-              }`}
-            >
-              <span className="text-4xl">📄</span>
-              <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
-                Drop your PDF here, or click to browse
-              </p>
-              <p className="mt-1 text-sm text-slate-400">Lecture notes, textbook chapters, reports — up to 20 pages on the free plan.</p>
+          <CardBody className="flex flex-col items-center py-14 text-center">
+            <div className="relative flex h-20 w-20 items-center justify-center">
+              <span className="animate-pulse text-4xl">🧠</span>
+            </div>
+            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
+              {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}
+            </p>
+            {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
+            <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
+            <p className="mt-6 text-xs text-slate-400">
+              Calling {model} via OpenRouter. Larger decks take a minute.
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {step === 'idle' && (
+        <div className="space-y-6">
+          <Card>
+            <CardBody>
+              {file ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📄</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{file.name}</p>
+                    <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    handleFile(e.dataTransfer.files[0] ?? null);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-colors ${
+                    dragActive
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                      : 'border-slate-300 hover:border-brand-400 dark:border-slate-700'
+                  }`}
+                >
+                  <span className="text-4xl">📄</span>
+                  <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
+                    Drop your PDF here, or click to browse
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">Lecture notes, textbook chapters, reports — up to 20 pages on the free plan.</p>
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -173,23 +210,6 @@ export function CreateDeckPage() {
                 className="hidden"
                 onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
               />
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {step === 'configure' && file && (
-        <div className="space-y-6">
-          <Card>
-            <CardBody className="flex items-center gap-3">
-              <span className="text-2xl">📄</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{file.name}</p>
-                <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep('upload')}>
-                Change
-              </Button>
             </CardBody>
           </Card>
 
@@ -201,7 +221,7 @@ export function CreateDeckPage() {
                 <Select value={model} onChange={(e) => setModel(e.target.value)}>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} {m.recommended ? '(recommended)' : ''} — ${m.inputPrice}/${m.outputPrice} per M tok
+                      {m.name} {m.recommended ? '(recommended)' : ''} — ${formatPrice(m.inputPrice)}/${formatPrice(m.outputPrice)} per M tok
                     </option>
                   ))}
                 </Select>
@@ -256,78 +276,18 @@ export function CreateDeckPage() {
             </CardBody>
           </Card>
 
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setStep('upload')}>
-              Back
-            </Button>
-            <Button size="lg" onClick={startGeneration}>
+          <div className="flex justify-end">
+            <Button size="lg" disabled={!file} onClick={startGeneration}>
               Generate flashcards
             </Button>
           </div>
         </div>
       )}
-
-      {step === 'generating' && (
-        <Card>
-          <CardBody className="flex flex-col items-center py-14 text-center">
-            <div className="relative flex h-20 w-20 items-center justify-center">
-              <span className="animate-pulse text-4xl">🧠</span>
-            </div>
-            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
-              {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}
-            </p>
-            {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
-            <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-            <p className="mt-6 text-xs text-slate-400">
-              {isMock
-                ? 'Running on mocked generation — add an OpenRouter key in Settings to use your own PDF.'
-                : `Calling ${model} via OpenRouter. Larger decks take a minute.`}
-            </p>
-          </CardBody>
-        </Card>
-      )}
-
-      {step === 'error' && (
-        <Card>
-          <CardBody className="flex flex-col items-center py-14 text-center">
-            <span className="text-4xl">⚠️</span>
-            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">Generation failed</p>
-            <p className="mt-1 max-w-sm text-sm text-slate-400">{errorMessage}</p>
-            <Button className="mt-6" onClick={() => setStep('configure')}>
-              Try again
-            </Button>
-          </CardBody>
-        </Card>
-      )}
     </div>
   );
 }
 
-function StepIndicator({ step }: { step: Step }) {
-  const steps: Array<{ id: Step; label: string }> = [
-    { id: 'upload', label: 'Upload' },
-    { id: 'configure', label: 'Configure' },
-    { id: 'generating', label: 'Generate' },
-  ];
-  const activeIndex = steps.findIndex((s) => s.id === step || (step === 'error' && s.id === 'generating'));
-
-  return (
-    <div className="flex items-center gap-2">
-      {steps.map((s, i) => (
-        <div key={s.id} className="flex flex-1 items-center gap-2">
-          <div
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-              i <= activeIndex ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'
-            }`}
-          >
-            {i + 1}
-          </div>
-          <span className={`text-sm font-medium ${i <= activeIndex ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
-            {s.label}
-          </span>
-          {i < steps.length - 1 && <div className="mx-2 h-px flex-1 bg-slate-200 dark:bg-slate-800" />}
-        </div>
-      ))}
-    </div>
-  );
+/** Live OpenRouter pricing carries float noise (e.g. 0.26899999999999996); round it to cents for display. */
+function formatPrice(price: number): number {
+  return Math.round(price * 100) / 100;
 }

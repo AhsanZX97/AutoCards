@@ -1,5 +1,5 @@
 import { DEFAULT_FILTERS } from './studyQueue';
-import type { StudySettings } from '../types';
+import type { GradingScale, ShuffleMode, StudyMode, StudySettings, TimerSettings } from '../types';
 
 export const DEFAULT_TIMER_SETTINGS: StudySettings['timer'] = {
   enabled: false,
@@ -25,28 +25,43 @@ export function createDefaultStudySettings(): StudySettings {
   };
 }
 
-/** Per-mode overrides applied on top of the deck/global defaults. */
-export function applyModePreset(settings: StudySettings): StudySettings {
-  switch (settings.mode) {
-    case 'timed':
-      return { ...settings, timer: { ...settings.timer, enabled: true } };
-    case 'exam':
-      return {
-        ...settings,
-        timer: { ...settings.timer, enabled: true, perCardSeconds: 45 },
-        gradingScale: 'binary',
-      };
-    case 'cram':
-      return { ...settings, shuffle: 'weakest-first' };
-    case 'spaced':
-      return {
-        ...settings,
-        shuffle: 'due-first',
-        filters: { ...settings.filters, dueOnly: true },
-      };
-    case 'survival':
-      return { ...settings, timer: { ...settings.timer, enabled: true, perCardSeconds: 15 } };
-    default:
-      return settings;
-  }
+/** The settings a mode forces. Anything not listed here stays under the learner's control. */
+export interface ModePreset {
+  timer?: Partial<TimerSettings>;
+  shuffle?: ShuffleMode;
+  gradingScale?: GradingScale;
+}
+
+export const MODE_PRESETS: Record<StudyMode, ModePreset> = {
+  classic: {},
+  timed: { timer: { enabled: true } },
+  exam: { timer: { enabled: true, perCardSeconds: 45 }, gradingScale: 'binary' },
+  cram: { shuffle: 'weakest-first' },
+  survival: { timer: { enabled: true, perCardSeconds: 15 } },
+};
+
+/** Put back the defaults for every key the outgoing mode had forced. */
+function revertForced<T extends object>(current: T, forced: Partial<T> | undefined, defaults: T): T {
+  if (!forced) return current;
+  const out = { ...current };
+  for (const key of Object.keys(forced) as (keyof T)[]) out[key] = defaults[key];
+  return out;
+}
+
+/**
+ * Switch `settings` to `mode`, undoing whatever the previous mode forced before layering the new
+ * mode's overrides on top. Without the undo step, presets accumulate: picking Timed then Classic
+ * would leave the timer running.
+ */
+export function applyModePreset(settings: StudySettings, mode: StudyMode): StudySettings {
+  const defaults = createDefaultStudySettings();
+  const { timer: outgoingTimer, ...outgoing } = MODE_PRESETS[settings.mode] ?? {};
+  const { timer: incomingTimer, ...incoming } = MODE_PRESETS[mode] ?? {};
+
+  return {
+    ...revertForced(settings, outgoing, defaults),
+    ...incoming,
+    mode,
+    timer: { ...revertForced(settings.timer, outgoingTimer, defaults.timer), ...incomingTimer },
+  };
 }

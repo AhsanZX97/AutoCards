@@ -35,14 +35,14 @@ function ProfileTab() {
   const app = useApp();
   const user = app.authStore((s) => s.session?.user);
   const updateProfile = app.authStore((s) => s.updateProfile);
-  const [name, setName] = useState(user?.name ?? '');
+  const [username, setUsername] = useState(user?.username ?? '');
   const [saving, setSaving] = useState(false);
 
   if (!user) return null;
 
   async function save() {
     setSaving(true);
-    await updateProfile({ name });
+    await updateProfile({ username });
     setSaving(false);
     toast({ variant: 'success', title: 'Profile updated' });
   }
@@ -51,14 +51,14 @@ function ProfileTab() {
     <Card>
       <CardBody className="space-y-5">
         <div className="flex items-center gap-4">
-          <Avatar name={user.name} initials={user.initials} avatarUrl={user.avatarUrl} size="lg" />
+          <Avatar name={user.username} initials={user.initials} avatarUrl={user.avatarUrl} size="lg" />
           <div>
-            <p className="font-semibold text-slate-900 dark:text-white">{user.name}</p>
+            <p className="font-semibold text-slate-900 dark:text-white">@{user.username}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
           </div>
         </div>
-        <Field label="Full name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        <Field label="Username" hint="3–20 chars, lowercase, a–z, 0–9, _">
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" />
         </Field>
         <Field label="Email">
           <Input value={user.email} disabled />

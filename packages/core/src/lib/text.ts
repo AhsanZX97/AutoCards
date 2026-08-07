@@ -113,6 +113,18 @@ export function initialsOf(name: string): string {
   return `${(parts[0] as string)[0]}${(parts[parts.length - 1] as string)[0]}`.toUpperCase();
 }
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+/** Lowers and trims a username for storage / comparison. */
+export function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/** Handles are lowercase letters, digits and underscores, 3–20 chars. */
+export function isValidUsername(value: string): boolean {
+  return USERNAME_RE.test(value);
+}
+
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }

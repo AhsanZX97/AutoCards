@@ -34,7 +34,7 @@ export default function StudySetupScreen() {
   }
 
   function setMode(mode: StudySettings['mode']) {
-    setSettings((s) => applyModePreset({ ...s, mode }));
+    setSettings((s) => applyModePreset(s, mode));
   }
 
   const activeCount = cards.filter((c) => !c.suspended).length;

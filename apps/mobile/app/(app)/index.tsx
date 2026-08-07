@@ -21,17 +21,16 @@ export default function DashboardScreen() {
     () => activeDecks.slice(0, 5).map((deck) => ({ deck, stats: computeDeckStats(cardsByDeck[deck.id] ?? []) })),
     [activeDecks, cardsByDeck],
   );
-  const totalDue = deckSummaries.reduce((sum, d) => sum + d.stats.due, 0);
-  const firstName = user?.name.split(' ')[0] ?? 'there';
+  const firstName = user?.username ?? 'there';
 
   return (
     <Screen>
       <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Welcome back, {firstName} 👋</Text>
       <Text style={{ fontSize: 14, color: theme.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-        {totalDue > 0 ? `${totalDue} card${totalDue === 1 ? '' : 's'} due for review today.` : "You're all caught up."}
+        {activeDecks.length > 0 ? `${activeDecks.length} deck${activeDecks.length === 1 ? '' : 's'} ready to study.` : 'Create your first deck to get started.'}
       </Text>
 
-      <Button title="+ Create deck from PDF" onPress={() => router.push('/(app)/decks/new')} />
+      <Button title="Create deck from PDF — coming soon" onPress={() => {}} disabled />
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
         <StatTile icon="🔥" label="Streak" value={String(stats.streak.current)} />

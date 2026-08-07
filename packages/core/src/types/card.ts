@@ -32,22 +32,6 @@ export interface Choice {
   correct: boolean;
 }
 
-export const SRS_STATES = ['new', 'learning', 'review', 'relearning'] as const;
-export type SrsStateName = (typeof SRS_STATES)[number];
-
-export interface SrsState {
-  state: SrsStateName;
-  /** Days until the next review. */
-  intervalDays: number;
-  /** SM-2 ease factor. Floors at 1.3. */
-  ease: number;
-  repetitions: number;
-  /** Times the card was forgotten after having graduated. */
-  lapses: number;
-  dueAt: IsoDate;
-  lastReviewedAt?: IsoDate;
-}
-
 /** Where in the source PDF this card came from. */
 export interface CardSource {
   page?: number;
@@ -90,12 +74,19 @@ export interface Flashcard {
   /** Manual bias on how often the card is drawn. 0.25–4, default 1. */
   weight: number;
 
+  /**
+   * Manual sort order within the deck — lower comes first, and a deck that has
+   * been reordered holds a contiguous 0..n-1 run. Optional because cards
+   * written before manual ordering existed don't carry one; `sortCardsByPosition`
+   * falls back to array order for those, so nothing needs migrating.
+   */
+  position?: number;
+
   /** 0–100, derived from review history. */
   mastery: number;
   timesSeen: number;
   timesCorrect: number;
 
-  srs: SrsState;
   source?: CardSource;
 
   /** BCP-47 tag used by text-to-speech. */

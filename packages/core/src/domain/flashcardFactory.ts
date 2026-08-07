@@ -1,6 +1,5 @@
 import { createId } from '../lib/id';
 import { nowIso } from '../lib/date';
-import { createSrsState } from './srs';
 import type { CardDraft, Flashcard, GeneratedCard, Id } from '../types';
 
 const DRAFT_DEFAULTS: CardDraft = {
@@ -56,7 +55,6 @@ export function createCardFromDraft(deckId: Id, draft: CardDraft, now: Date = ne
     mastery: 0,
     timesSeen: 0,
     timesCorrect: 0,
-    srs: createSrsState(now),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -66,19 +64,20 @@ export function applyDraftToCard(card: Flashcard, draft: CardDraft, now: Date = 
   return { ...card, ...draft, updatedAt: nowIso(now) };
 }
 
-/** Turns generator output into full `Flashcard` records with fresh ids and SRS state. */
+/** Turns generator output into full `Flashcard` records with fresh ids. */
 export function materializeGeneratedCards(
   deckId: Id,
   generated: readonly GeneratedCard[],
   now: Date = new Date(),
 ): Flashcard[] {
-  return generated.map((card) => {
+  return generated.map((card, index) => {
     const draft: CardDraft = {
       ...DRAFT_DEFAULTS,
       ...card,
       tags: card.tags ?? [],
     };
-    const flashcard = createCardFromDraft(deckId, draft, now);
+    // Generated order is the deck's starting order, so it becomes `position`.
+    const flashcard: Flashcard = { ...createCardFromDraft(deckId, draft, now), position: index };
     return card.source ? { ...flashcard, source: card.source } : flashcard;
   });
 }

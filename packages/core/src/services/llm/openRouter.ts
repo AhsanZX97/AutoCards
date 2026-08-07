@@ -6,7 +6,7 @@ import { CARD_TYPE_LABELS } from '../../types';
 import { costOf, MODEL_CATALOG } from './models';
 import { normalizeGeneratedCards } from './normalizeCards';
 import { GenerationAbortedError } from './types';
-import type { GenerateArgs, LlmService, ModelInfo } from './types';
+import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 
 const API_BASE = 'https://openrouter.ai/api/v1';
 const COMPLETIONS_ENDPOINT = `${API_BASE}/chat/completions`;
@@ -19,6 +19,9 @@ const MAX_CONTEXT_CHARS = 60_000;
 const TOKENS_PER_CARD = 220;
 const MIN_OUTPUT_TOKENS = 2_000;
 const MAX_OUTPUT_TOKENS = 32_000;
+
+/** A single choice is a short phrase, not a paragraph. */
+const SUGGEST_CHOICE_MAX_TOKENS = 60;
 
 /** How often the waiting indicator creeps forward during the single long call. */
 const TICK_MS = 700;
@@ -44,7 +47,6 @@ export interface OpenRouterConfig {
  */
 export class OpenRouterLlmService implements LlmService {
   readonly id = 'openrouter';
-  readonly isMock = false;
 
   /** Live catalog, fetched once per session. */
   private modelCache?: ModelInfo[];
@@ -220,6 +222,51 @@ export class OpenRouterLlmService implements LlmService {
     };
   }
 
+  async suggestChoice({ front, back, existingChoices, model, signal }: SuggestChoiceArgs): Promise<string> {
+    throwIfAborted(signal);
+
+    const body = {
+      model,
+      messages: [
+        { role: 'system', content: SUGGEST_CHOICE_SYSTEM_PROMPT },
+        { role: 'user', content: buildSuggestChoicePrompt({ front, back, existingChoices }) },
+      ],
+      max_tokens: SUGGEST_CHOICE_MAX_TOKENS,
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(COMPLETIONS_ENDPOINT, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json', ...this.headers() },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      if (isAbortError(error)) throw new GenerationAbortedError();
+      throw new Error(`Could not reach OpenRouter: ${messageOf(error)}`);
+    }
+
+    if (!response.ok) {
+      throw new Error(await describeHttpFailure(response, model));
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string };
+    };
+
+    if (payload.error?.message) {
+      throw new Error(`OpenRouter: ${payload.error.message}`);
+    }
+
+    const text = stripSuggestionWrapping(payload.choices?.[0]?.message?.content ?? '');
+    if (!text) {
+      throw new Error('The model returned an empty response. Try again, or pick a different model.');
+    }
+    return text;
+  }
+
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.config.apiKey}`,
@@ -324,6 +371,35 @@ function describeTypes(types: GenerateArgs['options']['cardTypes']): string {
 
 function buildUserPrompt(text: string): string {
   return `Source document:\n\n${truncate(text, MAX_CONTEXT_CHARS)}`;
+}
+
+const SUGGEST_CHOICE_SYSTEM_PROMPT = [
+  'You write one wrong answer choice for a multiple-choice flashcard.',
+  'Reply with only the choice text itself — no quotes, numbering, labels, or explanation.',
+  'It must be clearly incorrect but plausible, matching the style and length of the existing choices.',
+  'It must not repeat the correct answer or any existing choice.',
+].join('\n');
+
+function buildSuggestChoicePrompt({
+  front,
+  back,
+  existingChoices,
+}: Pick<SuggestChoiceArgs, 'front' | 'back' | 'existingChoices'>): string {
+  const lines = [`Question: ${front}`, `Correct answer: ${back}`];
+  if (existingChoices.length > 0) {
+    lines.push(`Choices already on the card: ${existingChoices.join('; ')}`);
+  }
+  lines.push('Write one new wrong choice.');
+  return lines.join('\n');
+}
+
+/** Models sometimes wrap the bare choice text in quotes or a leading dash. */
+function stripSuggestionWrapping(text: string): string {
+  return text
+    .trim()
+    .replace(/^[-*]\s*/, '')
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .trim();
 }
 
 /**

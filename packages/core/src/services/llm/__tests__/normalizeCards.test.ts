@@ -3,7 +3,7 @@ import { normalizeGeneratedCards } from '../normalizeCards';
 import type { GenerationOptions } from '../../../types';
 
 const BASE_OPTIONS: GenerationOptions = {
-  model: 'anthropic/claude-opus-5',
+  model: 'deepseek/deepseek-v3.2',
   cardCount: 10,
   cardTypes: ['basic', 'reversed', 'cloze', 'multiple-choice', 'true-false', 'type-in'],
   difficulty: 'medium',

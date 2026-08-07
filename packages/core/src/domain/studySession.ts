@@ -14,7 +14,7 @@ export function createSession(
   rng: Rng = Math.random,
   now: Date = new Date(),
 ): StudySession {
-  const queue = buildQueue(cards, settings.filters, settings.shuffle, rng, now);
+  const queue = buildQueue(cards, settings.filters, settings.shuffle, rng);
   return {
     id: createId('sesh'),
     deckId: deck.id,

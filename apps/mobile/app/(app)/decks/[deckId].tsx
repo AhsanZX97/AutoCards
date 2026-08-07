@@ -1,7 +1,16 @@
 import { useMemo } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Share, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CARD_TYPE_LABELS, computeDeckStats, hasCloze, parseCloze, type Flashcard } from '@autocards/core';
+import {
+  CARD_TYPE_LABELS,
+  buildDeckExport,
+  computeDeckStats,
+  hasCloze,
+  parseCloze,
+  serializeDeckExport,
+  shareUrlForDeck,
+  type Flashcard,
+} from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, DIFFICULTY_COLOR, PRIORITY_COLOR, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
@@ -26,12 +35,40 @@ export default function DeckDetailScreen() {
       </Screen>
     );
   }
+  const currentDeck = deck;
 
   function confirmDelete(card: Flashcard) {
     Alert.alert('Delete card', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteCard(deckId!, card.id) },
     ]);
+  }
+
+  async function handleShare() {
+    const payload = buildDeckExport(currentDeck, cards);
+    try {
+      await Share.share({
+        title: `${payload.title} — Auto Cards`,
+        message: `Study "${payload.title}" (${payload.cards.length} cards) on Auto Cards: ${shareUrlForDeck(
+          payload,
+          'https://autocards.app/app/decks',
+        )}`,
+      });
+    } catch {
+      // User dismissed the share sheet.
+    }
+  }
+
+  async function handleExport() {
+    const payload = buildDeckExport(currentDeck, cards);
+    try {
+      await Share.share({
+        title: payload.title,
+        message: serializeDeckExport(payload),
+      });
+    } catch {
+      // User dismissed the share sheet.
+    }
   }
 
   return (
@@ -46,17 +83,30 @@ export default function DeckDetailScreen() {
         </View>
       </View>
 
-      <Button
-        title="Study now"
-        onPress={() => router.push(`/study/${deckId}/setup`)}
-        disabled={stats.total === 0}
-        style={{ marginBottom: spacing.lg }}
-      />
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+        <Button
+          title="Share"
+          variant="outline"
+          onPress={handleShare}
+          style={{ flexGrow: 1 }}
+        />
+        <Button
+          title="Export"
+          variant="outline"
+          onPress={handleExport}
+          style={{ flexGrow: 1 }}
+        />
+        <Button
+          title="Study now"
+          onPress={() => router.push(`/study/${deckId}/setup`)}
+          disabled={stats.total === 0}
+          style={{ flexGrow: 1.5 }}
+        />
+      </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
         <MiniStat label="Cards" value={stats.total} theme={theme} />
         <MiniStat label="New" value={stats.new} theme={theme} />
-        <MiniStat label="Due" value={stats.due} theme={theme} highlight />
         <MiniStat label="Mastered" value={stats.mastered} theme={theme} />
       </View>
 

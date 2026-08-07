@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createApp, type App, type OpenRouterConfig } from '@autocards/core';
 import { BrowserPdfExtractor } from '@autocards/core';
 import { createWebStorage } from './webStorage';
@@ -8,10 +9,9 @@ const AppContext = createContext<App | null>(null);
 let singleton: App | null = null;
 
 /**
- * Build-time key, for running the real generator locally without pasting a key
- * into Settings on every fresh profile. Vite inlines this into the bundle, so
- * it must stay unset for any deployed build — see `.env.example`. In production
- * the key comes from the user's own Settings entry instead.
+ * OpenRouter key generation runs on for every user — see `.env.example`.
+ * Vite inlines this into the bundle, so it is readable by anyone who loads
+ * the app; proxy the call through a server instead if that's not acceptable.
  */
 function buildTimeConfig(): OpenRouterConfig | undefined {
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY?.trim();
@@ -23,6 +23,14 @@ function buildTimeConfig(): OpenRouterConfig | undefined {
   };
 }
 
+/** Supabase client for real accounts + cross-device sync. Required — see `.env.example`. */
+function buildSupabase(): SupabaseClient | undefined {
+  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (!url || !anonKey) return undefined;
+  return createClient(url, anonKey);
+}
+
 /** One instance per page load — stores persist to localStorage across reloads. */
 function getApp(): App {
   if (!singleton) {
@@ -30,6 +38,7 @@ function getApp(): App {
       storage: createWebStorage(),
       pdfExtractor: new BrowserPdfExtractor(),
       openRouter: buildTimeConfig(),
+      supabase: buildSupabase(),
     });
   }
   return singleton;

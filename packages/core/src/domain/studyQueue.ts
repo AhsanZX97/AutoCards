@@ -1,18 +1,12 @@
-import { daysOverdue, isDue } from '../lib/date';
 import { shuffle, weightedShuffle, type Rng } from '../lib/random';
 import { DIFFICULTY_WEIGHT, PRIORITY_WEIGHT } from '../types';
 import type { Flashcard, StudyFilters, ShuffleMode } from '../types';
 
 /** Applies every filter in `StudyFilters` to a deck's cards. */
-export function filterCards(
-  cards: readonly Flashcard[],
-  filters: StudyFilters,
-  now: Date = new Date(),
-): Flashcard[] {
+export function filterCards(cards: readonly Flashcard[], filters: StudyFilters): Flashcard[] {
   return cards.filter((card) => {
     if (card.suspended) return false;
     if (filters.starredOnly && !card.starred) return false;
-    if (filters.dueOnly && !isDue(card.srs.dueAt, now)) return false;
     if (filters.excludeMastered && card.mastery >= filters.masteredThreshold) return false;
     if (filters.categoryIds.length > 0) {
       if (!card.categoryId || !filters.categoryIds.includes(card.categoryId)) return false;
@@ -44,7 +38,6 @@ export function orderCards(
   cards: readonly Flashcard[],
   mode: ShuffleMode,
   rng: Rng = Math.random,
-  now: Date = new Date(),
 ): Flashcard[] {
   switch (mode) {
     case 'none':
@@ -61,10 +54,6 @@ export function orderCards(
         .sort((a, b) => DIFFICULTY_WEIGHT[b.difficulty] - DIFFICULTY_WEIGHT[a.difficulty]);
     case 'weakest-first':
       return cards.slice().sort((a, b) => a.mastery - b.mastery);
-    case 'due-first':
-      return cards
-        .slice()
-        .sort((a, b) => daysOverdue(b.srs.dueAt, now) - daysOverdue(a.srs.dueAt, now));
     default:
       return shuffle(cards, rng);
   }
@@ -80,17 +69,16 @@ export function buildQueue(
   filters: StudyFilters,
   shuffleMode: ShuffleMode,
   rng: Rng = Math.random,
-  now: Date = new Date(),
 ): string[] {
-  const filtered = filterCards(cards, filters, now);
+  const filtered = filterCards(cards, filters);
   const capped =
     filters.cardLimit > 0 && filters.cardLimit < filtered.length
-      ? orderCards(filtered, shuffleMode === 'none' ? 'random' : shuffleMode, rng, now).slice(
+      ? orderCards(filtered, shuffleMode === 'none' ? 'random' : shuffleMode, rng).slice(
           0,
           filters.cardLimit,
         )
       : filtered;
-  return orderCards(capped, shuffleMode, rng, now).map((card) => card.id);
+  return orderCards(capped, shuffleMode, rng).map((card) => card.id);
 }
 
 export const DEFAULT_FILTERS: StudyFilters = {
@@ -99,7 +87,6 @@ export const DEFAULT_FILTERS: StudyFilters = {
   difficulties: [],
   priorities: [],
   starredOnly: false,
-  dueOnly: false,
   excludeMastered: false,
   masteredThreshold: 90,
   cardLimit: 0,

@@ -4,6 +4,7 @@ import { createId } from '../lib/id';
 import { nowIso } from '../lib/date';
 import { STORAGE_KEYS, type StorageAdapter } from '../lib/storage';
 import { toZustandStorage } from './persistBridge';
+import { buildDeckExport, type DeckExport } from '../lib/deckTransfer';
 import {
   applyDraftToCard,
   computeDeckStats,
@@ -11,7 +12,9 @@ import {
   createCardFromDraft,
   createDefaultStudySettings,
   materializeGeneratedCards,
-  reviewCard as advanceSrs,
+  nextPosition,
+  reorderCards,
+  sortCardsByPosition,
 } from '../domain';
 import type {
   Accent,
@@ -21,8 +24,8 @@ import type {
   DeckStats,
   Flashcard,
   GenerationResult,
-  Grade,
   Id,
+  SyncOp,
 } from '../types';
 
 export interface DeckState {
@@ -31,11 +34,13 @@ export interface DeckState {
 
   createDeckFromGeneration: (result: GenerationResult, ownerId: Id) => Deck;
   createBlankDeck: (ownerId: Id, title: string, accent?: Accent, icon?: string) => Deck;
+  importDeck: (payload: DeckExport, ownerId: Id) => Deck;
   updateDeck: (deckId: Id, patch: Partial<Pick<Deck, 'title' | 'description' | 'icon' | 'accent' | 'tags'>>) => void;
   archiveDeck: (deckId: Id, archived: boolean) => void;
   deleteDeck: (deckId: Id) => void;
 
   addCategory: (deckId: Id, name: string, accent: Accent, icon: string) => Category;
+  updateCategory: (deckId: Id, categoryId: Id, patch: Partial<Omit<Category, 'id'>>) => void;
   deleteCategory: (deckId: Id, categoryId: Id) => void;
 
   addCard: (deckId: Id, draft: CardDraft) => Flashcard;
@@ -44,15 +49,44 @@ export interface DeckState {
   deleteCards: (deckId: Id, cardIds: Id[]) => void;
   toggleStar: (deckId: Id, cardId: Id) => void;
   toggleSuspend: (deckId: Id, cardId: Id) => void;
+  /** Moves a card to `toIndex` (0-based) in the deck's manual order. */
+  reorderCard: (deckId: Id, cardId: Id, toIndex: number) => void;
 
-  reviewCard: (deckId: Id, cardId: Id, grade: Grade, correct: boolean) => void;
+  reviewCard: (deckId: Id, cardId: Id, correct: boolean) => void;
+
+  /** Remote-merge entry points driven by the sync engine on pull. Unlike the
+   *  local mutators above, none of these fire `onChange`, because they reflect
+   *  remote truth rather than a local edit that needs pushing back up. */
+  applyRemoteDeck: (deck: Deck) => void;
+  applyRemoteDeleteDeck: (deckId: Id) => void;
+  applyRemoteCard: (card: Flashcard) => void;
+  applyRemoteDeleteCard: (deckId: Id, cardId: Id) => void;
+  /** Empties local state without firing `onChange` — used on sign-out so a
+   *  second account on the same device never starts from the first account's
+   *  decks. */
+  clear: () => void;
 
   getDeck: (deckId: Id) => Deck | undefined;
   getCards: (deckId: Id) => Flashcard[];
+  getDeckExport: (deckId: Id) => DeckExport | undefined;
   getDeckStats: (deckId: Id) => DeckStats;
 }
 
-export function createDeckStore(storage: StorageAdapter) {
+function deckOp(deckId: Id, op: 'upsert' | 'delete' = 'upsert'): SyncOp {
+  return { kind: 'deck', id: deckId, op };
+}
+
+function cardOp(deckId: Id, cardId: Id, op: 'upsert' | 'delete' = 'upsert'): SyncOp {
+  return { kind: 'card', id: cardId, deckId, op };
+}
+
+/**
+ * `onChange` is how deck/card mutations reach the sync outbox — see
+ * `createApp.ts`, which wires it to `syncStore.enqueue`. Every mutator below
+ * calls it after `set()`, batched even for a single row, so a caller never
+ * has to special-case a multi-row mutator like `deleteCards`.
+ */
+export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[]) => void = () => {}) {
   return create<DeckState>()(
     persist(
       (set, get) => ({
@@ -86,6 +120,7 @@ export function createDeckStore(storage: StorageAdapter) {
             decks: [deck, ...state.decks],
             cardsByDeck: { ...state.cardsByDeck, [deckId]: cards },
           }));
+          onChange([deckOp(deckId), ...cards.map((card) => cardOp(deckId, card.id))]);
           return deck;
         },
 
@@ -110,6 +145,50 @@ export function createDeckStore(storage: StorageAdapter) {
             decks: [deck, ...state.decks],
             cardsByDeck: { ...state.cardsByDeck, [deckId]: [] },
           }));
+          onChange([deckOp(deckId)]);
+          return deck;
+        },
+
+        importDeck: (payload, ownerId) => {
+          const timestamp = nowIso();
+          const deckId = createId('deck');
+          // Remap every id the shared deck carries so nothing can collide with
+          // ids the receiving account already owns. The export strips mastery,
+          // so `createCardFromDraft` is the right entry point.
+          const categoryIdMap = new Map<string, string>();
+          const categories = payload.categories.map((category) => {
+            const id = createId('cat');
+            categoryIdMap.set(category.id, id);
+            return { ...category, id };
+          });
+          const cards = payload.cards.map((draft, index) => ({
+            ...createCardFromDraft(deckId, {
+              ...draft,
+              categoryId: draft.categoryId ? categoryIdMap.get(draft.categoryId) : undefined,
+            }),
+            // The export carries order as the array order — keep it.
+            position: index,
+          }));
+          const deck: Deck = {
+            id: deckId,
+            ownerId,
+            title: payload.title,
+            description: payload.description,
+            icon: payload.icon,
+            accent: payload.accent,
+            tags: payload.tags,
+            categories,
+            defaultSettings: payload.defaultSettings,
+            ...(payload.generatedBy ? { generatedBy: payload.generatedBy } : {}),
+            archived: false,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+          set((state) => ({
+            decks: [deck, ...state.decks],
+            cardsByDeck: { ...state.cardsByDeck, [deckId]: cards },
+          }));
+          onChange([deckOp(deckId), ...cards.map((card) => cardOp(deckId, card.id))]);
           return deck;
         },
 
@@ -119,6 +198,7 @@ export function createDeckStore(storage: StorageAdapter) {
               deck.id === deckId ? { ...deck, ...patch, updatedAt: nowIso() } : deck,
             ),
           }));
+          onChange([deckOp(deckId)]);
         },
 
         archiveDeck: (deckId, archived) => {
@@ -127,6 +207,7 @@ export function createDeckStore(storage: StorageAdapter) {
               deck.id === deckId ? { ...deck, archived, updatedAt: nowIso() } : deck,
             ),
           }));
+          onChange([deckOp(deckId)]);
         },
 
         deleteDeck: (deckId) => {
@@ -137,6 +218,10 @@ export function createDeckStore(storage: StorageAdapter) {
               cardsByDeck: rest,
             };
           });
+          // Cards are cascade-tombstoned server-side once the deck delete
+          // lands (see `decks_cascade_delete` in supabase/schema.sql), so
+          // only the deck op needs to be enqueued here.
+          onChange([deckOp(deckId, 'delete')]);
         },
 
         addCategory: (deckId, name, accent, icon) => {
@@ -148,37 +233,65 @@ export function createDeckStore(storage: StorageAdapter) {
                 : deck,
             ),
           }));
+          onChange([deckOp(deckId)]);
           return category;
         },
 
+        updateCategory: (deckId, categoryId, patch) => {
+          set((state) => ({
+            decks: state.decks.map((deck) =>
+              deck.id === deckId
+                ? {
+                    ...deck,
+                    categories: deck.categories.map((category) =>
+                      category.id === categoryId ? { ...category, ...patch } : category,
+                    ),
+                    updatedAt: nowIso(),
+                  }
+                : deck,
+            ),
+          }));
+          onChange([deckOp(deckId)]);
+        },
+
         deleteCategory: (deckId, categoryId) => {
+          const timestamp = nowIso();
+          const affectedCardIds: Id[] = [];
           set((state) => ({
             decks: state.decks.map((deck) =>
               deck.id === deckId
                 ? {
                     ...deck,
                     categories: deck.categories.filter((c) => c.id !== categoryId),
-                    updatedAt: nowIso(),
+                    updatedAt: timestamp,
                   }
                 : deck,
             ),
             cardsByDeck: {
               ...state.cardsByDeck,
-              [deckId]: (state.cardsByDeck[deckId] ?? []).map((card) =>
-                card.categoryId === categoryId ? { ...card, categoryId: undefined } : card,
-              ),
+              [deckId]: (state.cardsByDeck[deckId] ?? []).map((card) => {
+                if (card.categoryId !== categoryId) return card;
+                affectedCardIds.push(card.id);
+                return { ...card, categoryId: undefined, updatedAt: timestamp };
+              }),
             },
           }));
+          onChange([deckOp(deckId), ...affectedCardIds.map((cardId) => cardOp(deckId, cardId))]);
         },
 
         addCard: (deckId, draft) => {
-          const card = createCardFromDraft(deckId, draft);
+          const existing = get().cardsByDeck[deckId] ?? [];
+          const card: Flashcard = {
+            ...createCardFromDraft(deckId, draft),
+            position: nextPosition(existing),
+          };
           set((state) => ({
             cardsByDeck: {
               ...state.cardsByDeck,
               [deckId]: [...(state.cardsByDeck[deckId] ?? []), card],
             },
           }));
+          onChange([cardOp(deckId, card.id)]);
           return card;
         },
 
@@ -191,6 +304,7 @@ export function createDeckStore(storage: StorageAdapter) {
               ),
             },
           }));
+          onChange([cardOp(deckId, cardId)]);
         },
 
         deleteCard: (deckId, cardId) => {
@@ -200,6 +314,7 @@ export function createDeckStore(storage: StorageAdapter) {
               [deckId]: (state.cardsByDeck[deckId] ?? []).filter((card) => card.id !== cardId),
             },
           }));
+          onChange([cardOp(deckId, cardId, 'delete')]);
         },
 
         deleteCards: (deckId, cardIds) => {
@@ -210,6 +325,7 @@ export function createDeckStore(storage: StorageAdapter) {
               [deckId]: (state.cardsByDeck[deckId] ?? []).filter((card) => !idSet.has(card.id)),
             },
           }));
+          onChange(cardIds.map((cardId) => cardOp(deckId, cardId, 'delete')));
         },
 
         toggleStar: (deckId, cardId) => {
@@ -217,10 +333,11 @@ export function createDeckStore(storage: StorageAdapter) {
             cardsByDeck: {
               ...state.cardsByDeck,
               [deckId]: (state.cardsByDeck[deckId] ?? []).map((card) =>
-                card.id === cardId ? { ...card, starred: !card.starred } : card,
+                card.id === cardId ? { ...card, starred: !card.starred, updatedAt: nowIso() } : card,
               ),
             },
           }));
+          onChange([cardOp(deckId, cardId)]);
         },
 
         toggleSuspend: (deckId, cardId) => {
@@ -228,36 +345,88 @@ export function createDeckStore(storage: StorageAdapter) {
             cardsByDeck: {
               ...state.cardsByDeck,
               [deckId]: (state.cardsByDeck[deckId] ?? []).map((card) =>
-                card.id === cardId ? { ...card, suspended: !card.suspended } : card,
+                card.id === cardId ? { ...card, suspended: !card.suspended, updatedAt: nowIso() } : card,
               ),
             },
           }));
+          onChange([cardOp(deckId, cardId)]);
         },
 
-        reviewCard: (deckId, cardId, grade, correct) => {
+        reorderCard: (deckId, cardId, toIndex) => {
+          const { cards, changedIds } = reorderCards(get().cardsByDeck[deckId] ?? [], cardId, toIndex);
+          if (changedIds.length === 0) return;
+          set((state) => ({ cardsByDeck: { ...state.cardsByDeck, [deckId]: cards } }));
+          onChange(changedIds.map((id) => cardOp(deckId, id)));
+        },
+
+        reviewCard: (deckId, cardId, correct) => {
           set((state) => ({
             cardsByDeck: {
               ...state.cardsByDeck,
               [deckId]: (state.cardsByDeck[deckId] ?? []).map((card) => {
                 if (card.id !== cardId) return card;
-                const srs = advanceSrs(card.srs, grade);
                 const timesSeen = card.timesSeen + 1;
                 const timesCorrect = card.timesCorrect + (correct ? 1 : 0);
                 return {
                   ...card,
-                  srs,
                   timesSeen,
                   timesCorrect,
-                  mastery: computeMastery(srs, timesSeen, timesCorrect),
+                  mastery: computeMastery(timesSeen, timesCorrect),
                   updatedAt: nowIso(),
                 };
               }),
             },
           }));
+          onChange([cardOp(deckId, cardId)]);
         },
+
+        applyRemoteDeck: (deck) => {
+          set((state) => ({
+            decks: state.decks.some((d) => d.id === deck.id)
+              ? state.decks.map((d) => (d.id === deck.id ? deck : d))
+              : [deck, ...state.decks],
+          }));
+        },
+
+        applyRemoteDeleteDeck: (deckId) => {
+          set((state) => {
+            const { [deckId]: _removed, ...cardsByDeck } = state.cardsByDeck;
+            return { decks: state.decks.filter((d) => d.id !== deckId), cardsByDeck };
+          });
+        },
+
+        applyRemoteCard: (card) => {
+          set((state) => {
+            const existing = state.cardsByDeck[card.deckId] ?? [];
+            const present = existing.some((c) => c.id === card.id);
+            const merged = present
+              ? existing.map((c) => (c.id === card.id ? card : c))
+              : [...existing, card];
+            // Every reader treats the stored array as display order, so a card
+            // arriving from another device has to land in its ordered slot
+            // rather than at the end.
+            return { cardsByDeck: { ...state.cardsByDeck, [card.deckId]: sortCardsByPosition(merged) } };
+          });
+        },
+
+        applyRemoteDeleteCard: (deckId, cardId) => {
+          set((state) => ({
+            cardsByDeck: {
+              ...state.cardsByDeck,
+              [deckId]: (state.cardsByDeck[deckId] ?? []).filter((c) => c.id !== cardId),
+            },
+          }));
+        },
+
+        clear: () => set({ decks: [], cardsByDeck: {} }),
 
         getDeck: (deckId) => get().decks.find((deck) => deck.id === deckId),
         getCards: (deckId) => get().cardsByDeck[deckId] ?? [],
+        getDeckExport: (deckId) => {
+          const deck = get().decks.find((d) => d.id === deckId);
+          if (!deck) return undefined;
+          return buildDeckExport(deck, get().cardsByDeck[deckId] ?? []);
+        },
         getDeckStats: (deckId) => computeDeckStats(get().cardsByDeck[deckId] ?? []),
       }),
       {

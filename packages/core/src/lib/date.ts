@@ -37,15 +37,6 @@ export function daysBetween(a: Date | IsoDate, b: Date | IsoDate): number {
   return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
 }
 
-export function isDue(dueAt: IsoDate, now: Date = new Date()): boolean {
-  return new Date(dueAt).getTime() <= now.getTime();
-}
-
-/** Negative when the card is not due yet. */
-export function daysOverdue(dueAt: IsoDate, now: Date = new Date()): number {
-  return (now.getTime() - new Date(dueAt).getTime()) / MS_PER_DAY;
-}
-
 /** `1:05`, or `1:02:03` once it passes an hour. */
 export function formatDuration(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -90,17 +81,6 @@ export function formatRelative(date: IsoDate, now: Date = new Date()): string {
   }
   const plural = value === 1 ? unit : `${unit}s`;
   return future ? `in ${value} ${plural}` : `${value} ${plural} ago`;
-}
-
-/** `Tomorrow` / `in 6 days` / `Due now` — for SRS due dates. */
-export function formatDueLabel(dueAt: IsoDate, now: Date = new Date()): string {
-  const days = daysBetween(now, dueAt);
-  if (new Date(dueAt).getTime() <= now.getTime()) return 'Due now';
-  if (days <= 0) return 'Later today';
-  if (days === 1) return 'Tomorrow';
-  if (days < 30) return `in ${days} days`;
-  const months = Math.round(days / 30);
-  return months < 12 ? `in ${months} mo` : `in ${Math.round(days / 365)} yr`;
 }
 
 /** Day keys for the last `count` days, oldest first, ending today. */

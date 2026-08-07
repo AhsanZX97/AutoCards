@@ -1,46 +1,44 @@
 import { describe, expect, it } from 'vitest';
-import { RoutingLlmService } from '../routingLlm';
+import { LlmConfigError, RoutingLlmService } from '../routingLlm';
 import type { OpenRouterConfig } from '../openRouter';
 
 describe('RoutingLlmService', () => {
-  it('uses the mock generator when no config is available', () => {
+  it('throws LlmConfigError when no config is available', () => {
     const service = new RoutingLlmService(() => undefined);
-    expect(service.id).toBe('mock');
-    expect(service.isMock).toBe(true);
+    expect(() => service.active()).toThrow(LlmConfigError);
   });
 
-  it('uses the mock generator when the key is blank', () => {
+  it('throws LlmConfigError when the key is blank', () => {
     const service = new RoutingLlmService(() => ({ apiKey: '' }));
-    expect(service.isMock).toBe(true);
+    expect(() => service.active()).toThrow(LlmConfigError);
   });
 
-  it('uses the mock generator when the key is only whitespace', () => {
+  it('throws LlmConfigError when the key is only whitespace', () => {
     const service = new RoutingLlmService(() => ({ apiKey: '   ' }));
-    expect(service.isMock).toBe(true);
+    expect(() => service.active()).toThrow(LlmConfigError);
   });
 
   it('uses OpenRouter once a key is available', () => {
     const service = new RoutingLlmService(() => ({ apiKey: 'sk-or-test' }));
     expect(service.id).toBe('openrouter');
-    expect(service.isMock).toBe(false);
   });
 
-  it('switches to OpenRouter without being rebuilt when a key appears', () => {
+  it('starts working without being rebuilt once a key appears', () => {
     let key = '';
     const service = new RoutingLlmService(() => ({ apiKey: key }));
-    expect(service.isMock).toBe(true);
+    expect(() => service.active()).toThrow(LlmConfigError);
 
     key = 'sk-or-test';
-    expect(service.isMock).toBe(false);
+    expect(service.active().id).toBe('openrouter');
   });
 
-  it('falls back to the mock when the key is cleared again', () => {
+  it('throws again once the key is cleared', () => {
     let key = 'sk-or-test';
     const service = new RoutingLlmService(() => ({ apiKey: key }));
-    expect(service.isMock).toBe(false);
+    expect(service.active().id).toBe('openrouter');
 
     key = '';
-    expect(service.isMock).toBe(true);
+    expect(() => service.active()).toThrow(LlmConfigError);
   });
 
   it('reuses the same OpenRouter instance while the key is unchanged', () => {

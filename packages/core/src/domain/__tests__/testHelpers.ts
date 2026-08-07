@@ -1,4 +1,3 @@
-import { createSrsState } from '../srs';
 import type { Difficulty, Flashcard, Priority } from '../../types';
 
 let counter = 0;
@@ -21,7 +20,6 @@ export function makeCard(overrides: Partial<Flashcard> = {}): Flashcard {
     mastery: 0,
     timesSeen: 0,
     timesCorrect: 0,
-    srs: createSrsState(now),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     ...overrides,

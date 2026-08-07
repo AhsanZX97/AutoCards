@@ -18,7 +18,7 @@ export default function SettingsScreen() {
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
 
-  const [name, setName] = useState(user?.name ?? '');
+  const [username, setUsername] = useState(user?.username ?? '');
 
   async function handleSignOut() {
     await signOut();
@@ -33,9 +33,9 @@ export default function SettingsScreen() {
 
       <Card style={{ marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Profile</Text>
-        <Field label="Full name" value={name} onChangeText={setName} />
+        <Field label="Username" hint="3–20 chars, lowercase, a–z, 0–9, _" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} />
         <Field label="Email" value={user.email} editable={false} />
-        <Button title="Save changes" onPress={() => updateProfile({ name })} />
+        <Button title="Save changes" onPress={() => updateProfile({ username })} />
       </Card>
 
       <Card style={{ marginBottom: spacing.md }}>
@@ -76,8 +76,8 @@ export default function SettingsScreen() {
       <Card style={{ marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '700', color: theme.text }}>Plan: {user.plan}</Text>
         <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>
-          Uploads produce a sample deck. Reading text out of a PDF is not available on mobile yet,
-          so decks generated from your own files are web-only for now.
+          Reading text out of a PDF is not available on mobile yet, so creating decks from your own
+          files is web-only for now.
         </Text>
       </Card>
 

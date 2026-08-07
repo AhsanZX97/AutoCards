@@ -1,37 +1,53 @@
 import type { StorageAdapter } from './lib/storage';
-import { MockAuthService } from './services/auth/mockAuth';
-import type { AuthService } from './services/auth/mockAuth';
+import type { AuthService } from './services/auth/types';
 import { RoutingLlmService } from './services/llm';
 import type { LlmService, OpenRouterConfig } from './services/llm';
 import type { PdfExtractor } from './services/pdf';
-import { createAuthStore, createDeckStore, createSettingsStore, createStudyStore } from './store';
+import { SupabaseAuthService } from './services/auth/supabaseAuth';
+import { SupabaseSyncBackend } from './services/sync/supabaseSyncBackend';
+import { SyncEngine } from './services/sync/syncEngine';
+import {
+  createAuthStore,
+  createDeckStore,
+  createSettingsStore,
+  createStudyStore,
+  createSyncStore,
+} from './store';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CreateAppOptions {
   storage: StorageAdapter;
   pdfExtractor: PdfExtractor;
   /**
-   * Build-time OpenRouter credentials. A key the user saves in Settings takes
-   * precedence over this one; without either, generation stays on the mock.
+   * OpenRouter credentials generation runs on. Every user's generation calls
+   * go through this one key — there is no per-user bring-your-own-key path.
    *
    * Note that on web this key is compiled into the bundle and is readable by
-   * anyone who loads the app — fine for local development against your own
-   * key, not for a deployed build. There, leave it unset and let each user
-   * supply their own in Settings, or proxy the call through a server that
-   * holds the key.
+   * anyone who loads the app. Proxy the call through a server that holds the
+   * key instead if that's not acceptable for your deployment.
    */
   openRouter?: OpenRouterConfig;
-  /** Override for tests; defaults to `MockAuthService`. */
+  /** Override for tests; a real client requires either this or `supabase`. */
   authService?: AuthService;
+  /** A pre-built Supabase client — required (via this or `authService`) for real accounts and cross-device deck sync. */
+  supabase?: SupabaseClient;
+  /** Sync flush cadence; defaults to 10s. Only used when `supabase` is set. */
+  syncFlushIntervalMs?: number;
 }
 
 /**
  * Wires services and stores into one object apps can pull from a context or
- * module-level singleton. This is the single place that decides mock vs. real
- * — everything else in the app talks to the `LlmService`/`AuthService`
- * interfaces and doesn't know which implementation is behind them.
+ * module-level singleton — everything else in the app talks to the
+ * `LlmService`/`AuthService` interfaces and doesn't know which implementation
+ * is behind them.
  */
 export function createApp(options: CreateAppOptions) {
-  const auth: AuthService = options.authService ?? new MockAuthService();
+  if (!options.authService && !options.supabase) {
+    throw new Error(
+      'createApp requires a Supabase client (set `supabase`), or an `authService` override for tests.',
+    );
+  }
+  const auth: AuthService = options.authService ?? new SupabaseAuthService(options.supabase!);
 
   const settingsStore = createSettingsStore(options.storage);
 
@@ -45,8 +61,30 @@ export function createApp(options: CreateAppOptions) {
   });
 
   const authStore = createAuthStore(auth, options.storage);
-  const deckStore = createDeckStore(options.storage);
+  const syncStore = options.supabase ? createSyncStore(options.storage) : null;
+  const deckStore = createDeckStore(options.storage, (ops) => syncStore?.getState().enqueue(ops));
   const studyStore = createStudyStore(deckStore, options.storage);
+
+  let syncEngine: SyncEngine | null = null;
+  if (options.supabase) {
+    syncEngine = new SyncEngine({
+      authStore,
+      deckStore,
+      syncStore: syncStore!,
+      backend: new SupabaseSyncBackend(options.supabase),
+      flushIntervalMs: options.syncFlushIntervalMs,
+    });
+    syncEngine.start();
+    // Keep the store in step with Supabase's own session lifecycle (silent
+    // token refresh, sign-in/out) rather than only when restore() runs.
+    options.supabase.auth.onAuthStateChange((_event, supabaseSession) => {
+      if (!supabaseSession) {
+        authStore.getState().syncFromProvider(null);
+        return;
+      }
+      void authStore.getState().restore();
+    });
+  }
 
   return {
     services: { auth, llm, pdf: options.pdfExtractor },
@@ -54,6 +92,9 @@ export function createApp(options: CreateAppOptions) {
     deckStore,
     studyStore,
     settingsStore,
+    syncStore,
+    syncEngine,
+    dispose: () => syncEngine?.stop(),
   };
 }
 

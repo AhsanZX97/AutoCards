@@ -27,17 +27,28 @@ export interface GenerateArgs {
   signal?: AbortSignal;
 }
 
+export interface SuggestChoiceArgs {
+  /** The question side of the card, for context. */
+  front: string;
+  /** The correct answer — the suggestion must not restate it. */
+  back: string;
+  /** Choice text already on the card, so the suggestion isn't a duplicate. */
+  existingChoices: string[];
+  model: string;
+  signal?: AbortSignal;
+}
+
 /**
  * The single seam between the app and whatever writes the flashcards.
- * `MockLlmService` implements it today; `OpenRouterLlmService` takes over once
- * a real key is wired up.
+ * `OpenRouterLlmService` is the only implementation.
  */
 export interface LlmService {
-  /** Identifies the implementation in the UI, e.g. `mock` or `openrouter`. */
+  /** Identifies the implementation in the UI, e.g. `openrouter`. */
   readonly id: string;
-  readonly isMock: boolean;
   listModels(): Promise<ModelInfo[]>;
   generateDeck(args: GenerateArgs): Promise<GenerationResult>;
+  /** One plausible wrong answer for a multiple-choice card, pitched at its context. */
+  suggestChoice(args: SuggestChoiceArgs): Promise<string>;
 }
 
 export class GenerationAbortedError extends Error {

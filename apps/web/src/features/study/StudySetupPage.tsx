@@ -40,7 +40,7 @@ export function StudySetupPage() {
   const activeDeck = deck;
 
   function setMode(mode: StudySettings['mode']) {
-    setSettings((s) => applyModePreset({ ...s, mode }));
+    setSettings((s) => applyModePreset(s, mode));
   }
 
   function update<K extends keyof StudySettings>(key: K, value: StudySettings[K]) {
@@ -82,7 +82,7 @@ export function StudySetupPage() {
       <div>
         <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Study "{deck.title}"</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {activeCount} card{activeCount === 1 ? '' : 's'} available · {stats.due} due for review
+          {activeCount} card{activeCount === 1 ? '' : 's'} available
         </p>
       </div>
 
@@ -201,7 +201,6 @@ export function StudySetupPage() {
           </div>
 
           <Switch checked={settings.filters.starredOnly} onChange={(v) => updateFilters('starredOnly', v)} label="Starred only" />
-          <Switch checked={settings.filters.dueOnly} onChange={(v) => updateFilters('dueOnly', v)} label="Due only" description="Only cards scheduled for review" />
           <Switch checked={settings.filters.excludeMastered} onChange={(v) => updateFilters('excludeMastered', v)} label="Exclude mastered" description={`Skip cards at ${settings.filters.masteredThreshold}%+ mastery`} />
         </CardBody>
       </Card>

@@ -12,14 +12,36 @@ export default function SignUpScreen() {
   const status = app.authStore((s) => s.status);
   const error = app.authStore((s) => s.error);
   const errorField = app.authStore((s) => s.errorField);
+  const pendingEmail = app.authStore((s) => s.pendingConfirmationEmail);
 
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   async function onSubmit() {
-    const ok = await signUp({ name, email, password });
+    const ok = await signUp({ username, email, password });
     if (ok) router.replace('/(app)');
+  }
+
+  if (pendingEmail) {
+    return (
+      <Screen>
+        <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
+          <Text style={{ fontSize: 40 }}>✉️</Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
+            Check your email
+          </Text>
+          <Text style={{ fontSize: 15, color: theme.textMuted, marginTop: spacing.md, textAlign: 'center', lineHeight: 22 }}>
+            We sent a confirmation link to{' '}
+            <Text style={{ fontWeight: '700', color: theme.text }}>{pendingEmail}</Text>.
+            Click it to confirm your account, then sign in.
+          </Text>
+          <Link href="/(auth)/sign-in" style={{ marginTop: spacing.xl }}>
+            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 16 }}>Go to sign in</Text>
+          </Link>
+        </View>
+      </Screen>
+    );
   }
 
   return (
@@ -35,10 +57,13 @@ export default function SignUpScreen() {
       </View>
 
       <Field
-        label="Full name"
-        placeholder="Alex Rivera"
-        value={name}
-        onChangeText={setName}
+        label="Username"
+        hint="3–20 chars, lowercase, a–z, 0–9, _"
+        placeholder="alex_rivera"
+        autoCapitalize="none"
+        autoCorrect={false}
+        value={username}
+        onChangeText={setUsername}
         error={errorField === 'name' ? error ?? undefined : undefined}
       />
       <Field
@@ -69,9 +94,6 @@ export default function SignUpScreen() {
           <Text style={{ color: theme.primary, fontWeight: '700' }}>Sign in</Text>
         </Link>
       </View>
-      <Text style={{ textAlign: 'center', color: theme.textFaint, fontSize: 12, marginTop: spacing.lg }}>
-        Auth is mocked for this preview — any valid-looking email works.
-      </Text>
     </Screen>
   );
 }

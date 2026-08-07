@@ -1,31 +1,31 @@
 import type { GenerationResult } from '../../types';
-import { MockLlmService } from './mockLlm';
 import { OpenRouterLlmService, type OpenRouterConfig } from './openRouter';
-import type { GenerateArgs, LlmService, ModelInfo } from './types';
+import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
+
+/** Thrown when no usable OpenRouter key is configured at call time. */
+export class LlmConfigError extends Error {
+  constructor() {
+    super('No OpenRouter API key is configured.');
+    this.name = 'LlmConfigError';
+  }
+}
 
 /**
- * Picks between the mock and the real generator on every call.
+ * Resolves the OpenRouter key on every call rather than once at construction.
  *
  * The key is not known when the app is constructed: it lives in the settings
- * store, which the user can fill in from Settings → Generation at any point,
- * and the app object is a page-load singleton. Deciding once at startup would
- * mean a key entered in Settings did nothing until a reload — and clearing it
- * would leave the app calling a dead key. So the decision is deferred to the
- * moment of use, and the underlying service is rebuilt only when the key
- * actually changes.
+ * store, which can change at any point, and the app object is a page-load
+ * singleton. Deciding once at startup would mean a key change did nothing
+ * until a reload. So the decision is deferred to the moment of use, and the
+ * underlying service is rebuilt only when the key actually changes.
  */
 export class RoutingLlmService implements LlmService {
-  private mock = new MockLlmService();
   private real?: { key: string; service: OpenRouterLlmService };
 
   constructor(private readonly resolveConfig: () => OpenRouterConfig | undefined) {}
 
   get id(): string {
     return this.active().id;
-  }
-
-  get isMock(): boolean {
-    return this.active().isMock;
   }
 
   listModels(): Promise<ModelInfo[]> {
@@ -36,13 +36,17 @@ export class RoutingLlmService implements LlmService {
     return this.active().generateDeck(args);
   }
 
+  suggestChoice(args: SuggestChoiceArgs): Promise<string> {
+    return this.active().suggestChoice(args);
+  }
+
   /** The service the next call would use, given the key available right now. */
   active(): LlmService {
     const config = this.resolveConfig();
     const key = config?.apiKey.trim();
     if (!config || !key) {
       this.real = undefined;
-      return this.mock;
+      throw new LlmConfigError();
     }
     if (this.real?.key !== key) {
       this.real = { key, service: new OpenRouterLlmService({ ...config, apiKey: key }) };

@@ -59,7 +59,7 @@ export function createStudyStore(deckStore: DeckStore, storage: StorageAdapter) 
             response,
           }, cardsById);
 
-          deckStore.getState().reviewCard(deckId, cardId, finalGrade, correct);
+          deckStore.getState().reviewCard(deckId, cardId, correct);
           set({ activeSession: updated });
 
           if (updated.status === 'completed') {

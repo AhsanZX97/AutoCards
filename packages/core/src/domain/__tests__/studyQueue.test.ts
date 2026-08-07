@@ -18,14 +18,6 @@ describe('filterCards', () => {
     expect(result[0]?.starred).toBe(true);
   });
 
-  it('filters to due cards only when requested', () => {
-    const now = new Date('2026-06-01T00:00:00.000Z');
-    const due = makeCard({ srs: { ...makeCard().srs, dueAt: '2026-05-01T00:00:00.000Z' } });
-    const notDue = makeCard({ srs: { ...makeCard().srs, dueAt: '2026-12-01T00:00:00.000Z' } });
-    const result = filterCards([due, notDue], { ...DEFAULT_FILTERS, dueOnly: true }, now);
-    expect(result.map((c) => c.id)).toEqual([due.id]);
-  });
-
   it('excludes mastered cards above the threshold', () => {
     const mastered = makeCard({ mastery: 95 });
     const learning = makeCard({ mastery: 40 });
@@ -87,14 +79,6 @@ describe('orderCards', () => {
     const critical = makeCard({ priority: 'critical' });
     const result = orderCards([low, critical], 'priority-first');
     expect(result.map((c) => c.id)).toEqual([critical.id, low.id]);
-  });
-
-  it('due-first sorts the most overdue card to the front', () => {
-    const now = new Date('2026-06-15T00:00:00.000Z');
-    const veryOverdue = makeCard({ srs: { ...makeCard().srs, dueAt: '2026-01-01T00:00:00.000Z' } });
-    const barelyOverdue = makeCard({ srs: { ...makeCard().srs, dueAt: '2026-06-10T00:00:00.000Z' } });
-    const result = orderCards([barelyOverdue, veryOverdue], 'due-first', Math.random, now);
-    expect(result.map((c) => c.id)).toEqual([veryOverdue.id, barelyOverdue.id]);
   });
 
   it('random preserves the full set and is deterministic per seed', () => {

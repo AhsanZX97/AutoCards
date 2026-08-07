@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { computeDeckStats } from '@autocards/core';
+import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Badge, Button, Card, CardBody, Input, Progress } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
+import { toast } from '../../components/ui/toastStore';
 
 type FilterMode = 'active' | 'archived';
 
@@ -14,6 +15,9 @@ export function DeckLibraryPage() {
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
   const archiveDeck = app.deckStore((s) => s.archiveDeck);
   const deleteDeck = app.deckStore((s) => s.deleteDeck);
+  const importDeck = app.deckStore((s) => s.importDeck);
+  const userId = app.authStore((s) => s.session?.user.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('active');
@@ -24,6 +28,35 @@ export function DeckLibraryPage() {
       .filter((deck) => deck.title.toLowerCase().includes(query.toLowerCase()));
   }, [decks, filter, query]);
 
+  function handleImportFile(file: File | null) {
+    if (!file) return;
+    if (!userId) {
+      toast({ variant: 'error', title: 'Sign in to import a deck' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const payload = parseDeckExport(String(reader.result ?? ''));
+      if (!payload) {
+        toast({ variant: 'error', title: 'Not a valid deck file' });
+        return;
+      }
+      if (payload.cards.length === 0 && payload.categories.length === 0) {
+        toast({ variant: 'error', title: 'Deck file is empty' });
+        return;
+      }
+      const deck = importDeck(payload, userId);
+      toast({
+        variant: 'success',
+        title: 'Deck imported',
+        description: `${deck.title} — ${payload.cards.length} cards`,
+      });
+      navigate(`/app/decks/${deck.id}`);
+    };
+    reader.onerror = () => toast({ variant: 'error', title: 'Could not read file' });
+    reader.readAsText(file);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -31,10 +64,25 @@ export function DeckLibraryPage() {
           <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">My Decks</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{decks.length} deck{decks.length === 1 ? '' : 's'} total</p>
         </div>
-        <Link to="/app/decks/new">
-          <Button>+ Create deck from PDF</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            Import
+          </Button>
+          <Link to="/app/decks/new">
+            <Button>+ Create deck from PDF</Button>
+          </Link>
+        </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          handleImportFile(e.target.files?.[0] ?? null);
+          e.currentTarget.value = '';
+        }}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xs flex-1">
@@ -63,8 +111,18 @@ export function DeckLibraryPage() {
             <span className="text-4xl">🗂️</span>
             <p className="mt-3 font-medium text-slate-700 dark:text-slate-300">No decks found</p>
             <p className="mt-1 text-sm text-slate-400">
-              {filter === 'archived' ? 'Nothing archived yet.' : 'Create your first deck to get started.'}
+              {filter === 'archived' ? 'Nothing archived yet.' : 'Create your first deck or import one to get started.'}
             </p>
+            {filter === 'active' && (
+              <div className="mt-4 flex gap-2">
+                <Link to="/app/decks/new">
+                  <Button size="sm" variant="outline">Create a deck</Button>
+                </Link>
+                <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  Import a deck
+                </Button>
+              </div>
+            )}
           </CardBody>
         </Card>
       ) : (
@@ -99,7 +157,6 @@ export function DeckLibraryPage() {
                   </div>
                   <Progress value={stats.averageMastery} max={100} className="mt-2" />
                   <div className="mt-4 flex items-center gap-2">
-                    {stats.due > 0 && <Badge variant="warning">{stats.due} due</Badge>}
                     {stats.starred > 0 && <Badge variant="info">{stats.starred} ⭐</Badge>}
                   </div>
                   <div className="mt-4 flex gap-2">

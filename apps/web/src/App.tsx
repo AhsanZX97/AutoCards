@@ -12,6 +12,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { DeckLibraryPage } from './features/decks/DeckLibraryPage';
 import { CreateDeckPage } from './features/decks/CreateDeckPage';
 import { DeckDetailPage } from './features/decks/DeckDetailPage';
+import { ImportSharedDeck } from './features/decks/ImportSharedDeck';
 import { StudySetupPage } from './features/study/StudySetupPage';
 import { StudyRunnerPage } from './features/study/StudyRunnerPage';
 import { StudyResultsPage } from './features/study/StudyResultsPage';
@@ -132,6 +133,7 @@ export default function App() {
         />
       </Routes>
       <Toaster />
+      <ImportSharedDeck />
     </>
   );
 }

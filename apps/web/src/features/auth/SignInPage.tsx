@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { DEMO_CREDENTIALS } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Field, Input } from '../../components/ui';
 
@@ -23,11 +22,6 @@ export function SignInPage() {
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/app';
       navigate(from, { replace: true });
     }
-  }
-
-  function fillDemo() {
-    setEmail(DEMO_CREDENTIALS.email);
-    setPassword(DEMO_CREDENTIALS.password);
   }
 
   return (
@@ -60,23 +54,6 @@ export function SignInPage() {
           Sign in
         </Button>
       </form>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-        </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-white px-2 text-slate-400 dark:bg-slate-950">or</span>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={fillDemo}
-        className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-500 hover:border-brand-400 hover:text-brand-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-brand-500 dark:hover:text-brand-400"
-      >
-        Fill demo credentials
-      </button>
 
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         Don&apos;t have an account?{' '}

@@ -44,8 +44,6 @@ export interface DeckStats {
   new: number;
   learning: number;
   review: number;
-  /** Cards whose SRS due date has passed. */
-  due: number;
   mastered: number;
   suspended: number;
   starred: number;

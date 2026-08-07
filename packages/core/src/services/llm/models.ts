@@ -10,14 +10,41 @@ import type { ModelInfo } from './types';
  */
 export const MODEL_CATALOG: ModelInfo[] = [
   {
-    id: 'anthropic/claude-opus-5',
-    name: 'Claude Opus 5',
-    vendor: 'Anthropic',
-    context: 1_000_000,
-    inputPrice: 5,
-    outputPrice: 25,
-    description: 'Best card quality on dense, technical PDFs. The default.',
+    id: 'deepseek/deepseek-v3.2',
+    name: 'DeepSeek V3.2',
+    vendor: 'DeepSeek',
+    context: 128_000,
+    inputPrice: 0.27,
+    outputPrice: 1.1,
+    description: 'Best card quality per dollar on dense, technical PDFs. The default.',
     recommended: true,
+  },
+  {
+    id: 'moonshotai/kimi-k2',
+    name: 'Kimi K2',
+    vendor: 'Moonshot AI',
+    context: 128_000,
+    inputPrice: 0.6,
+    outputPrice: 2.5,
+    description: 'Strong reasoning on long documents. Good for dense textbook chapters.',
+  },
+  {
+    id: 'qwen/qwen3-max',
+    name: 'Qwen3 Max',
+    vendor: 'Alibaba',
+    context: 256_000,
+    inputPrice: 1.2,
+    outputPrice: 6,
+    description: 'Alibaba’s flagship. Handles long, multilingual source documents well.',
+  },
+  {
+    id: 'z-ai/glm-4.6',
+    name: 'GLM-4.6',
+    vendor: 'Zhipu AI',
+    context: 128_000,
+    inputPrice: 0.6,
+    outputPrice: 2.2,
+    description: 'Fast and cheap. Good for short handouts and lecture slides.',
   },
   {
     id: 'anthropic/claude-sonnet-5',
@@ -26,7 +53,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
     context: 1_000_000,
     inputPrice: 3,
     outputPrice: 15,
-    description: 'Near-Opus quality, noticeably cheaper. Good default for bulk decks.',
+    description: 'Near-frontier quality, noticeably pricier. Good for bulk decks that need extra polish.',
   },
   {
     id: 'anthropic/claude-haiku-4.5',
@@ -35,20 +62,11 @@ export const MODEL_CATALOG: ModelInfo[] = [
     context: 200_000,
     inputPrice: 1,
     outputPrice: 5,
-    description: 'Fastest and cheapest. Best for short handouts and lecture slides.',
-  },
-  {
-    id: 'anthropic/claude-fable-5',
-    name: 'Claude Fable 5',
-    vendor: 'Anthropic',
-    context: 1_000_000,
-    inputPrice: 10,
-    outputPrice: 50,
-    description: 'Most capable. Worth it for research papers and legal texts.',
+    description: 'Fastest Claude option. Best for short handouts and lecture slides.',
   },
 ];
 
-export const DEFAULT_MODEL_ID = 'anthropic/claude-opus-5';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v3.2';
 
 export function findModel(id: string): ModelInfo | undefined {
   return MODEL_CATALOG.find((model) => model.id === id);

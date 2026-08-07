@@ -22,8 +22,8 @@ export function DashboardPage() {
     [activeDecks, cardsByDeck],
   );
   const deckSummaries = allDeckStats.slice(0, 6);
-  const totalDue = allDeckStats.reduce((sum, d) => sum + d.stats.due, 0);
-  const firstName = user?.name.split(' ')[0] ?? 'there';
+  const totalCards = allDeckStats.reduce((sum, d) => sum + d.stats.total, 0);
+  const firstName = user?.username ?? 'there';
 
   return (
     <div className="space-y-8">
@@ -33,9 +33,9 @@ export function DashboardPage() {
             Welcome back, {firstName} 👋
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {totalDue > 0
-              ? `You have ${totalDue} card${totalDue === 1 ? '' : 's'} due for review today.`
-              : "You're all caught up. Nice work."}
+            {activeDecks.length > 0
+              ? `You have ${activeDecks.length} deck${activeDecks.length === 1 ? '' : 's'} ready to study.`
+              : 'Create your first deck to get started.'}
           </p>
         </div>
         <Link to="/app/decks/new">
@@ -48,7 +48,7 @@ export function DashboardPage() {
         <StatTile icon="🔥" label="Day streak" value={stats.streak.current} sublabel={stats.streak.atRisk ? 'At risk today' : `Best: ${stats.streak.longest}`} />
         <StatTile icon="⭐" label="Level" value={stats.level.level} sublabel={`${stats.level.xpIntoLevel}/${stats.level.xpForNextLevel} XP`} />
         <StatTile icon="🎯" label="Accuracy" value={`${Math.round(stats.accuracy * 100)}%`} sublabel={`${stats.totalCards} cards answered`} />
-        <StatTile icon="📚" label="Decks" value={activeDecks.length} sublabel={`${totalDue} due now`} />
+        <StatTile icon="📚" label="Decks" value={activeDecks.length} sublabel={`${totalCards} cards total`} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -82,7 +82,6 @@ export function DashboardPage() {
                           <span className="text-xs text-slate-400">{deckStats.averageMastery}% mastered</span>
                         </div>
                       </div>
-                      {deckStats.due > 0 && <Badge variant="warning">{deckStats.due} due</Badge>}
                     </Link>
                   );
                 })}

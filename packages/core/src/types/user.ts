@@ -43,7 +43,8 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
 export interface User {
   id: Id;
   email: string;
-  name: string;
+  /** Unique lowercase handle (a-z0-9_), the student-facing identity. */
+  username: string;
   /** Two-letter fallback rendered when there is no avatar image. */
   initials: string;
   avatarUrl?: string;
@@ -64,5 +65,14 @@ export interface Credentials {
 }
 
 export interface SignUpInput extends Credentials {
-  name: string;
+  username: string;
 }
+
+/**
+ * Sign-up doesn't always yield an authenticated session: a provider that
+ * requires email confirmation returns no session until the link is clicked.
+ * Callers must branch on `status` rather than assume `session` is present.
+ */
+export type SignUpResult =
+  | { status: 'authenticated'; session: Session }
+  | { status: 'confirmation-required'; email: string };

@@ -11,6 +11,8 @@ import {
 } from '@autocards/core';
 import { Button, Field, Input, Modal, Select, Switch, Textarea } from '../../components/ui';
 import { Chip } from '../../components/ui/Chip';
+import { toast } from '../../components/ui/toastStore';
+import { useApp } from '../../lib/appContext';
 
 interface CardEditorModalProps {
   open: boolean;
@@ -25,7 +27,9 @@ function emptyChoice(): Choice {
 }
 
 export function CardEditorModal({ open, onClose, onSave, initial, categories }: CardEditorModalProps) {
+  const app = useApp();
   const [draft, setDraft] = useState<CardDraft>(() => initial ?? blankDraft());
+  const [suggestingChoice, setSuggestingChoice] = useState(false);
 
   useEffect(() => {
     if (open) setDraft(initial ?? blankDraft());
@@ -45,6 +49,27 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
 
   function removeChoice(id: string) {
     update('choices', (draft.choices ?? []).filter((c) => c.id !== id));
+  }
+
+  async function addAiChoice() {
+    setSuggestingChoice(true);
+    try {
+      const model = app.settingsStore.getState().generationDefaults.model;
+      const text = await app.services.llm.suggestChoice({
+        front: draft.front,
+        back: draft.back,
+        existingChoices: (draft.choices ?? []).map((c) => c.text).filter(Boolean),
+        model,
+      });
+      update('choices', [...(draft.choices ?? []), { id: createId('choice'), text, correct: false }]);
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: error instanceof Error ? error.message : 'Could not generate a choice',
+      });
+    } finally {
+      setSuggestingChoice(false);
+    }
   }
 
   function handleSave() {
@@ -106,9 +131,18 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Choices</p>
               {draft.type === 'multiple-choice' && (
-                <button onClick={addChoice} className="text-xs font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
-                  + Add choice
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={addAiChoice}
+                    disabled={suggestingChoice}
+                    className="text-xs font-semibold text-brand-700 hover:text-brand-600 disabled:opacity-50 dark:text-brand-400"
+                  >
+                    {suggestingChoice ? 'Thinking…' : '+ AI choice'}
+                  </button>
+                  <button onClick={addChoice} className="text-xs font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
+                    + Add choice
+                  </button>
+                </div>
               )}
             </div>
             <div className="space-y-2">

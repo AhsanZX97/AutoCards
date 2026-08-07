@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { AuthService } from '../services/auth/mockAuth';
-import { AuthError } from '../services/auth/mockAuth';
+import type { AuthService } from '../services/auth/types';
+import { AuthError } from '../services/auth/types';
 import type { StorageAdapter } from '../lib/storage';
 import { STORAGE_KEYS } from '../lib/storage';
 import { toZustandStorage } from './persistBridge';
@@ -12,12 +12,19 @@ export interface AuthState {
   status: 'idle' | 'restoring' | 'loading' | 'authenticated' | 'signed-out';
   error: string | null;
   errorField: 'email' | 'password' | 'name' | null;
+  /** Set when sign-up lands in the `confirmation-required` state — the UI
+   *  shows a "check your email" screen instead of navigating into the app. */
+  pendingConfirmationEmail: string | null;
   restore: () => Promise<void>;
   signIn: (credentials: Credentials) => Promise<boolean>;
   signUp: (input: SignUpInput) => Promise<boolean>;
   signOut: () => Promise<void>;
-  updateProfile: (patch: Partial<Pick<User, 'name' | 'avatarUrl'>>) => Promise<void>;
+  updateProfile: (patch: Partial<Pick<User, 'username' | 'avatarUrl'>>) => Promise<void>;
   changePlan: (plan: Plan) => Promise<void>;
+  /** Applies a session snapshot from an external auth source (Supabase's
+   *  `onAuthStateChange`), so a silently-refreshed token updates the store
+   *  proactively rather than only when `restore()` happens to run. */
+  syncFromProvider: (session: Session | null) => void;
   clearError: () => void;
 }
 
@@ -29,6 +36,7 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
         status: 'idle',
         error: null,
         errorField: null,
+        pendingConfirmationEmail: null,
 
         restore: async () => {
           const { session } = get();
@@ -46,7 +54,7 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
         },
 
         signIn: async (credentials) => {
-          set({ status: 'loading', error: null, errorField: null });
+          set({ status: 'loading', error: null, errorField: null, pendingConfirmationEmail: null });
           try {
             const session = await auth.signIn(credentials);
             set({ session, status: 'authenticated' });
@@ -62,11 +70,16 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
         },
 
         signUp: async (input) => {
-          set({ status: 'loading', error: null, errorField: null });
+          set({ status: 'loading', error: null, errorField: null, pendingConfirmationEmail: null });
           try {
-            const session = await auth.signUp(input);
-            set({ session, status: 'authenticated' });
-            return true;
+            const result = await auth.signUp(input);
+            if (result.status === 'authenticated') {
+              set({ session: result.session, status: 'authenticated' });
+              return true;
+            }
+            // Provider requires email confirmation — no session yet.
+            set({ status: 'signed-out', pendingConfirmationEmail: result.email });
+            return false;
           } catch (err) {
             set({
               status: 'signed-out',
@@ -79,7 +92,7 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
 
         signOut: async () => {
           await auth.signOut();
-          set({ session: null, status: 'signed-out', error: null, errorField: null });
+          set({ session: null, status: 'signed-out', error: null, errorField: null, pendingConfirmationEmail: null });
         },
 
         updateProfile: async (patch) => {
@@ -94,6 +107,11 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
           if (!session) return;
           const user = await auth.changePlan(session.user, plan);
           set({ session: { ...session, user } });
+        },
+
+        syncFromProvider: (session) => {
+          if (session) set({ session, status: 'authenticated', error: null, errorField: null });
+          else set({ session: null, status: 'signed-out', pendingConfirmationEmail: null });
         },
 
         clearError: () => set({ error: null, errorField: null }),

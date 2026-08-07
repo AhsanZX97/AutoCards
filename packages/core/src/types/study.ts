@@ -5,7 +5,6 @@ export const STUDY_MODES = [
   'timed',
   'exam',
   'cram',
-  'spaced',
   'survival',
 ] as const;
 export type StudyMode = (typeof STUDY_MODES)[number];
@@ -42,12 +41,6 @@ export const STUDY_MODE_INFO: Record<StudyMode, StudyModeInfo> = {
     description: 'Missed cards come back until every one is answered right.',
     icon: '🔁',
   },
-  spaced: {
-    id: 'spaced',
-    label: 'Spaced repetition',
-    description: 'Only the cards due today, scheduled by the SRS algorithm.',
-    icon: '🧠',
-  },
   survival: {
     id: 'survival',
     label: 'Survival',
@@ -62,7 +55,6 @@ export const SHUFFLE_MODES = [
   'priority-first',
   'hardest-first',
   'weakest-first',
-  'due-first',
 ] as const;
 export type ShuffleMode = (typeof SHUFFLE_MODES)[number];
 
@@ -72,7 +64,6 @@ export const SHUFFLE_MODE_LABELS: Record<ShuffleMode, string> = {
   'priority-first': 'Priority first',
   'hardest-first': 'Hardest first',
   'weakest-first': 'Weakest first',
-  'due-first': 'Most overdue first',
 };
 
 export interface TimerSettings {
@@ -93,7 +84,6 @@ export interface StudyFilters {
   difficulties: Difficulty[];
   priorities: Priority[];
   starredOnly: boolean;
-  dueOnly: boolean;
   /** Leave out cards already at or above `masteredThreshold`. */
   excludeMastered: boolean;
   /** Cards at or above this mastery count as mastered. */
