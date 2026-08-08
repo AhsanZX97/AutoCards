@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeGeneratedCards } from '../normalizeCards';
-import type { GenerationOptions } from '../../../types';
+import { allowedCardTypes, normalizeGeneratedCards } from '../normalizeCards';
+import { CARD_TYPES, type CardType, type GenerationOptions } from '../../../types';
 
 const BASE_OPTIONS: GenerationOptions = {
   model: 'deepseek/deepseek-v3.2',
   cardCount: 10,
-  cardTypes: ['basic', 'reversed', 'cloze', 'multiple-choice', 'true-false', 'type-in'],
+  cardTypes: ['basic', 'multiple-choice', 'true-false', 'type-in'],
   difficulty: 'medium',
   autoCategories: false,
   includeHints: true,
@@ -95,8 +95,8 @@ describe('normalizeGeneratedCards', () => {
 
   it('drops a card that cannot be demoted into any requested type', () => {
     const { cards } = normalizeGeneratedCards(
-      { cards: [{ type: 'basic', front: 'Q', back: 'A' }] },
-      options({ cardTypes: ['cloze'] }),
+      { cards: [{ type: 'basic', front: 'Q', back: '' }] },
+      options({ cardTypes: ['type-in'] }),
     );
     expect(cards).toEqual([]);
   });
@@ -345,8 +345,8 @@ describe('normalizeGeneratedCards', () => {
     });
   });
 
-  describe('cloze cards', () => {
-    it('keeps a cloze card carrying blank markers', () => {
+  describe('cloze cards, which the app no longer writes', () => {
+    it('reads a blanked sentence out into a basic question and answer', () => {
       const { cards } = normalizeGeneratedCards(
         {
           cards: [
@@ -360,34 +360,22 @@ describe('normalizeGeneratedCards', () => {
         },
         options(),
       );
-      expect(cards[0]?.type).toBe('cloze');
-      expect(cards[0]?.clozeText).toBe('The capital of France is {{c1::Paris}}.');
-    });
-
-    it('fills front and back from the cloze text so the card is never blank', () => {
-      const { cards } = normalizeGeneratedCards(
-        {
-          cards: [
-            { type: 'cloze', front: '', back: '', clozeText: 'Water boils at {{c1::100C}}.' },
-          ],
-        },
-        options(),
-      );
-      expect(cards[0]?.front).toContain('Water boils at');
-      expect(cards[0]?.back).toBe('Water boils at 100C.');
-    });
-
-    it('demotes to basic when the cloze text has no blank markers', () => {
-      const { cards } = normalizeGeneratedCards(
-        {
-          cards: [
-            { type: 'cloze', front: 'Q', back: 'A', clozeText: 'No blanks in this sentence.' },
-          ],
-        },
-        options(),
-      );
       expect(cards[0]?.type).toBe('basic');
       expect(cards[0]?.clozeText).toBeUndefined();
+      expect(cards[0]?.front).toContain('The capital of France is');
+      expect(cards[0]?.back).toBe('The capital of France is Paris.');
+    });
+
+    it('leaves a front and back the model did write alone', () => {
+      const { cards } = normalizeGeneratedCards(
+        {
+          cards: [
+            { type: 'cloze', front: 'Q', back: 'A', clozeText: 'Water boils at {{c1::100C}}.' },
+          ],
+        },
+        options(),
+      );
+      expect(cards[0]).toMatchObject({ type: 'basic', front: 'Q', back: 'A' });
     });
 
     it('drops a cloze card with neither markers nor a usable front and back', () => {
@@ -500,6 +488,32 @@ describe('normalizeGeneratedCards', () => {
         options({ autoCategories: true, cardCount: 1 }),
       );
       expect(categories.map((c) => c.name)).toEqual(['Kept']);
+    });
+  });
+
+  describe('retired card types', () => {
+    it('drops a type the app no longer knows', () => {
+      expect(allowedCardTypes(['basic', 'reversed' as CardType])).toEqual(['basic']);
+    });
+
+    it('falls back to every current type when nothing requested survives', () => {
+      expect(allowedCardTypes(['reversed' as CardType])).toEqual([...CARD_TYPES]);
+    });
+
+    it('writes a card claiming a retired type as a basic one', () => {
+      const { cards } = normalizeGeneratedCards(
+        { cards: [{ type: 'reversed', front: 'Term', back: 'Definition' }] },
+        options(),
+      );
+      expect(cards[0]?.type).toBe('basic');
+    });
+
+    it('keeps a retired type out of a run that only asked for it', () => {
+      const { cards } = normalizeGeneratedCards(
+        { cards: [{ type: 'reversed', front: 'Term', back: 'Definition' }] },
+        options({ cardTypes: ['reversed' as CardType] }),
+      );
+      expect(cards[0]?.type).toBe('basic');
     });
   });
 });

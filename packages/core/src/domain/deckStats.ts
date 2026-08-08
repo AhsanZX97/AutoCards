@@ -1,7 +1,8 @@
 import type { DeckStats, Flashcard } from '../types';
 
-const MASTERED_THRESHOLD = 90;
-const LEARNING_THRESHOLD = 40;
+/** Exported so the UI can explain these counts without restating the numbers. */
+export const MASTERED_THRESHOLD = 90;
+export const LEARNING_THRESHOLD = 40;
 
 export function computeDeckStats(cards: readonly Flashcard[]): DeckStats {
   const stats: DeckStats = {

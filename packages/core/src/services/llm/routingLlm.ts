@@ -2,10 +2,14 @@ import type { GenerationResult } from '../../types';
 import { OpenRouterLlmService, type OpenRouterConfig } from './openRouter';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 
-/** Thrown when no usable OpenRouter key is configured at call time. */
+/**
+ * Thrown when no usable OpenRouter key is configured at call time. The message
+ * is what the user sees, so it says what it means for them rather than naming
+ * the key — a missing key is our deployment problem, not theirs.
+ */
 export class LlmConfigError extends Error {
   constructor() {
-    super('No OpenRouter API key is configured.');
+    super('Card generation is not switched on for this app yet.');
     this.name = 'LlmConfigError';
   }
 }

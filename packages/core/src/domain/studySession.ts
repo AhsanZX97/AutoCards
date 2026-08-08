@@ -103,6 +103,20 @@ export function recordAnswer(
   };
 }
 
+/**
+ * Closes out a session that a reload or a closed tab left behind. There is no
+ * resume path, but the answers already written to card mastery cannot be taken
+ * back — so the run is recorded as abandoned rather than dropped, otherwise the
+ * cards say they were reviewed while the stats say nothing happened.
+ *
+ * Duration is the time banked at the last answer, not the wall clock: the gap
+ * between closing the tab and reopening it is not study time.
+ */
+export function abandonStaleSession(session: StudySession): StudySession {
+  const lastActivity = new Date(new Date(session.startedAt).getTime() + session.durationMs);
+  return abandonSession(session, lastActivity);
+}
+
 export function abandonSession(session: StudySession, now: Date = new Date()): StudySession {
   if (session.status !== 'active') return session;
   return {

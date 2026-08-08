@@ -249,9 +249,13 @@ function utf8Decode(bytes: Uint8Array): string {
 function readCardDraft(raw: unknown, categoryIds: Set<string>): CardDraft | null {
   if (!isRecord(raw)) return null;
 
-  const front = readString(raw.front);
-  const back = readString(raw.back);
+  // A deck shared from an older build can still hold cloze cards. Their content
+  // lives in `clozeText`, so it is read out into a plain question and answer
+  // rather than importing a type this build no longer writes.
   const clozeText = readString(raw.clozeText);
+  const parsedCloze = clozeText && hasCloze(clozeText) ? parseCloze(clozeText) : undefined;
+  const front = readString(raw.front) || (parsedCloze?.prompt ?? '');
+  const back = readString(raw.back) || (parsedCloze?.answer ?? '');
 
   const base: CardDraft = {
     type: 'basic',
@@ -282,7 +286,7 @@ function readCardDraft(raw: unknown, categoryIds: Set<string>): CardDraft | null
   if (categoryId && categoryIds.has(categoryId)) base.categoryId = categoryId;
 
   const type = readCardType(raw.type, raw);
-  return applyType(base, type, raw, clozeText);
+  return applyType(base, type, raw);
 }
 
 /**
@@ -293,21 +297,8 @@ function applyType(
   base: CardDraft,
   requested: CardType,
   raw: Record<string, unknown>,
-  clozeText: string,
 ): CardDraft | null {
   switch (requested) {
-    case 'cloze': {
-      if (!clozeText || !hasCloze(clozeText)) break;
-      const parsed = parseCloze(clozeText);
-      return {
-        ...base,
-        type: 'cloze',
-        clozeText,
-        front: base.front || parsed.prompt,
-        back: base.back || parsed.answer,
-      };
-    }
-
     case 'multiple-choice': {
       const choices = readChoices(raw.choices);
       if (choices) return { ...base, type: 'multiple-choice', choices };
@@ -339,7 +330,6 @@ function applyType(
     }
 
     case 'basic':
-    case 'reversed':
       return base.front && base.back ? { ...base, type: requested } : null;
   }
 
@@ -390,12 +380,9 @@ function readCardType(value: unknown, raw: Record<string, unknown>): CardType {
   if (direct) return direct;
   if (text === 'mcq' || text === 'multiple-choice-question' || text === 'choice') return 'multiple-choice';
   if (text === 'truefalse' || text === 'boolean') return 'true-false';
-  if (text === 'fill-in-the-blank' || text === 'fill-in-blank') return 'cloze';
   if (text === 'typein') return 'type-in';
 
   // No usable label — infer from the fields that came with it.
-  const clozeText = readString(raw.clozeText);
-  if (clozeText && hasCloze(clozeText)) return 'cloze';
   if (Array.isArray(raw.choices)) return 'multiple-choice';
   return 'basic';
 }

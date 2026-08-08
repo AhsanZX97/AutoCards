@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CARD_TYPE_LABELS, type Flashcard } from '@autocards/core';
+import { cardTypeLabel, type Flashcard } from '@autocards/core';
 import { Badge, Button, Card, CardBody, Progress } from '../../components/ui';
 import { DIFFICULTY_BADGE } from '../../lib/badges';
 import { getAnswerText, getPromptText } from '../../lib/cardText';
@@ -151,7 +151,7 @@ export function DeckFlashcardView({
       >
         <CardBody className="flex min-h-[320px] flex-col items-center justify-center gap-5 p-8 text-center">
           <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <Badge variant="neutral">{CARD_TYPE_LABELS[card.type]}</Badge>
+            <Badge variant="neutral">{cardTypeLabel(card.type)}</Badge>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
               {DIFFICULTY_BADGE[card.difficulty].label}
             </span>

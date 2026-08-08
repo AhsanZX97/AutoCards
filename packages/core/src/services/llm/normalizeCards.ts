@@ -45,12 +45,24 @@ const CATEGORY_ICONS = ['📘', '🛠️', '🧠', '🎯', '🔬', '📐', '🗺
 const TRUE_WORDS = new Set(['true', 't', 'yes', 'correct']);
 const FALSE_WORDS = new Set(['false', 'f', 'no', 'incorrect']);
 
+/**
+ * The card types a run may actually produce.
+ *
+ * Settings saved before a type was retired still name it — `reversed` is the
+ * one so far — so anything the app no longer knows is dropped, and a request
+ * left with nothing usable falls back to the full list rather than to silence.
+ */
+export function allowedCardTypes(requested: readonly CardType[]): CardType[] {
+  const known = requested.filter((type) => (CARD_TYPES as readonly string[]).includes(type));
+  return known.length > 0 ? known : [...CARD_TYPES];
+}
+
 export function normalizeGeneratedCards(
   payload: unknown,
   options: GenerationOptions,
 ): NormalizedGeneration {
   const raw = extractCardArray(payload);
-  const allowed = new Set<CardType>(options.cardTypes.length > 0 ? options.cardTypes : [...CARD_TYPES]);
+  const allowed = new Set<CardType>(allowedCardTypes(options.cardTypes));
 
   const kept: Array<{ card: GeneratedCard; categoryName?: string }> = [];
   let discarded = 0;
@@ -92,9 +104,13 @@ function normalizeCard(
 ): { card: GeneratedCard; categoryName?: string } | undefined {
   if (!isRecord(entry)) return undefined;
 
-  const front = readString(entry.front ?? entry.question ?? entry.prompt);
-  const back = readString(entry.back ?? entry.answer ?? entry.response);
+  // Nothing asks for cloze cards any more, but a model told to write flashcards
+  // still reaches for one now and then. Read the sentence rather than drop the
+  // card: blanked out it is the question, whole it is the answer.
   const clozeText = readString(entry.clozeText ?? entry.cloze ?? entry.text);
+  const parsedCloze = clozeText && hasCloze(clozeText) ? parseCloze(clozeText) : undefined;
+  const front = readString(entry.front ?? entry.question ?? entry.prompt) || (parsedCloze?.prompt ?? '');
+  const back = readString(entry.back ?? entry.answer ?? entry.response) || (parsedCloze?.answer ?? '');
 
   const base: GeneratedCard = {
     type: 'basic',
@@ -119,8 +135,8 @@ function normalizeCard(
     if (source) base.source = source;
   }
 
-  const requested = readCardType(entry.type, { hasChoices: entry.choices !== undefined, clozeText });
-  const card = applyType(base, requested, entry, clozeText, allowed);
+  const requested = readCardType(entry.type, { hasChoices: entry.choices !== undefined });
+  const card = applyType(base, requested, entry, allowed);
   if (!card) return undefined;
 
   const categoryName = readString(entry.category ?? entry.categoryName ?? entry.topic) || undefined;
@@ -135,20 +151,16 @@ function applyType(
   base: GeneratedCard,
   requested: CardType,
   entry: Record<string, unknown>,
-  clozeText: string,
   allowed: Set<CardType>,
 ): GeneratedCard | undefined {
   if (allowed.has(requested)) {
-    const specialized = specialize(base, requested, entry, clozeText);
+    const specialized = specialize(base, requested, entry);
     if (specialized) return specialized;
   }
   // The claimed type was either not requested or could not be satisfied. A card
   // with both sides written still works as a plain question/answer pair.
   if (allowed.has('basic') && base.front && base.back) {
     return { ...base, type: 'basic' };
-  }
-  if (allowed.has('reversed') && base.front && base.back) {
-    return { ...base, type: 'reversed' };
   }
   return undefined;
 }
@@ -157,23 +169,8 @@ function specialize(
   base: GeneratedCard,
   type: CardType,
   entry: Record<string, unknown>,
-  clozeText: string,
 ): GeneratedCard | undefined {
   switch (type) {
-    case 'cloze': {
-      if (!clozeText || !hasCloze(clozeText)) return undefined;
-      const parsed = parseCloze(clozeText);
-      return {
-        ...base,
-        type: 'cloze',
-        clozeText,
-        // The runner renders `clozeText`, but front/back are what every list,
-        // search and export path shows — leaving them empty renders blank rows.
-        front: base.front || parsed.prompt,
-        back: base.back || parsed.answer,
-      };
-    }
-
     case 'multiple-choice': {
       const choices = readChoices(entry.choices ?? entry.options, base.back, entry.correctIndex ?? entry.answerIndex);
       if (!choices) return undefined;
@@ -202,7 +199,6 @@ function specialize(
     }
 
     case 'basic':
-    case 'reversed':
       return base.front && base.back ? { ...base, type } : undefined;
 
     default:
@@ -210,10 +206,7 @@ function specialize(
   }
 }
 
-function readCardType(
-  value: unknown,
-  shape: { hasChoices: boolean; clozeText: string },
-): CardType {
+function readCardType(value: unknown, shape: { hasChoices: boolean }): CardType {
   const raw = readString(value).toLowerCase().replace(/[\s_]+/g, '-');
   const direct = CARD_TYPES.find((type) => type === raw);
   if (direct) return direct;
@@ -221,11 +214,9 @@ function readCardType(
   // Common aliases a model reaches for when it does not follow the schema.
   if (raw === 'mcq' || raw === 'multiple-choice-question' || raw === 'choice') return 'multiple-choice';
   if (raw === 'truefalse' || raw === 'boolean') return 'true-false';
-  if (raw === 'fill-in-the-blank' || raw === 'fill-in-blank') return 'cloze';
   if (raw === 'short-answer' || raw === 'typein') return raw === 'typein' ? 'type-in' : 'basic';
 
   // No usable label — infer from the fields that came with it.
-  if (shape.clozeText && hasCloze(shape.clozeText)) return 'cloze';
   if (shape.hasChoices) return 'multiple-choice';
   return 'basic';
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CARD_TYPE_LABELS,
   CARD_TYPES,
+  DEFAULT_MODEL_ID,
   DIFFICULTIES,
   GENERATION_STAGE_LABELS,
   type CardType,
@@ -10,7 +11,6 @@ import {
   type Flashcard,
   type GeneratedCard,
   type GenerationProgress,
-  type ModelInfo,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Chip, Field, Modal, Progress, Select, Slider, Switch, Textarea } from '../../components/ui';
@@ -53,14 +53,12 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
   const [step, setStep] = useState<Step>('setup');
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [models, setModels] = useState<ModelInfo[]>([]);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   const [cardCount, setCardCount] = useState(defaults.cardCount);
   const [cardTypes, setCardTypes] = useState<CardType[]>(defaults.cardTypes);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty);
-  const [model, setModel] = useState(defaults.model);
   const [categoryTarget, setCategoryTarget] = useState<string>(AUTO_CATEGORY);
   const [includeHints, setIncludeHints] = useState(defaults.includeHints);
   const [includeExplanations, setIncludeExplanations] = useState(defaults.includeExplanations);
@@ -76,30 +74,6 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     setProgress(null);
     setErrorMessage('');
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
-    app.services.llm
-      .listModels()
-      .then((available) => {
-        if (cancelled) return;
-        setModels(available);
-        // A saved default can name a model OpenRouter no longer serves, which
-        // would fail the whole run with a 404. Snap to a live one.
-        setModel((current) =>
-          available.some((m) => m.id === current)
-            ? current
-            : available.find((m) => m.recommended)?.id ?? available[0]?.id ?? current,
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setModels([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [app, open]);
 
   const handleFile = useCallback((selected: File | null) => {
     if (!selected) return;
@@ -126,14 +100,16 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
 
     setStep('generating');
     setErrorMessage('');
-    updateDefaults({ model, cardCount, cardTypes, difficulty, includeHints, includeExplanations, includeSourceQuotes });
+    updateDefaults({ cardCount, cardTypes, difficulty, includeHints, includeExplanations, includeSourceQuotes });
 
     try {
       const document = await app.services.pdf.extract(file);
       const result = await app.services.llm.generateDeck({
         document,
         options: {
-          model,
+          // Fixed house model — see `CreateDeckPage`; picking one is not a
+          // decision to put in front of a student.
+          model: DEFAULT_MODEL_ID,
           cardCount,
           cardTypes,
           difficulty,
@@ -162,7 +138,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
 
       if (added.length === 0) {
         setErrorMessage(
-          `Every card ${model} wrote was already in this deck. Try a different section of the document, or add custom instructions pointing it somewhere new.`,
+          'Every card written for this batch was already in the deck. Try a different section of the document, or add custom instructions pointing it somewhere new.',
         );
         setStep('error');
         return;
@@ -219,7 +195,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
           </p>
           {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
           <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-          <p className="mt-6 text-xs text-slate-400">Calling {model} via OpenRouter. This takes a minute.</p>
+          <p className="mt-6 text-xs text-slate-400">Reading your PDF and writing cards. This takes a minute.</p>
         </div>
       )}
 
@@ -284,16 +260,6 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
-
-          <Field label="Model" hint="Better models produce better cards">
-            <Select value={model} onChange={(e) => setModel(e.target.value)}>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} {m.recommended ? '(recommended)' : ''}
-                </option>
-              ))}
-            </Select>
-          </Field>
 
           <Slider
             label="Number of cards"

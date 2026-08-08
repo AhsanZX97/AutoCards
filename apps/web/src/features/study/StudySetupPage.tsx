@@ -10,11 +10,12 @@ import {
   applyModePreset,
   computeDeckStats,
   createDefaultStudySettings,
+  filterCards,
   normalizeStudySettings,
   type StudySettings,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
-import { Button, Card, CardBody, Chip, Field, Select, Slider, Switch } from '../../components/ui';
+import { Button, Card, CardBody, Chip, Field, FormNotice, Select, Slider, Switch } from '../../components/ui';
 import { EMPTY_ARRAY } from '../../lib/empty';
 
 export function StudySetupPage() {
@@ -33,6 +34,9 @@ export function StudySetupPage() {
   );
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
+  // What the session would actually queue up. `activeCount` below only counts
+  // unsuspended cards, so it says nothing about whether the filters match.
+  const matchingCount = useMemo(() => filterCards(cards, settings.filters).length, [cards, settings.filters]);
 
   if (!deckId) return <Navigate to="/app/decks" replace />;
   if (!deck) {
@@ -76,6 +80,10 @@ export function StudySetupPage() {
   }
 
   function handleStart() {
+    // Starting with an empty queue would create a session the runner cannot
+    // show, which used to bounce the learner back to the deck with no reason
+    // given. The button is disabled in that case; this is the backstop.
+    if (matchingCount === 0) return;
     startSession(activeDeck, cards, settings);
     navigate(`/app/study/${deckId}/run`);
   }
@@ -220,11 +228,19 @@ export function StudySetupPage() {
         </CardBody>
       </Card>
 
+      {matchingCount === 0 && (
+        <FormNotice>
+          {activeCount === 0
+            ? 'Every card in this deck is suspended, so there is nothing to study yet.'
+            : 'No cards match these filters. Widen them to start studying.'}
+        </FormNotice>
+      )}
+
       <div className="flex justify-end gap-3 pb-8">
         <Button variant="outline" onClick={() => navigate(`/app/decks/${deckId}`)}>
           Cancel
         </Button>
-        <Button size="lg" onClick={handleStart} disabled={activeCount === 0}>
+        <Button size="lg" onClick={handleStart} disabled={matchingCount === 0}>
           Start studying
         </Button>
       </div>

@@ -187,7 +187,6 @@ function BillingTab() {
                   <li>{formatLimit(limits.monthlyUploads)} uploads/mo</li>
                   <li>{formatLimit(limits.maxDecks)} decks</li>
                   <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF</li>
-                  <li>{limits.byoKey ? 'Bring your own key' : 'Shared generation'}</li>
                 </ul>
                 {!isCurrent && (
                   <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => changePlan(plan as Plan)}>

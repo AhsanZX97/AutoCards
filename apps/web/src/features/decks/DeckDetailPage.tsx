@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
-  CARD_TYPE_LABELS,
   DIFFICULTIES,
+  LEARNING_THRESHOLD,
+  MASTERED_THRESHOLD,
+  PRIORITIES,
+  cardTypeLabel,
   computeDeckStats,
   hasCloze,
   parseCloze,
@@ -11,7 +14,7 @@ import {
   type Flashcard,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
-import { Badge, Button, Card, CardBody, Chip, Input, Progress, Select } from '../../components/ui';
+import { Badge, Button, Card, CardBody, Chip, InfoButton, Input, Modal, Progress, Select } from '../../components/ui';
 import { DIFFICULTY_BADGE, PRIORITY_BADGE } from '../../lib/badges';
 import { accentOf } from '../../lib/accent';
 import { AddCardMenu } from './AddCardMenu';
@@ -57,6 +60,7 @@ export function DeckDetailPage() {
   const [deckEditorOpen, setDeckEditorOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [statsHelpOpen, setStatsHelpOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -136,6 +140,12 @@ export function DeckDetailPage() {
       toast({ variant: 'success', title: 'Card added' });
     }
     setEditorOpen(false);
+  }
+
+  /** Steps a card through low → normal → high → critical and back around. */
+  function cyclePriority(card: Flashcard) {
+    const next = PRIORITIES[(PRIORITIES.indexOf(card.priority) + 1) % PRIORITIES.length]!;
+    updateCard(deckId!, card.id, { ...draftFromExisting(card), priority: next });
   }
 
   /** The modal hands back the whole intended category list; turn that into the
@@ -256,9 +266,6 @@ export function DeckDetailPage() {
                 ))}
               </div>
             )}
-            {deck.generatedBy && (
-              <p className="mt-1 text-xs text-slate-400">Generated with {deck.generatedBy}</p>
-            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -279,12 +286,18 @@ export function DeckDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <MiniStat label="Cards" value={stats.total} />
-        <MiniStat label="New" value={stats.new} />
-        <MiniStat label="Learning" value={stats.learning} />
-        <MiniStat label="Mastered" value={stats.mastered} />
-        <MiniStat label="Avg mastery" value={`${stats.averageMastery}%`} />
+      <div>
+        <div className="mb-2 flex items-center gap-1.5">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Progress</p>
+          <InfoButton label="What do these numbers mean?" onClick={() => setStatsHelpOpen(true)} />
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <MiniStat label="Cards" value={stats.total} />
+          <MiniStat label="New" value={stats.new} />
+          <MiniStat label="Learning" value={stats.learning} />
+          <MiniStat label="Mastered" value={stats.mastered} />
+          <MiniStat label="Avg mastery" value={`${stats.averageMastery}%`} />
+        </div>
       </div>
 
       {deck.categories.length > 0 && (
@@ -420,6 +433,7 @@ export function DeckDetailPage() {
               onDelete={() => handleDelete(card)}
               onToggleStar={() => toggleStar(deckId!, card.id)}
               onToggleSuspend={() => toggleSuspend(deckId!, card.id)}
+              onCyclePriority={() => cyclePriority(card)}
             />
           ))}
         </div>
@@ -447,6 +461,42 @@ export function DeckDetailPage() {
         cards={cards}
       />
       {deckId && <DeckShareModal open={shareOpen} onClose={() => setShareOpen(false)} deckId={deckId} />}
+
+      <Modal
+        open={statsHelpOpen}
+        onClose={() => setStatsHelpOpen(false)}
+        title="How progress is measured"
+        description="All of it comes from how often you answer each card correctly."
+        size="md"
+        footer={<Button onClick={() => setStatsHelpOpen(false)}>Got it</Button>}
+      >
+        <dl className="space-y-3.5 text-sm">
+          <StatHelp term="Mastery">
+            The share of times you have answered a card right — 8 correct out of 10 tries is 80%. A brand new card
+            starts at 0% because it has no answers behind it yet.
+          </StatHelp>
+          <StatHelp term="New">You have not studied these cards even once.</StatHelp>
+          <StatHelp term="Learning">
+            Cards you are still getting wrong more often than not — under {LEARNING_THRESHOLD}% mastery.
+          </StatHelp>
+          <StatHelp term="Mastered">
+            Cards you almost always get right — {MASTERED_THRESHOLD}% mastery or better. You can skip these in a
+            session from the study screen.
+          </StatHelp>
+          <StatHelp term="Avg mastery">
+            The average across every card in the deck, leaving out any you have paused.
+          </StatHelp>
+        </dl>
+      </Modal>
+    </div>
+  );
+}
+
+function StatHelp({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="font-semibold text-slate-800 dark:text-slate-100">{term}</dt>
+      <dd className="mt-0.5 text-slate-600 dark:text-slate-400">{children}</dd>
     </div>
   );
 }
@@ -529,6 +579,7 @@ function CardRow({
   onDelete,
   onToggleStar,
   onToggleSuspend,
+  onCyclePriority,
 }: {
   card: Flashcard;
   /** 1-based place in the deck, which is what the number box shows and takes. */
@@ -546,6 +597,7 @@ function CardRow({
   onDelete: () => void;
   onToggleStar: () => void;
   onToggleSuspend: () => void;
+  onCyclePriority: () => void;
 }) {
   // Only armed while the grip is held, so the row stays selectable and
   // clickable everywhere else.
@@ -630,32 +682,44 @@ function CardRow({
           <button onClick={onToggleStar} className="text-lg" aria-label="Toggle star">
             {card.starred ? '⭐' : '☆'}
           </button>
-          <button
-            type="button"
-            onClick={() => setAnswerShown((v) => !v)}
-            aria-expanded={answerShown}
-            title={answerShown ? 'Hide answer' : 'Show answer'}
-            className="min-w-0 flex-1 text-left"
-          >
-            <p
-              className={cn(
-                'text-sm font-medium text-slate-800 dark:text-slate-200',
-                answerShown ? 'break-words' : 'truncate',
-              )}
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setAnswerShown((v) => !v)}
+              aria-expanded={answerShown}
+              title={answerShown ? 'Hide answer' : 'Show answer'}
+              className="w-full text-left"
             >
-              {displayFront}
-            </p>
+              <p
+                className={cn(
+                  'text-sm font-medium text-slate-800 dark:text-slate-200',
+                  answerShown ? 'break-words' : 'truncate',
+                )}
+              >
+                {displayFront}
+              </p>
+            </button>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="neutral">{CARD_TYPE_LABELS[card.type]}</Badge>
+              <Badge variant="neutral">{cardTypeLabel(card.type)}</Badge>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
                 {DIFFICULTY_BADGE[card.difficulty].label}
               </span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_BADGE[card.priority].classes}`}>
+              {/* Priority is a triage call made while looking over a deck, so it
+                  is set here rather than buried in the card editor. */}
+              <button
+                type="button"
+                onClick={onCyclePriority}
+                title="Click to change priority — it decides which cards come up first"
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-75',
+                  PRIORITY_BADGE[card.priority].classes,
+                )}
+              >
                 {PRIORITY_BADGE[card.priority].label}
-              </span>
+              </button>
               {card.suspended && <Badge variant="warning">Suspended</Badge>}
             </div>
-          </button>
+          </div>
           <div className="hidden w-32 shrink-0 sm:block">
             <Progress value={card.mastery} max={100} />
             <p className="mt-1 text-center text-xs text-slate-400">{card.mastery}% mastery</p>

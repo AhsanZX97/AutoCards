@@ -1,5 +1,5 @@
 import { hasCloze, normalizeAnswer, parseCloze, textSimilarity } from '../lib/text';
-import type { CardType } from '../types';
+import type { StoredCardType } from '../types';
 
 /**
  * Keeps a second pass of generation from re-covering ground the deck already
@@ -18,7 +18,7 @@ import type { CardType } from '../types';
 
 /** Enough of any card shape to compare it against another. */
 export interface ComparableCard {
-  type?: CardType;
+  type?: StoredCardType;
   front: string;
   back: string;
   clozeText?: string;

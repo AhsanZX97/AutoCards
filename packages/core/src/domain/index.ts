@@ -9,4 +9,5 @@ export * from './statsAggregation';
 export * from './flashcardFactory';
 export * from './cardOrder';
 export * from './cardDedupe';
+export * from './retiredCards';
 export * from './uploadQuota';

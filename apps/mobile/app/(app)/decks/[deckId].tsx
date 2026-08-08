@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  CARD_TYPE_LABELS,
   buildDeckExport,
+  cardTypeLabel,
   computeDeckStats,
   hasCloze,
   parseCloze,
@@ -131,7 +131,7 @@ export default function DeckDetailScreen() {
                     {front}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                    <Badge label={CARD_TYPE_LABELS[card.type]} color={theme.textMuted} softColor={theme.surfaceAlt} />
+                    <Badge label={cardTypeLabel(card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
                     <Badge
                       label={card.difficulty}
                       color={DIFFICULTY_COLOR[card.difficulty]}

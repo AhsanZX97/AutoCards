@@ -82,11 +82,13 @@ describe('buildDeckExport / parseDeckExport', () => {
     expect(restored?.generatedBy).toBeUndefined();
     expect(restored?.cards).toHaveLength(3);
 
-    // Content survives, review state never enters the payload.
+    // Content survives, review state never enters the payload. A cloze card
+    // from an older build arrives as the plain question and answer it becomes.
     const cloze = restored?.cards[0];
-    expect(cloze?.type).toBe('cloze');
-    expect(cloze?.clozeText).toBe('Mitosis {{c1::duplicates}} the chromosomes.');
+    expect(cloze?.type).toBe('basic');
+    expect(cloze?.clozeText).toBeUndefined();
     expect(cloze?.front).toBe(parsePrompt('Mitosis {{c1::duplicates}} the chromosomes.'));
+    expect(cloze?.back).toBe('Mitosis duplicates the chromosomes.');
     expect(cloze?.categoryId).toBe('cat_1');
 
     const mcq = restored?.cards[1];

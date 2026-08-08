@@ -3,8 +3,8 @@ import {
   CARD_TYPE_LABELS,
   CARD_TYPES,
   DIFFICULTIES,
-  PRIORITIES,
   createId,
+  demoteRetiredCard,
   type CardDraft,
   type Category,
   type Choice,
@@ -28,11 +28,13 @@ function emptyChoice(): Choice {
 
 export function CardEditorModal({ open, onClose, onSave, initial, categories }: CardEditorModalProps) {
   const app = useApp();
-  const [draft, setDraft] = useState<CardDraft>(() => initial ?? blankDraft());
+  // A card written when cloze still existed opens as the plain question and
+  // answer it becomes, rather than as a type the picker can no longer show.
+  const [draft, setDraft] = useState<CardDraft>(() => demoteRetiredCard(initial ?? blankDraft()));
   const [suggestingChoice, setSuggestingChoice] = useState(false);
 
   useEffect(() => {
-    if (open) setDraft(initial ?? blankDraft());
+    if (open) setDraft(demoteRetiredCard(initial ?? blankDraft()));
   }, [open, initial]);
 
   function update<K extends keyof CardDraft>(key: K, value: CardDraft[K]) {
@@ -106,25 +108,12 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
           </Select>
         </Field>
 
-        {draft.type === 'cloze' ? (
-          <Field label="Cloze text" hint='Wrap hidden text in {{c1::...}}'>
-            <Textarea
-              rows={3}
-              value={draft.clozeText ?? ''}
-              onChange={(e) => update('clozeText', e.target.value)}
-              placeholder="The {{c1::mitochondria}} is the powerhouse of the cell."
-            />
-          </Field>
-        ) : (
-          <>
-            <Field label="Front">
-              <Textarea rows={2} value={draft.front} onChange={(e) => update('front', e.target.value)} placeholder="Question or prompt" />
-            </Field>
-            <Field label="Back">
-              <Textarea rows={2} value={draft.back} onChange={(e) => update('back', e.target.value)} placeholder="Answer" />
-            </Field>
-          </>
-        )}
+        <Field label="Front">
+          <Textarea rows={2} value={draft.front} onChange={(e) => update('front', e.target.value)} placeholder="Question or prompt" />
+        </Field>
+        <Field label="Back">
+          <Textarea rows={2} value={draft.back} onChange={(e) => update('back', e.target.value)} placeholder="Answer" />
+        </Field>
 
         {(draft.type === 'multiple-choice' || draft.type === 'true-false') && (
           <div>
@@ -192,35 +181,17 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
               ))}
             </Select>
           </Field>
-          <Field label="Priority">
-            <Select value={draft.priority} onChange={(e) => update('priority', e.target.value as CardDraft['priority'])}>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p[0]?.toUpperCase() + p.slice(1)}
+          <Field label="Category">
+            <Select value={draft.categoryId ?? ''} onChange={(e) => update('categoryId', e.target.value || undefined)}>
+              <option value="">No category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
                 </option>
               ))}
             </Select>
           </Field>
         </div>
-
-        <Field label="Category">
-          <Select value={draft.categoryId ?? ''} onChange={(e) => update('categoryId', e.target.value || undefined)}>
-            <option value="">No category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.icon} {cat.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field label="Tags" hint="Comma separated">
-          <Input
-            value={draft.tags.join(', ')}
-            onChange={(e) => update('tags', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-            placeholder="exam, chapter-3"
-          />
-        </Field>
 
         <Field label="Hint" hint="optional">
           <Input value={draft.hint ?? ''} onChange={(e) => update('hint', e.target.value)} />
@@ -277,7 +248,6 @@ function normalizeDraft(draft: CardDraft): CardDraft {
 }
 
 function validateDraft(draft: CardDraft): boolean {
-  if (draft.type === 'cloze') return Boolean(draft.clozeText?.includes('{{'));
   if (!draft.front.trim()) return false;
   if (draft.type === 'multiple-choice') {
     const choices = draft.choices ?? [];

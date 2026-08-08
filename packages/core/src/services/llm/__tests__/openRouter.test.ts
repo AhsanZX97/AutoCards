@@ -71,20 +71,39 @@ const VALID_REPLY = JSON.stringify({
 });
 
 let fetchMock: ReturnType<typeof vi.fn>;
+let errorLog: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.useFakeTimers();
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
+  errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  errorLog.mockRestore();
 });
 
 function service() {
   return new OpenRouterLlmService({ apiKey: 'sk-or-test' });
+}
+
+/** Anything the person who uploaded the PDF cannot act on, and must not be shown. */
+const INTERNALS = /openrouter|deepseek|api key|credit|endpoint|http|\b[45]\d\d\b|json/i;
+
+/**
+ * A failure a user should only ever read as "not your fault, try later" — the
+ * message stays free of provider, model and status detail whatever went wrong.
+ */
+async function expectCleanFailure(pending: Promise<unknown>) {
+  await expect(pending).rejects.toThrow(/unavailable|garbled/i);
+  const message = await pending.then(
+    () => '',
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  expect(message).not.toMatch(INTERNALS);
 }
 
 describe('OpenRouterLlmService', () => {
@@ -270,28 +289,29 @@ describe('OpenRouterLlmService', () => {
   });
 
   describe('failures', () => {
-    it('explains a rejected key rather than leaking the status body', async () => {
+    it('keeps a rejected key out of the message and logs the detail instead', async () => {
       fetchMock.mockResolvedValue(failure(401, '{"error":{"message":"No auth credentials found"}}'));
-      await expect(
-        service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/rejected the API key/i);
+      await expectCleanFailure(service().generateDeck({ document: DOCUMENT, options: OPTIONS }));
+      expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('No auth credentials found'));
     });
 
-    it('explains an unknown model slug', async () => {
+    it('keeps an unknown model slug out of the message', async () => {
       fetchMock.mockResolvedValue(failure(404, '{"error":{"message":"No endpoints found"}}'));
-      await expect(
-        service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/does not serve "deepseek\/deepseek-v3\.2"/);
+      await expectCleanFailure(service().generateDeck({ document: DOCUMENT, options: OPTIONS }));
     });
 
-    it('explains an exhausted account', async () => {
+    it('keeps a billing problem out of the message', async () => {
       fetchMock.mockResolvedValue(failure(402, '{"error":{"message":"Insufficient credits"}}'));
-      await expect(
-        service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/out of credit/i);
+      await expectCleanFailure(service().generateDeck({ document: DOCUMENT, options: OPTIONS }));
     });
 
-    it('surfaces an upstream error returned inside a 200', async () => {
+    it('asks the user to wait when the service is rate-limited', async () => {
+      fetchMock.mockResolvedValue(failure(429, '{"error":{"message":"Rate limit exceeded"}}'));
+      const failed = service().generateDeck({ document: DOCUMENT, options: OPTIONS });
+      await expect(failed).rejects.toThrow(/busy/i);
+    });
+
+    it('hides an upstream error returned inside a 200', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
@@ -299,44 +319,41 @@ describe('OpenRouterLlmService', () => {
         text: async () => '',
       } as unknown as Response);
 
-      await expect(
-        service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/Upstream provider is down/);
+      await expectCleanFailure(service().generateDeck({ document: DOCUMENT, options: OPTIONS }));
+      expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('Upstream provider is down'));
     });
 
-    it('reports a truncated reply as a length problem', async () => {
+    it('reports a truncated reply as a size problem the user can act on', async () => {
       fetchMock.mockResolvedValue(completion('{"cards": [{"front": "Q", "ba', { finish_reason: 'length' }));
       await expect(
         service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/ran out of room/i);
+      ).rejects.toThrow(/fewer cards/i);
     });
 
     it('reports unparseable output', async () => {
       fetchMock.mockResolvedValue(completion('I am afraid I cannot do that.'));
-      await expect(
-        service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/did not return valid JSON/i);
+      await expectCleanFailure(service().generateDeck({ document: DOCUMENT, options: OPTIONS }));
     });
 
     it('fails loudly rather than silently returning a curated deck when nothing is usable', async () => {
       fetchMock.mockResolvedValue(completion(JSON.stringify({ cards: [{ front: '', back: '' }] })));
       await expect(
         service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/none were usable/i);
+      ).rejects.toThrow(/usable/i);
     });
 
-    it('explains an empty card list as a possible scanned PDF', async () => {
+    it('explains an empty card list as a possible scan', async () => {
       fetchMock.mockResolvedValue(completion(JSON.stringify({ cards: [] })));
       await expect(
         service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/no extractable text/i);
+      ).rejects.toThrow(/scan/i);
     });
 
-    it('reports a network failure against the endpoint', async () => {
+    it('reports a network failure as a connection problem', async () => {
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
       await expect(
         service().generateDeck({ document: DOCUMENT, options: OPTIONS }),
-      ).rejects.toThrow(/Could not reach OpenRouter/i);
+      ).rejects.toThrow(/connection/i);
     });
 
     it('refuses a synthetic document without spending a token', async () => {
@@ -345,7 +362,7 @@ describe('OpenRouterLlmService', () => {
           document: { ...DOCUMENT, synthetic: true },
           options: OPTIONS,
         }),
-      ).rejects.toThrow(/No text could be read out of/i);
+      ).rejects.toThrow(/could not read any text/i);
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -403,14 +420,14 @@ describe('OpenRouterLlmService', () => {
       expect(text).toBe('The chloroplast');
     });
 
-    it('explains a rejected key rather than leaking the status body', async () => {
+    it('keeps a rejected key out of the message', async () => {
       fetchMock.mockResolvedValue(failure(401, '{"error":{"message":"No auth credentials found"}}'));
-      await expect(
+      await expectCleanFailure(
         service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
-      ).rejects.toThrow(/rejected the API key/i);
+      );
     });
 
-    it('surfaces an upstream error returned inside a 200', async () => {
+    it('hides an upstream error returned inside a 200', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
@@ -418,16 +435,16 @@ describe('OpenRouterLlmService', () => {
         text: async () => '',
       } as unknown as Response);
 
-      await expect(
+      await expectCleanFailure(
         service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
-      ).rejects.toThrow(/Upstream provider is down/);
+      );
     });
 
     it('reports an empty reply', async () => {
       fetchMock.mockResolvedValue(completion('   '));
       await expect(
         service().suggestChoice({ front: 'Q', back: 'A', existingChoices: [], model: 'deepseek/deepseek-v3.2' }),
-      ).rejects.toThrow(/empty response/i);
+      ).rejects.toThrow(/nothing came back/i);
     });
 
     it('throws GenerationAbortedError when the signal is already aborted', async () => {

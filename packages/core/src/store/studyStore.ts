@@ -3,7 +3,14 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { hashSeed, seededRng } from '../lib/random';
 import { STORAGE_KEYS, type StorageAdapter } from '../lib/storage';
 import { toZustandStorage } from './persistBridge';
-import { abandonSession, createSession, gradeFromCorrectness, recordAnswer, toSessionSummary } from '../domain';
+import {
+  abandonSession,
+  abandonStaleSession,
+  createSession,
+  gradeFromCorrectness,
+  recordAnswer,
+  toSessionSummary,
+} from '../domain';
 import type { DeckStore } from './deckStore';
 import type { Deck, Flashcard, Grade, SessionSummary, StudySession, StudySettings } from '../types';
 
@@ -85,7 +92,28 @@ export function createStudyStore(deckStore: DeckStore, storage: StorageAdapter) 
       {
         name: STORAGE_KEYS.sessions,
         storage: createJSONStorage(() => toZustandStorage(storage)),
-        partialize: (state) => ({ history: state.history }),
+        // `activeSession` is persisted only so that a reload can close it out —
+        // see `merge`. It is never restored as something to carry on with.
+        partialize: (state) => ({ history: state.history, activeSession: state.activeSession }),
+        merge: (persisted, current) => {
+          const saved = (persisted ?? {}) as Partial<StudyState>;
+          const history = saved.history ?? current.history;
+          const stale = saved.activeSession;
+
+          // A session still marked active at load time is one the learner
+          // walked away from. Record it, then drop it: the runner has no resume
+          // path, so leaving it in place would only strand them mid-run.
+          if (stale && stale.status === 'active' && stale.answers.length > 0) {
+            return {
+              ...current,
+              ...saved,
+              history: [toSessionSummary(abandonStaleSession(stale)), ...history].slice(0, 500),
+              activeSession: null,
+            };
+          }
+
+          return { ...current, ...saved, history, activeSession: null };
+        },
       },
     ),
   );

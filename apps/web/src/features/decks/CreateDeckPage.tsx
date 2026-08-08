@@ -1,21 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  CARD_TYPE_DESCRIPTIONS,
   CARD_TYPE_LABELS,
   CARD_TYPES,
+  DEFAULT_MODEL_ID,
   DIFFICULTIES,
   GENERATION_STAGE_LABELS,
   type CardType,
   type Difficulty,
   type GenerationProgress,
-  type ModelInfo,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
-import { Button, Card, CardBody, Chip, Field, Input, Progress, Select, Slider, Switch, Textarea } from '../../components/ui';
+import { Button, Card, CardBody, Chip, Field, InfoButton, Input, Modal, Progress, Slider, Switch, Tabs, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
 
 type Step = 'idle' | 'generating' | 'error';
+/** Deck cards come from a PDF, or the deck starts empty and is filled in by hand. */
+type Mode = 'ai' | 'manual';
+
+const MODE_TABS = [
+  { id: 'ai', label: 'Generate with AI', icon: '✨' },
+  { id: 'manual', label: 'Start from scratch', icon: '✏️' },
+];
 
 export function CreateDeckPage() {
   const app = useApp();
@@ -27,46 +35,28 @@ export function CreateDeckPage() {
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
+  const createBlankDeck = app.deckStore((s) => s.createBlankDeck);
+  const updateDeck = app.deckStore((s) => s.updateDeck);
 
+  const [mode, setMode] = useState<Mode>('ai');
   const [step, setStep] = useState<Step>('idle');
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [models, setModels] = useState<ModelInfo[]>([]);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualDescription, setManualDescription] = useState('');
 
   const [cardCount, setCardCount] = useState(defaults.cardCount);
   const [cardTypes, setCardTypes] = useState<CardType[]>(defaults.cardTypes);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty);
-  const [model, setModel] = useState(defaults.model);
   const [autoCategories, setAutoCategories] = useState(defaults.autoCategories);
   const [includeHints, setIncludeHints] = useState(defaults.includeHints);
   const [includeExplanations, setIncludeExplanations] = useState(defaults.includeExplanations);
   const [includeSourceQuotes, setIncludeSourceQuotes] = useState(defaults.includeSourceQuotes);
   const [instructions, setInstructions] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    app.services.llm
-      .listModels()
-      .then((available) => {
-        if (cancelled) return;
-        setModels(available);
-        // The saved default can name a model OpenRouter no longer serves, which
-        // would fail the whole generation with a 404. Snap to a live one.
-        setModel((current) =>
-          available.some((m) => m.id === current)
-            ? current
-            : available.find((m) => m.recommended)?.id ?? available[0]?.id ?? current,
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setModels([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [app]);
+  const [typeHelpOpen, setTypeHelpOpen] = useState(false);
 
   const handleFile = useCallback((selected: File | null) => {
     if (!selected) return;
@@ -92,14 +82,16 @@ export function CreateDeckPage() {
     setStep('generating');
     setErrorMessage('');
 
-    updateDefaults({ model, cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes });
+    updateDefaults({ cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes });
 
     try {
       const document = await app.services.pdf.extract(file);
       const result = await app.services.llm.generateDeck({
         document,
         options: {
-          model,
+          // Model choice is not a decision to put in front of a student, so the
+          // page always runs on the house default rather than exposing a picker.
+          model: DEFAULT_MODEL_ID,
           cardCount,
           cardTypes,
           difficulty,
@@ -124,6 +116,16 @@ export function CreateDeckPage() {
     }
   }
 
+  function createManualDeck() {
+    const title = manualTitle.trim();
+    if (!title || !userId) return;
+    // No PDF, no model call — so this never touches the upload quota.
+    const deck = createBlankDeck(userId, title);
+    if (manualDescription.trim()) updateDeck(deck.id, { description: manualDescription.trim() });
+    toast({ variant: 'success', title: 'Deck created!', description: 'Add your first card to get going.' });
+    navigate(`/app/decks/${deck.id}`);
+  }
+
   function tryAgain() {
     setErrorMessage('');
     setStep('idle');
@@ -133,8 +135,14 @@ export function CreateDeckPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Create a deck</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload a PDF and Auto Cards will write the flashcards for you.</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {mode === 'ai'
+            ? 'Upload a PDF and Auto Cards will write the flashcards for you.'
+            : 'Start with an empty deck and write the cards yourself.'}
+        </p>
       </div>
+
+      {step === 'idle' && <Tabs items={MODE_TABS} active={mode} onChange={(id) => setMode(id as Mode)} />}
 
       {step === 'error' && (
         <Card>
@@ -160,14 +168,43 @@ export function CreateDeckPage() {
             </p>
             {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
             <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-            <p className="mt-6 text-xs text-slate-400">
-              Calling {model} via OpenRouter. Larger decks take a minute.
-            </p>
+            <p className="mt-6 text-xs text-slate-400">Reading your PDF and writing cards. Larger decks take a minute.</p>
           </CardBody>
         </Card>
       )}
 
-      {step === 'idle' && (
+      {step === 'idle' && mode === 'manual' && (
+        <Card>
+          <CardBody className="space-y-6">
+            <Field label="Deck name">
+              <Input
+                autoFocus
+                placeholder="e.g. Financial Accounting — Chapter 4"
+                value={manualTitle}
+                onChange={(e) => setManualTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') createManualDeck();
+                }}
+              />
+            </Field>
+            <Field label="Description" hint="optional">
+              <Textarea
+                rows={2}
+                placeholder="What this deck covers…"
+                value={manualDescription}
+                onChange={(e) => setManualDescription(e.target.value)}
+              />
+            </Field>
+            <div className="flex items-center justify-end">
+              <Button size="lg" disabled={!manualTitle.trim()} onClick={createManualDeck}>
+                Create empty deck
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {step === 'idle' && mode === 'ai' && (
         <div className="space-y-6">
           {!quota.canUpload && (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
@@ -228,16 +265,6 @@ export function CreateDeckPage() {
             <CardBody className="space-y-6">
               <h3 className="font-semibold text-slate-900 dark:text-white">Generation options</h3>
 
-              <Field label="Model" hint="Better models produce better cards">
-                <Select value={model} onChange={(e) => setModel(e.target.value)}>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} {m.recommended ? '(recommended)' : ''} — ${formatPrice(m.inputPrice)}/${formatPrice(m.outputPrice)} per M tok
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
               <Slider
                 label="Number of cards"
                 value={cardCount}
@@ -249,7 +276,10 @@ export function CreateDeckPage() {
               />
 
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Card types to include</p>
+                <div className="mb-2 flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Card types to include</p>
+                  <InfoButton label="What do these card types mean?" onClick={() => setTypeHelpOpen(true)} />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {CARD_TYPES.map((type) => (
                     <Chip key={type} active={cardTypes.includes(type)} onClick={() => toggleCardType(type)}>
@@ -295,11 +325,24 @@ export function CreateDeckPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={typeHelpOpen}
+        onClose={() => setTypeHelpOpen(false)}
+        title="Card types"
+        description="What each one looks like when you study."
+        size="md"
+        footer={<Button onClick={() => setTypeHelpOpen(false)}>Got it</Button>}
+      >
+        <dl className="space-y-3.5 text-sm">
+          {CARD_TYPES.map((type) => (
+            <div key={type}>
+              <dt className="font-semibold text-slate-800 dark:text-slate-100">{CARD_TYPE_LABELS[type]}</dt>
+              <dd className="mt-0.5 text-slate-600 dark:text-slate-400">{CARD_TYPE_DESCRIPTIONS[type]}</dd>
+            </div>
+          ))}
+        </dl>
+      </Modal>
     </div>
   );
-}
-
-/** Live OpenRouter pricing carries float noise (e.g. 0.26899999999999996); round it to cents for display. */
-function formatPrice(price: number): number {
-  return Math.round(price * 100) / 100;
 }

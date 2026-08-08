@@ -44,6 +44,11 @@ export function StudyRunnerPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
 
   const startedAtRef = useRef(Date.now());
+  // How long the card actually took to answer, frozen the moment the answer is
+  // locked in. Without this the clock would keep running while the learner
+  // reads the explanation, and that reading time would be scored as thinking
+  // time — enough on its own to wipe out the speed bonus on every card.
+  const answerTimeRef = useRef<number | null>(null);
 
   // Keyed on the queue slot, not the card id. Cram re-queues a missed card to
   // the end of the queue, so missing the *last* card puts the same id in the
@@ -51,6 +56,7 @@ export function StudyRunnerPage() {
   // stuck showing the previous answer.
   useEffect(() => {
     startedAtRef.current = Date.now();
+    answerTimeRef.current = null;
     setFlipped(false);
     setHintRevealed(false);
     setSelectedChoiceId(null);
@@ -59,8 +65,24 @@ export function StudyRunnerPage() {
     setRemaining(session?.settings.timer.enabled ? session.settings.timer.perCardSeconds : null);
   }, [session?.position]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The countdown is for producing an answer, so it stops as soon as one
+  // exists: `revealed` for auto-graded cards, `flipped` for self-graded ones.
+  // Self-graded cards never set `revealed`, so without the `flipped` check the
+  // clock would run on while the learner picks a grade and then auto-submit
+  // "again" over the top of them.
+  const answerGiven = revealed !== null || flipped;
+
+  // Freeze the elapsed time at the same instant the countdown stops. Anything
+  // after this point is reading the explanation or choosing a self-grade, which
+  // is not time spent answering.
   useEffect(() => {
-    if (remaining === null || revealed !== null) return undefined;
+    if (answerGiven && answerTimeRef.current === null) {
+      answerTimeRef.current = Date.now() - startedAtRef.current;
+    }
+  }, [answerGiven]);
+
+  useEffect(() => {
+    if (remaining === null || answerGiven) return undefined;
     if (remaining <= 0) {
       if (session?.settings.timer.autoAdvance) submitAnswer('again', false, true);
       return undefined;
@@ -68,7 +90,7 @@ export function StudyRunnerPage() {
     const timer = setTimeout(() => setRemaining((r) => (r !== null ? r - 1 : r)), 1000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining, revealed]);
+  }, [remaining, answerGiven]);
 
   if (!deckId) return <Navigate to="/app/decks" replace />;
   if (!session || session.deckId !== deckId) {
@@ -86,7 +108,9 @@ export function StudyRunnerPage() {
   const isAutoGraded = currentCard.type === 'multiple-choice' || currentCard.type === 'true-false' || currentCard.type === 'type-in';
 
   function submitAnswer(grade: Grade, correct: boolean, timedOut: boolean, response?: string) {
-    const timeMs = Date.now() - startedAtRef.current;
+    // Null only when the card was never answered — a timeout — where the full
+    // elapsed time is the honest figure.
+    const timeMs = answerTimeRef.current ?? Date.now() - startedAtRef.current;
     answer({
       cardId: currentCard!.id,
       grade,

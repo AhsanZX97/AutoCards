@@ -2,9 +2,9 @@ import { createId } from '../../lib/id';
 import { nowIso } from '../../lib/date';
 import { truncate } from '../../lib/text';
 import type { GenerationProgress, GenerationResult } from '../../types';
-import { CARD_TYPE_LABELS } from '../../types';
+import { cardTypeLabel } from '../../types';
 import { costOf, MODEL_CATALOG } from './models';
-import { normalizeGeneratedCards } from './normalizeCards';
+import { allowedCardTypes, normalizeGeneratedCards } from './normalizeCards';
 import { GenerationAbortedError } from './types';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 
@@ -117,7 +117,7 @@ export class OpenRouterLlmService implements LlmService {
     // placeholder, at full token cost. Refuse before spending anything.
     if (document.synthetic) {
       throw new Error(
-        `No text could be read out of ${document.filename}, so there is nothing to write cards from. Scanned or image-only PDFs need OCR first.`,
+        `We could not read any text out of ${document.filename}. If it is a scan or photos of pages, the words are really just pictures — try a PDF you can select text in.`,
       );
     }
 
@@ -142,7 +142,7 @@ export class OpenRouterLlmService implements LlmService {
 
     // The call is one long await with no server-side progress events, so the
     // bar creeps toward a ceiling instead of freezing for the whole wait.
-    const stopTicking = startWaitingTicker(report, options.model);
+    const stopTicking = startWaitingTicker(report);
 
     let response: Response;
     try {
@@ -154,13 +154,13 @@ export class OpenRouterLlmService implements LlmService {
       });
     } catch (error) {
       if (isAbortError(error)) throw new GenerationAbortedError();
-      throw new Error(`Could not reach OpenRouter: ${messageOf(error)}`);
+      throw new Error(offlineMessage(error));
     } finally {
       stopTicking();
     }
 
     if (!response.ok) {
-      throw new Error(await describeHttpFailure(response, options.model));
+      throw new Error(await describeHttpFailure(response));
     }
 
     const payload = (await response.json()) as {
@@ -171,7 +171,7 @@ export class OpenRouterLlmService implements LlmService {
 
     // OpenRouter can return a 200 carrying an upstream provider error.
     if (payload.error?.message) {
-      throw new Error(`OpenRouter: ${payload.error.message}`);
+      throw new Error(upstreamMessage(payload.error.message));
     }
 
     report({
@@ -188,8 +188,8 @@ export class OpenRouterLlmService implements LlmService {
     if (cards.length === 0) {
       throw new Error(
         discarded > 0
-          ? `The model returned ${discarded} card${discarded === 1 ? '' : 's'} but none were usable. Try a different model or fewer card types.`
-          : 'The model returned no cards. The PDF may have no extractable text — see if it is a scanned document.',
+          ? 'None of the cards came back in a usable state. Try again, or turn off a card type or two.'
+          : 'No cards came back from this PDF. If it is a scan or photos of pages, there is no text in it to work from.',
       );
     }
 
@@ -200,7 +200,7 @@ export class OpenRouterLlmService implements LlmService {
 
     return {
       deckTitle: document.title?.trim() || titleFromFilename(document.filename),
-      deckDescription: `Generated from ${document.filename} with ${options.model}.`,
+      deckDescription: `Generated from ${document.filename}.`,
       deckIcon: '📄',
       categories,
       cards,
@@ -244,11 +244,11 @@ export class OpenRouterLlmService implements LlmService {
       });
     } catch (error) {
       if (isAbortError(error)) throw new GenerationAbortedError();
-      throw new Error(`Could not reach OpenRouter: ${messageOf(error)}`);
+      throw new Error(offlineMessage(error));
     }
 
     if (!response.ok) {
-      throw new Error(await describeHttpFailure(response, model));
+      throw new Error(await describeHttpFailure(response));
     }
 
     const payload = (await response.json()) as {
@@ -257,12 +257,12 @@ export class OpenRouterLlmService implements LlmService {
     };
 
     if (payload.error?.message) {
-      throw new Error(`OpenRouter: ${payload.error.message}`);
+      throw new Error(upstreamMessage(payload.error.message));
     }
 
     const text = stripSuggestionWrapping(payload.choices?.[0]?.message?.content ?? '');
     if (!text) {
-      throw new Error('The model returned an empty response. Try again, or pick a different model.');
+      throw new Error('Nothing came back that time. Try again in a moment.');
     }
     return text;
   }
@@ -294,10 +294,7 @@ function outputBudget(cardCount: number): number {
  * Creeps the progress bar toward a ceiling while the single model call is in
  * flight. Never reaches 1 — only a real response does that.
  */
-function startWaitingTicker(
-  report: (progress: GenerationProgress) => void,
-  model: string,
-): () => void {
+function startWaitingTicker(report: (progress: GenerationProgress) => void): () => void {
   let elapsed = 0;
   const timer = setInterval(() => {
     elapsed += TICK_MS;
@@ -307,7 +304,7 @@ function startWaitingTicker(
     report({
       stage: 'generating',
       progress,
-      message: `${model} is writing your flashcards`,
+      message: 'Writing your flashcards',
       cardsGenerated: 0,
     });
   }, TICK_MS);
@@ -316,7 +313,7 @@ function startWaitingTicker(
 }
 
 function buildSystemPrompt(options: GenerateArgs['options'], avoidPrompts: string[] = []): string {
-  const types = options.cardTypes;
+  const types = allowedCardTypes(options.cardTypes);
   return [
     'You write flashcards from source documents. You reply with JSON only.',
     '',
@@ -381,10 +378,6 @@ function describeAvoided(prompts: string[]): string {
 function describeTypes(types: GenerateArgs['options']['cardTypes']): string {
   const rules: Record<string, string> = {
     basic: '  basic — nothing extra. "front" asks, "back" answers.',
-    reversed:
-      '  reversed — "front" is a term, "back" is its definition. It is also shown in reverse, so both sides must stand alone.',
-    cloze:
-      '  cloze — add "clozeText": the full sentence with the hidden words wrapped as {{c1::hidden}}, numbered c1, c2… Use 1-2 blanks. Leave "front" and "back" as empty strings.',
     'multiple-choice':
       '  multiple-choice — add "choices": an array of 4 objects {"text": "…", "correct": true|false}. Exactly one is correct, and "back" repeats that correct text. Wrong options must be plausible.',
     'true-false':
@@ -393,7 +386,7 @@ function describeTypes(types: GenerateArgs['options']['cardTypes']): string {
       '  type-in — add "acceptedAnswers": an array of every reasonable spelling or phrasing of the answer, including "back" itself. Keep answers to a few words.',
   };
   return types
-    .map((type) => rules[type] ?? `  ${CARD_TYPE_LABELS[type]}`)
+    .map((type) => rules[type] ?? `  ${cardTypeLabel(type)}`)
     .join('\n');
 }
 
@@ -437,7 +430,7 @@ function stripSuggestionWrapping(text: string): string {
 function parseJsonPayload(content: string, finishReason?: string): unknown {
   const trimmed = content.trim();
   if (!trimmed) {
-    throw new Error('The model returned an empty response. Try again, or pick a different model.');
+    throw new Error(GARBLED_MESSAGE);
   }
 
   const candidates = [trimmed, stripCodeFence(trimmed), firstJsonObject(trimmed)];
@@ -451,11 +444,9 @@ function parseJsonPayload(content: string, finishReason?: string): unknown {
   }
 
   if (finishReason === 'length') {
-    throw new Error(
-      'The model ran out of room before finishing the deck. Ask for fewer cards, or pick a model with a larger output limit.',
-    );
+    throw new Error('This deck was too big to finish in one go. Ask for fewer cards and try again.');
   }
-  throw new Error('The model did not return valid JSON. Try again, or pick a different model.');
+  throw new Error(GARBLED_MESSAGE);
 }
 
 function stripCodeFence(value: string): string | undefined {
@@ -471,7 +462,30 @@ function firstJsonObject(value: string): string | undefined {
   return value.slice(start, end + 1);
 }
 
-async function describeHttpFailure(response: Response, model: string): Promise<string> {
+/**
+ * What the user is told when a run fails.
+ *
+ * None of these name the provider, the model or an HTTP status: the person
+ * reading them uploaded a PDF and wants cards, and cannot act on any of that.
+ * They split by who can actually fix it — the user waits and retries, or we
+ * do. The underlying detail goes to the console for whoever is on support.
+ */
+const UNAVAILABLE_MESSAGE =
+  'Card generation is unavailable right now. This one is on us — please try again a little later.';
+const BUSY_MESSAGE = 'Card generation is busy at the moment. Give it a minute and try again.';
+const GARBLED_MESSAGE = 'The cards came back garbled that time. Try generating again.';
+
+function offlineMessage(error: unknown): string {
+  logFailure('request failed', messageOf(error));
+  return 'Could not reach the internet. Check your connection and try again.';
+}
+
+function upstreamMessage(detail: string): string {
+  logFailure('upstream error', detail);
+  return UNAVAILABLE_MESSAGE;
+}
+
+async function describeHttpFailure(response: Response): Promise<string> {
   const raw = await response.text().catch(() => '');
   let detail = raw.slice(0, 300);
   try {
@@ -480,19 +494,15 @@ async function describeHttpFailure(response: Response, model: string): Promise<s
   } catch {
     // Not JSON — the truncated body is the best detail available.
   }
+  logFailure(`HTTP ${response.status}`, detail);
 
-  switch (response.status) {
-    case 401:
-      return 'OpenRouter rejected the API key. Check it in Settings → Generation.';
-    case 402:
-      return 'Your OpenRouter account is out of credit.';
-    case 404:
-      return `OpenRouter does not serve "${model}". Pick a different model.`;
-    case 429:
-      return 'OpenRouter is rate-limiting this key. Wait a moment and try again.';
-    default:
-      return `OpenRouter returned ${response.status}${detail ? `: ${detail}` : ''}`;
-  }
+  // 401 (bad key), 402 (no credit) and 404 (retired model) are all our
+  // configuration rather than anything the user did or can change.
+  return response.status === 429 ? BUSY_MESSAGE : UNAVAILABLE_MESSAGE;
+}
+
+function logFailure(context: string, detail: string): void {
+  console.error(`[autocards] generation ${context}${detail ? `: ${detail}` : ''}`);
 }
 
 interface LiveModel {

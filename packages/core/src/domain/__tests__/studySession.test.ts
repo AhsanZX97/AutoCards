@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSession, currentCardId, recordAnswer } from '../studySession';
+import { abandonStaleSession, createSession, currentCardId, recordAnswer } from '../studySession';
 import { applyModePreset, createDefaultStudySettings } from '../studySettings';
 import { makeCard } from './testHelpers';
 import type { Deck, Flashcard, StudyMode, StudySession } from '../../types';
@@ -65,5 +65,32 @@ describe('cram mode queueing', () => {
     session = answer(session, cards, true);
 
     expect(session.status).toBe('completed');
+  });
+});
+
+describe('abandonStaleSession', () => {
+  it('marks a session left behind by a reload as abandoned', () => {
+    const cards = [makeCard(), makeCard()];
+    let session = startSession(cards, 'timed');
+    session = answer(session, cards, true);
+
+    expect(abandonStaleSession(session).status).toBe('abandoned');
+  });
+
+  it('counts only the time up to the last answer, not the time the tab was closed', () => {
+    const cards = [makeCard(), makeCard()];
+    let session = startSession(cards, 'timed');
+    session = answer(session, cards, true);
+
+    const banked = session.durationMs;
+    expect(abandonStaleSession(session).durationMs).toBe(banked);
+  });
+
+  it('keeps the answers so the run can still be recorded', () => {
+    const cards = [makeCard(), makeCard()];
+    let session = startSession(cards, 'timed');
+    session = answer(session, cards, true);
+
+    expect(abandonStaleSession(session).answers).toHaveLength(1);
   });
 });
