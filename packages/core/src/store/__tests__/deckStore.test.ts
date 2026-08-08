@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryStorage } from '../../lib/storage';
 import { createDeckStore } from '../deckStore';
-import type { SyncOp } from '../../types';
+import type { CardDraft, Category, GeneratedCard, SyncOp } from '../../types';
+
+function draft(front: string, back: string, extra: Partial<CardDraft> = {}): CardDraft {
+  return {
+    type: 'basic',
+    front,
+    back,
+    difficulty: 'medium',
+    priority: 'normal',
+    tags: [],
+    starred: false,
+    suspended: false,
+    weight: 1,
+    ...extra,
+  };
+}
+
+function generated(front: string, back: string, extra: Partial<GeneratedCard> = {}): GeneratedCard {
+  return { front, back, ...extra };
+}
 
 function setup() {
   const ops: SyncOp[] = [];
@@ -168,5 +187,173 @@ describe('createDeckStore.deleteCategory', () => {
     store.getState().deleteCategory(deck.id, category.id);
     expect(store.getState().getDeck(deck.id)?.categories).toEqual([]);
     expect(store.getState().getCards(deck.id).find((c) => c.id === card.id)?.categoryId).toBeUndefined();
+  });
+});
+
+describe('createDeckStore.addGeneratedCards', () => {
+  it('appends the cards to the end of the deck', () => {
+    const { store, deck } = setup();
+    store.getState().addCard(deck.id, draft('existing', 'card'));
+    store.getState().addGeneratedCards(deck.id, [generated('What is osmosis?', 'Diffusion of water')]);
+    expect(store.getState().getCards(deck.id).map((c) => c.front)).toEqual([
+      'existing',
+      'What is osmosis?',
+    ]);
+  });
+
+  it('numbers the new cards after the ones already in the deck', () => {
+    const { store, deck } = setup();
+    store.getState().addCard(deck.id, draft('one', 'a'));
+    store.getState().addCard(deck.id, draft('two', 'b'));
+    store.getState().addGeneratedCards(deck.id, [generated('three', 'c'), generated('four', 'd')]);
+    expect(store.getState().getCards(deck.id).map((c) => c.position)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('skips a card the deck already asks', () => {
+    const { store, deck } = setup();
+    store.getState().addCard(deck.id, draft('What is osmosis?', 'Diffusion of water'));
+    const result = store
+      .getState()
+      .addGeneratedCards(deck.id, [
+        generated('What is osmosis?', 'Diffusion of water.'),
+        generated('What is diffusion?', 'Movement down a gradient'),
+      ]);
+    expect(result.added.map((c) => c.front)).toEqual(['What is diffusion?']);
+    expect(result.duplicates).toBe(1);
+    expect(store.getState().getCards(deck.id)).toHaveLength(2);
+  });
+
+  it('reuses an existing category when the generated one shares its name', () => {
+    const { store, deck } = setup();
+    const existing = store.getState().addCategory(deck.id, 'Transport', 'sky', '🧬');
+    store.getState().addGeneratedCards(
+      deck.id,
+      [generated('What is osmosis?', 'Diffusion of water', { categoryId: 'cat_new' })],
+      [{ id: 'cat_new', name: 'transport', accent: 'rose', icon: '📘' }],
+    );
+    expect(store.getState().getDeck(deck.id)?.categories).toEqual([existing]);
+    expect(store.getState().getCards(deck.id)[0]?.categoryId).toBe(existing.id);
+  });
+
+  it('adds a category the deck does not have yet', () => {
+    const { store, deck } = setup();
+    store.getState().addGeneratedCards(
+      deck.id,
+      [generated('What is osmosis?', 'Diffusion of water', { categoryId: 'cat_new' })],
+      [{ id: 'cat_new', name: 'Transport', accent: 'rose', icon: '📘' }],
+    );
+    expect(store.getState().getDeck(deck.id)?.categories.map((c) => c.name)).toEqual(['Transport']);
+    expect(store.getState().getCards(deck.id)[0]?.categoryId).toBe('cat_new');
+  });
+
+  it('leaves out a category whose only cards were duplicates', () => {
+    const { store, deck } = setup();
+    store.getState().addCard(deck.id, draft('What is osmosis?', 'Diffusion of water'));
+    store.getState().addGeneratedCards(
+      deck.id,
+      [generated('What is osmosis?', 'Diffusion of water', { categoryId: 'cat_new' })],
+      [{ id: 'cat_new', name: 'Transport', accent: 'rose', icon: '📘' }],
+    );
+    expect(store.getState().getDeck(deck.id)?.categories).toEqual([]);
+  });
+
+  it('enqueues an upsert for each added card', () => {
+    const { store, deck, ops } = setup();
+    const result = store.getState().addGeneratedCards(deck.id, [generated('a', 'b'), generated('c', 'd')]);
+    expect(ops).toEqual(result.added.map((card) => ({ kind: 'card', id: card.id, deckId: deck.id, op: 'upsert' })));
+  });
+
+  it('enqueues a deck upsert only when a category was added', () => {
+    const { store, deck, ops } = setup();
+    store.getState().addGeneratedCards(
+      deck.id,
+      [generated('a', 'b', { categoryId: 'cat_new' })],
+      [{ id: 'cat_new', name: 'Transport', accent: 'rose', icon: '📘' }],
+    );
+    expect(ops.filter((op) => op.kind === 'deck')).toEqual([{ kind: 'deck', id: deck.id, op: 'upsert' }]);
+  });
+
+  it('does nothing when every card was a duplicate', () => {
+    const { store, deck, ops } = setup();
+    store.getState().addCard(deck.id, draft('What is osmosis?', 'Diffusion of water'));
+    ops.length = 0;
+    const result = store.getState().addGeneratedCards(deck.id, [generated('What is osmosis?', 'Diffusion of water')]);
+    expect(result).toEqual({ added: [], duplicates: 1 });
+    expect(ops).toEqual([]);
+  });
+
+  it('ignores an unknown deck id', () => {
+    const { store, ops } = setup();
+    expect(store.getState().addGeneratedCards('deck_missing', [generated('a', 'b')])).toEqual({
+      added: [],
+      duplicates: 0,
+    });
+    expect(ops).toEqual([]);
+  });
+});
+
+describe('createDeckStore.createDeckFromGeneration', () => {
+  function result(cards: GeneratedCard[], categories: Category[] = []) {
+    return {
+      deckTitle: 'Biology',
+      deckDescription: 'From notes.pdf',
+      deckIcon: '📄',
+      categories,
+      cards,
+      source: {
+        id: 'src_1',
+        filename: 'notes.pdf',
+        size: 1_000,
+        pageCount: 2,
+        charCount: 500,
+        uploadedAt: '2026-01-01T00:00:00.000Z',
+      },
+      model: 'test/model',
+      usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 },
+      elapsedMs: 10,
+    };
+  }
+
+  it('drops a card the model wrote twice in one pass', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store.getState().createDeckFromGeneration(
+      result([
+        generated('What is osmosis?', 'Diffusion of water'),
+        generated('What is osmosis?', 'Diffusion of water.'),
+        generated('What is diffusion?', 'Movement down a gradient'),
+      ]),
+      'user_1',
+    );
+    expect(store.getState().getCards(deck.id).map((c) => c.front)).toEqual([
+      'What is osmosis?',
+      'What is diffusion?',
+    ]);
+  });
+
+  it('numbers the surviving cards contiguously', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store.getState().createDeckFromGeneration(
+      result([generated('a', 'b'), generated('a', 'b'), generated('c', 'd')]),
+      'user_1',
+    );
+    expect(store.getState().getCards(deck.id).map((c) => c.position)).toEqual([0, 1]);
+  });
+
+  it('leaves out a category whose only card was a repeat', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store.getState().createDeckFromGeneration(
+      result(
+        [
+          generated('a', 'b', { categoryId: 'cat_keep' }),
+          generated('a', 'b', { categoryId: 'cat_drop' }),
+        ],
+        [
+          { id: 'cat_keep', name: 'Kept', accent: 'sky', icon: '📘' },
+          { id: 'cat_drop', name: 'Dropped', accent: 'rose', icon: '🛠️' },
+        ],
+      ),
+      'user_1',
+    );
+    expect(store.getState().getDeck(deck.id)?.categories.map((c) => c.name)).toEqual(['Kept']);
   });
 });

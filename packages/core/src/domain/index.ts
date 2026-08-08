@@ -8,3 +8,5 @@ export * from './deckStats';
 export * from './statsAggregation';
 export * from './flashcardFactory';
 export * from './cardOrder';
+export * from './cardDedupe';
+export * from './uploadQuota';

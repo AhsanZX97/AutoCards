@@ -1,7 +1,6 @@
 import type { Difficulty, Id, IsoDate, Priority } from './common';
 
 export const STUDY_MODES = [
-  'classic',
   'timed',
   'exam',
   'cram',
@@ -17,12 +16,6 @@ export interface StudyModeInfo {
 }
 
 export const STUDY_MODE_INFO: Record<StudyMode, StudyModeInfo> = {
-  classic: {
-    id: 'classic',
-    label: 'Classic',
-    description: 'Flip at your own pace and grade yourself. No clock.',
-    icon: '🃏',
-  },
   timed: {
     id: 'timed',
     label: 'Timed drill',

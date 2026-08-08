@@ -23,6 +23,15 @@ export interface ModelInfo {
 export interface GenerateArgs {
   document: ExtractedDocument;
   options: GenerationOptions;
+  /**
+   * Question sides already in the deck being added to. The model is told not to
+   * write them again, which is cheaper than generating repeats and discarding
+   * them — though the caller should still run `dropDuplicateCards` over the
+   * result, because the instruction is followed loosely.
+   *
+   * Empty (or absent) when the generation is creating a new deck.
+   */
+  avoidPrompts?: string[];
   onProgress?: (progress: GenerationProgress) => void;
   signal?: AbortSignal;
 }

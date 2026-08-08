@@ -1,13 +1,12 @@
 import { createId } from './id';
 import { nowIso } from './date';
 import { hasCloze, parseCloze } from './text';
-import { createDefaultStudySettings, draftFromCard } from '../domain';
+import { createDefaultStudySettings, draftFromCard, normalizeStudySettings } from '../domain';
 import {
   ACCENTS,
   CARD_TYPES,
   DIFFICULTIES,
   PRIORITIES,
-  STUDY_MODES,
   type Accent,
   type CardDraft,
   type CardType,
@@ -423,10 +422,14 @@ function readCategories(value: unknown): Category[] {
 }
 
 function readDefaultSettings(value: unknown): StudySettings {
-  if (!isRecord(value) || !STUDY_MODES.includes(value.mode as (typeof STUDY_MODES)[number])) {
-    return createDefaultStudySettings();
-  }
-  return { ...createDefaultStudySettings(), ...(value as unknown as Partial<StudySettings>) };
+  if (!isRecord(value)) return createDefaultStudySettings();
+  // A deck shared before a mode was retired still names that mode. Keep the
+  // rest of the sharer's settings and let the normalizer move the mode forward,
+  // rather than dropping everything back to defaults over one stale field.
+  return normalizeStudySettings({
+    ...createDefaultStudySettings(),
+    ...(value as unknown as Partial<StudySettings>),
+  });
 }
 
 function readTags(value: unknown): string[] {

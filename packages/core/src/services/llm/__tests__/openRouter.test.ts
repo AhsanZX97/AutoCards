@@ -149,6 +149,44 @@ describe('OpenRouterLlmService', () => {
       expect(body.messages[0].content as string).toContain('Focus on chapter 3.');
     });
 
+    it('lists the prompts already in the deck so the model does not repeat them', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        document: DOCUMENT,
+        options: OPTIONS,
+        avoidPrompts: ['What pigment absorbs light energy?', 'Where does the light reaction happen?'],
+      });
+
+      const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+      const system = body.messages[0].content as string;
+      expect(system).toContain('already in the deck');
+      expect(system).toContain('What pigment absorbs light energy?');
+      expect(system).toContain('Where does the light reaction happen?');
+    });
+
+    it('says nothing about existing cards when the deck is empty', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({ document: DOCUMENT, options: OPTIONS, avoidPrompts: [] });
+
+      const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+      expect(body.messages[0].content as string).not.toContain('already in the deck');
+    });
+
+    it('bounds the avoid list so a large deck cannot crowd out the document', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        document: DOCUMENT,
+        options: OPTIONS,
+        avoidPrompts: Array.from({ length: 400 }, (_unused, index) => `Question number ${index}?`),
+      });
+
+      const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+      const system = body.messages[0].content as string;
+      const listed = system.split('\n').filter((line) => line.startsWith('- Question number ')).length;
+      expect(listed).toBeGreaterThan(0);
+      expect(listed).toBeLessThanOrEqual(150);
+    });
+
     it('returns the model’s cards', async () => {
       fetchMock.mockResolvedValue(completion(VALID_REPLY));
       const result = await service().generateDeck({ document: DOCUMENT, options: OPTIONS });

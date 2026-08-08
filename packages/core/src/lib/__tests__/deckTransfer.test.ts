@@ -12,6 +12,7 @@ import {
   serializeDeckExport,
   shareUrlForDeck,
 } from '../deckTransfer';
+import { createDefaultStudySettings } from '../../domain';
 import { makeCard } from '../../domain/__tests__/testHelpers';
 import type { Deck } from '../../types';
 
@@ -26,7 +27,7 @@ function makeDeck(overrides: Partial<Deck> = {}): Deck {
     tags: ['biology'],
     categories: [{ id: 'cat_1', name: 'Mitosis', accent: 'emerald', icon: '🔬' }],
     defaultSettings: {
-      mode: 'classic',
+      mode: 'cram',
       shuffle: 'random',
       reversed: false,
       gradingScale: 'four-point',
@@ -134,6 +135,23 @@ describe('normalizeDeckExport', () => {
     expect(restored?.icon).toBe('🗂️');
     expect(restored?.accent).toBe('indigo');
     expect(restored?.cards).toEqual([]);
+  });
+
+  it('moves a retired study mode forward without losing the rest of the settings', () => {
+    const restored = normalizeDeckExport({
+      cards: [],
+      defaultSettings: {
+        mode: 'classic',
+        reversed: true,
+        sound: false,
+        filters: { categoryIds: [], tags: [], difficulties: [], priorities: [], starredOnly: true, excludeMastered: false, masteredThreshold: 90, cardLimit: 15 },
+      },
+    });
+    expect(restored?.defaultSettings.mode).toBe(createDefaultStudySettings().mode);
+    expect(restored?.defaultSettings.reversed).toBe(true);
+    expect(restored?.defaultSettings.sound).toBe(false);
+    expect(restored?.defaultSettings.filters.cardLimit).toBe(15);
+    expect(restored?.defaultSettings.filters.starredOnly).toBe(true);
   });
 
   it('drops cards that cannot be salvaged', () => {

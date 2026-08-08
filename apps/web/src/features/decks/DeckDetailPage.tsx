@@ -14,11 +14,15 @@ import { useApp } from '../../lib/appContext';
 import { Badge, Button, Card, CardBody, Chip, Input, Progress, Select } from '../../components/ui';
 import { DIFFICULTY_BADGE, PRIORITY_BADGE } from '../../lib/badges';
 import { accentOf } from '../../lib/accent';
+import { AddCardMenu } from './AddCardMenu';
 import { CardEditorModal } from './CardEditorModal';
 import { DeckEditorModal, type DeckEdits } from './DeckEditorModal';
+import { DeckFlashcardView } from './DeckFlashcardView';
+import { DeckGenerateCardsModal } from './DeckGenerateCardsModal';
 import { DeckShareModal } from './DeckShareModal';
 import { toast } from '../../components/ui/toastStore';
 import { EMPTY_ARRAY } from '../../lib/empty';
+import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
 import { cn } from '../../lib/cn';
 
 /** Sentinel for the category filter, standing for "cards in no category". */
@@ -51,12 +55,15 @@ export function DeckDetailPage() {
   const [suspendedOnly, setSuspendedOnly] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [deckEditorOpen, setDeckEditorOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'flashcards'>('list');
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
+  const quota = useUploadQuota();
 
   // `cards` is stored in deck order, so a card's index is its place in the deck.
   const indexById = useMemo(() => new Map(cards.map((card, index) => [card.id, index])), [cards]);
@@ -202,6 +209,31 @@ export function DeckDetailPage() {
     setDropTargetId(null);
   }
 
+  // Shared by both views, so the flashcard view can show it without unmounting.
+  const emptyState = (
+    <Card>
+      <CardBody className="py-14 text-center">
+        <p className="text-slate-500 dark:text-slate-400">
+          {cards.length === 0 ? 'No cards yet. Add your first one.' : 'No cards match your filters.'}
+        </p>
+        {cards.length > 0 ? (
+          <Button size="sm" variant="outline" className="mt-4" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        ) : (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button size="sm" variant="outline" onClick={openNewCard}>
+              ✍️ Write one
+            </Button>
+            <Button size="sm" onClick={() => setGenerateOpen(true)}>
+              📄 Generate from a PDF
+            </Button>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -233,9 +265,11 @@ export function DeckDetailPage() {
           <Button variant="outline" onClick={() => setDeckEditorOpen(true)}>
             Edit deck
           </Button>
-          <Button variant="outline" onClick={openNewCard}>
-            + Add card
-          </Button>
+          <AddCardMenu
+            onWriteCard={openNewCard}
+            onGenerateFromPdf={() => setGenerateOpen(true)}
+            quotaLabel={formatQuota(quota)}
+          />
           <Button variant="outline" onClick={() => setShareOpen(true)}>
             Share
           </Button>
@@ -325,6 +359,14 @@ export function DeckDetailPage() {
               Clear filters
             </Button>
           )}
+          <div className="ml-auto flex items-center gap-1 rounded-xl border border-slate-200 p-1 dark:border-slate-800">
+            <ViewTab active={view === 'list'} onClick={() => setView('list')}>
+              ☰ List
+            </ViewTab>
+            <ViewTab active={view === 'flashcards'} onClick={() => setView('flashcards')}>
+              🃏 Flashcards
+            </ViewTab>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {isFiltered && cards.length > 0 && (
@@ -332,29 +374,29 @@ export function DeckDetailPage() {
               Showing {filteredCards.length} of {cards.length} cards
             </p>
           )}
-          {cards.length > 1 && (
-            <p className="text-xs text-slate-400">
-              {isFiltered
-                ? 'Clear the search and filters to drag cards. The number box still moves a card anywhere.'
-                : 'Drag the ⠿ grip to reorder, or type a card’s new number.'}
-            </p>
-          )}
+          {view === 'flashcards'
+            ? filteredCards.length > 0 && (
+                <p className="text-xs text-slate-400">
+                  Click the card to reveal the answer. ← → to move between cards, space to flip.
+                </p>
+              )
+            : cards.length > 1 && (
+                <p className="text-xs text-slate-400">
+                  {isFiltered
+                    ? 'Clear the search and filters to drag cards. The number box still moves a card anywhere.'
+                    : 'Drag the ⠿ grip to reorder, or type a card’s new number.'}
+                </p>
+              )}
         </div>
       </div>
 
-      {filteredCards.length === 0 ? (
-        <Card>
-          <CardBody className="py-14 text-center">
-            <p className="text-slate-500 dark:text-slate-400">
-              {cards.length === 0 ? 'No cards yet. Add your first one.' : 'No cards match your filters.'}
-            </p>
-            {cards.length > 0 && (
-              <Button size="sm" variant="outline" className="mt-4" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            )}
-          </CardBody>
-        </Card>
+      {/* The flashcard view is checked first and handles its own empty state.
+          Swapping it out for the shared one whenever a filter matched nothing
+          would unmount it, throwing away the shuffle and the current place. */}
+      {view === 'flashcards' ? (
+        <DeckFlashcardView cards={filteredCards} deckCards={cards} emptyState={emptyState} />
+      ) : filteredCards.length === 0 ? (
+        emptyState
       ) : (
         <div className="space-y-2">
           {filteredCards.map((card) => (
@@ -398,6 +440,12 @@ export function DeckDetailPage() {
         onDelete={handleDeleteDeck}
         deck={deck}
       />
+      <DeckGenerateCardsModal
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        deck={deck}
+        cards={cards}
+      />
       {deckId && <DeckShareModal open={shareOpen} onClose={() => setShareOpen(false)} deckId={deckId} />}
     </div>
   );
@@ -431,6 +479,25 @@ function draftFromExisting(card: Flashcard): CardDraft {
 /** Card count that rides inside a filter chip, dimmed so the label still leads. */
 function CountPill({ children }: { children: ReactNode }) {
   return <span className="ml-0.5 text-xs opacity-60">{children}</span>;
+}
+
+/** One half of the list / flashcards segmented control. */
+function ViewTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'rounded-lg px-3 py-1.5 text-sm font-medium transition',
+        active
+          ? 'bg-brand-600 text-white'
+          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 function MiniStat({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
@@ -484,12 +551,13 @@ function CardRow({
   // clickable everywhere else.
   const [gripHeld, setGripHeld] = useState(false);
   const [positionInput, setPositionInput] = useState(String(position));
+  const [answerShown, setAnswerShown] = useState(false);
 
   useEffect(() => setPositionInput(String(position)), [position]);
 
-  const displayFront = card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText)
-    ? parseCloze(card.clozeText).prompt
-    : card.front;
+  const isCloze = card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText);
+  const displayFront = isCloze ? parseCloze(card.clozeText!).prompt : card.front;
+  const displayBack = isCloze ? parseCloze(card.clozeText!).answer : card.back;
 
   function commitPosition() {
     const parsed = Number.parseInt(positionInput, 10);
@@ -529,66 +597,95 @@ function CardRow({
         dropTarget && 'ring-2 ring-brand-500',
       )}
     >
-      <CardBody className="flex items-center gap-4 p-4">
-        <div className="flex shrink-0 items-center gap-2">
+      <CardBody className="p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              aria-label="Drag to reorder"
+              title={reorderable ? 'Drag to reorder' : 'Clear the search and filter to drag cards'}
+              disabled={!reorderable}
+              onMouseDown={() => setGripHeld(true)}
+              onMouseUp={() => setGripHeld(false)}
+              className="cursor-grab select-none px-1 text-lg leading-none text-slate-300 hover:text-slate-500 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-600 dark:hover:text-slate-400"
+            >
+              ⠿
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={total}
+              aria-label="Card number"
+              title="Type a number to move this card there"
+              value={positionInput}
+              onChange={(e) => setPositionInput(e.target.value)}
+              onBlur={commitPosition}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') setPositionInput(String(position));
+              }}
+              className="w-12 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-center text-xs font-semibold text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:text-slate-400"
+            />
+          </div>
+          <button onClick={onToggleStar} className="text-lg" aria-label="Toggle star">
+            {card.starred ? '⭐' : '☆'}
+          </button>
           <button
             type="button"
-            aria-label="Drag to reorder"
-            title={reorderable ? 'Drag to reorder' : 'Clear the search and filter to drag cards'}
-            disabled={!reorderable}
-            onMouseDown={() => setGripHeld(true)}
-            onMouseUp={() => setGripHeld(false)}
-            className="cursor-grab select-none px-1 text-lg leading-none text-slate-300 hover:text-slate-500 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-600 dark:hover:text-slate-400"
+            onClick={() => setAnswerShown((v) => !v)}
+            aria-expanded={answerShown}
+            title={answerShown ? 'Hide answer' : 'Show answer'}
+            className="min-w-0 flex-1 text-left"
           >
-            ⠿
+            <p
+              className={cn(
+                'text-sm font-medium text-slate-800 dark:text-slate-200',
+                answerShown ? 'break-words' : 'truncate',
+              )}
+            >
+              {displayFront}
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge variant="neutral">{CARD_TYPE_LABELS[card.type]}</Badge>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
+                {DIFFICULTY_BADGE[card.difficulty].label}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_BADGE[card.priority].classes}`}>
+                {PRIORITY_BADGE[card.priority].label}
+              </span>
+              {card.suspended && <Badge variant="warning">Suspended</Badge>}
+            </div>
           </button>
-          <input
-            type="number"
-            min={1}
-            max={total}
-            aria-label="Card number"
-            title="Type a number to move this card there"
-            value={positionInput}
-            onChange={(e) => setPositionInput(e.target.value)}
-            onBlur={commitPosition}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') setPositionInput(String(position));
-            }}
-            className="w-12 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-center text-xs font-semibold text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:text-slate-400"
-          />
-        </div>
-        <button onClick={onToggleStar} className="text-lg" aria-label="Toggle star">
-          {card.starred ? '⭐' : '☆'}
-        </button>
-        <div className="min-w-0 flex-1 cursor-pointer" onClick={onEdit}>
-          <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{displayFront}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <Badge variant="neutral">{CARD_TYPE_LABELS[card.type]}</Badge>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
-              {DIFFICULTY_BADGE[card.difficulty].label}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_BADGE[card.priority].classes}`}>
-              {PRIORITY_BADGE[card.priority].label}
-            </span>
-            {card.suspended && <Badge variant="warning">Suspended</Badge>}
+          <div className="hidden w-32 shrink-0 sm:block">
+            <Progress value={card.mastery} max={100} />
+            <p className="mt-1 text-center text-xs text-slate-400">{card.mastery}% mastery</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={onToggleSuspend}>
+              {card.suspended ? 'Resume' : 'Suspend'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onEdit}>
+              Edit
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onDelete} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+              Delete
+            </Button>
           </div>
         </div>
-        <div className="hidden w-32 shrink-0 sm:block">
-          <Progress value={card.mastery} max={100} />
-          <p className="mt-1 text-center text-xs text-slate-400">{card.mastery}% mastery</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={onToggleSuspend}>
-            {card.suspended ? 'Resume' : 'Suspend'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onEdit}>
-            Edit
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10">
-            Delete
-          </Button>
-        </div>
+
+        {answerShown && (
+          <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-500/30 dark:bg-brand-500/10">
+            <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">Answer</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+              {displayBack || <span className="italic text-slate-400">No answer set.</span>}
+            </p>
+            {card.explanation && (
+              <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-500 dark:text-slate-400">
+                {card.explanation}
+              </p>
+            )}
+          </div>
+        )}
       </CardBody>
     </Card>
   );

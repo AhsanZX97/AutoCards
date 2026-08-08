@@ -13,6 +13,7 @@ import {
 import { useApp } from '../../lib/appContext';
 import { Button, Card, CardBody, Chip, Field, Input, Progress, Select, Slider, Switch, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
+import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
 
 type Step = 'idle' | 'generating' | 'error';
 
@@ -22,6 +23,7 @@ export function CreateDeckPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userId = app.authStore((s) => s.session?.user.id);
+  const quota = useUploadQuota();
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
@@ -86,7 +88,7 @@ export function CreateDeckPage() {
   }
 
   async function startGeneration() {
-    if (!file || !userId) return;
+    if (!file || !userId || !quota.canUpload) return;
     setStep('generating');
     setErrorMessage('');
 
@@ -111,6 +113,9 @@ export function CreateDeckPage() {
         onProgress: setProgress,
       });
       const deck = createDeckFromGeneration(result, userId);
+      // Spent on the way out rather than the way in: a run that never reached
+      // the model — a bad key, an unreadable PDF — costs nothing to fix.
+      quota.record();
       toast({ variant: 'success', title: 'Deck created!', description: `${result.cards.length} flashcards generated.` });
       navigate(`/app/decks/${deck.id}`);
     } catch (err) {
@@ -164,6 +169,12 @@ export function CreateDeckPage() {
 
       {step === 'idle' && (
         <div className="space-y-6">
+          {!quota.canUpload && (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              You have used all {quota.limit} of this month’s uploads. Upgrade your plan in Settings → Billing to
+              convert more PDFs.
+            </p>
+          )}
           <Card>
             <CardBody>
               {file ? (
@@ -276,8 +287,9 @@ export function CreateDeckPage() {
             </CardBody>
           </Card>
 
-          <div className="flex justify-end">
-            <Button size="lg" disabled={!file} onClick={startGeneration}>
+          <div className="flex items-center justify-end gap-4">
+            <span className="text-xs text-slate-400">{formatQuota(quota)}</span>
+            <Button size="lg" disabled={!file || !quota.canUpload} onClick={startGeneration}>
               Generate flashcards
             </Button>
           </div>

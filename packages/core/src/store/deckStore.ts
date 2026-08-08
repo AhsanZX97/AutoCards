@@ -11,6 +11,7 @@ import {
   computeMastery,
   createCardFromDraft,
   createDefaultStudySettings,
+  dropDuplicateCards,
   materializeGeneratedCards,
   nextPosition,
   reorderCards,
@@ -23,10 +24,18 @@ import type {
   Deck,
   DeckStats,
   Flashcard,
+  GeneratedCard,
   GenerationResult,
   Id,
   SyncOp,
 } from '../types';
+
+export interface AddGeneratedCardsResult {
+  /** The cards that actually landed in the deck, in the order they were added. */
+  added: Flashcard[];
+  /** How many candidates were dropped for repeating a card the deck already had. */
+  duplicates: number;
+}
 
 export interface DeckState {
   decks: Deck[];
@@ -44,6 +53,17 @@ export interface DeckState {
   deleteCategory: (deckId: Id, categoryId: Id) => void;
 
   addCard: (deckId: Id, draft: CardDraft) => Flashcard;
+  /**
+   * Appends a fresh batch of generated cards to a deck that already exists,
+   * dropping any that repeat what is already there. `categories` are the ones
+   * the generator invented for this batch; those matching a category the deck
+   * already has are folded into it rather than added twice.
+   */
+  addGeneratedCards: (
+    deckId: Id,
+    cards: readonly GeneratedCard[],
+    categories?: readonly Category[],
+  ) => AddGeneratedCardsResult;
   updateCard: (deckId: Id, cardId: Id, draft: CardDraft) => void;
   deleteCard: (deckId: Id, cardId: Id) => void;
   deleteCards: (deckId: Id, cardIds: Id[]) => void;
@@ -96,6 +116,16 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
         createDeckFromGeneration: (result, ownerId) => {
           const timestamp = nowIso();
           const deckId = createId('deck');
+          // A single pass restates itself often enough to be worth checking —
+          // the model covers one section twice, or asks the same thing plainly
+          // and again as a cloze. Same rule as `addGeneratedCards` applies.
+          const { kept } = dropDuplicateCards(result.cards, []);
+          const cards = materializeGeneratedCards(deckId, kept).map((card) => ({
+            ...card,
+            deckId,
+          }));
+          // A category left with no cards would render as an empty filter chip.
+          const usedCategoryIds = new Set(cards.map((card) => card.categoryId).filter(Boolean));
           const deck: Deck = {
             id: deckId,
             ownerId,
@@ -104,7 +134,7 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
             icon: result.deckIcon,
             accent: 'indigo',
             tags: [],
-            categories: result.categories,
+            categories: result.categories.filter((category) => usedCategoryIds.has(category.id)),
             source: result.source,
             generatedBy: result.model,
             defaultSettings: createDefaultStudySettings(),
@@ -112,10 +142,6 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
             createdAt: timestamp,
             updatedAt: timestamp,
           };
-          const cards = materializeGeneratedCards(deckId, result.cards).map((card) => ({
-            ...card,
-            deckId,
-          }));
           set((state) => ({
             decks: [deck, ...state.decks],
             cardsByDeck: { ...state.cardsByDeck, [deckId]: cards },
@@ -293,6 +319,70 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
           }));
           onChange([cardOp(deckId, card.id)]);
           return card;
+        },
+
+        addGeneratedCards: (deckId, cards, categories = []) => {
+          const deck = get().decks.find((d) => d.id === deckId);
+          if (!deck) return { added: [], duplicates: 0 };
+
+          const existing = get().cardsByDeck[deckId] ?? [];
+          const { kept, duplicates } = dropDuplicateCards(cards, existing);
+          if (kept.length === 0) return { added: [], duplicates: duplicates.length };
+
+          // A generated category that names one the deck already has is the same
+          // category — folding them together is what keeps a second pass from
+          // splitting "Transport" across two chips.
+          const byName = new Map(deck.categories.map((category) => [category.name.trim().toLowerCase(), category]));
+          const addedCategories: Category[] = [];
+          const categoryIdMap = new Map<Id, Id>();
+          for (const category of categories) {
+            const match = byName.get(category.name.trim().toLowerCase());
+            if (match) {
+              categoryIdMap.set(category.id, match.id);
+            } else {
+              byName.set(category.name.trim().toLowerCase(), category);
+              addedCategories.push(category);
+              categoryIdMap.set(category.id, category.id);
+            }
+          }
+
+          const timestamp = nowIso();
+          const offset = nextPosition(existing);
+          const added = materializeGeneratedCards(deckId, kept).map((card) => {
+            const categoryId = card.categoryId ? categoryIdMap.get(card.categoryId) : undefined;
+            return {
+              ...card,
+              // `materializeGeneratedCards` numbers from zero; these cards go
+              // after everything the deck already holds.
+              position: (card.position ?? 0) + offset,
+              ...(card.categoryId ? { categoryId } : {}),
+            };
+          });
+
+          // A category whose every card was dropped as a duplicate would show up
+          // as an empty filter chip, so only keep the ones still in use.
+          const usedCategoryIds = new Set(added.map((card) => card.categoryId).filter(Boolean));
+          const keptCategories = addedCategories.filter((category) => usedCategoryIds.has(category.id));
+
+          set((state) => ({
+            decks: keptCategories.length
+              ? state.decks.map((d) =>
+                  d.id === deckId
+                    ? { ...d, categories: [...d.categories, ...keptCategories], updatedAt: timestamp }
+                    : d,
+                )
+              : state.decks,
+            cardsByDeck: {
+              ...state.cardsByDeck,
+              [deckId]: [...(state.cardsByDeck[deckId] ?? []), ...added],
+            },
+          }));
+
+          onChange([
+            ...(keptCategories.length ? [deckOp(deckId)] : []),
+            ...added.map((card) => cardOp(deckId, card.id)),
+          ]);
+          return { added, duplicates: duplicates.length };
         },
 
         updateCard: (deckId, cardId, draft) => {

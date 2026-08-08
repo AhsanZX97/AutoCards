@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { checkTypeIn, hasCloze, normalizeAnswer, parseCloze, slugify } from '../text';
+import { checkTypeIn, hasCloze, normalizeAnswer, parseCloze, slugify, textSimilarity } from '../text';
+
+describe('textSimilarity', () => {
+  it('scores identical strings 1', () => {
+    expect(textSimilarity('testing effect', 'testing effect')).toBe(1);
+  });
+
+  it('scores two empty strings 1', () => {
+    expect(textSimilarity('', '')).toBe(1);
+  });
+
+  it('scores an empty string against a non-empty one 0', () => {
+    expect(textSimilarity('', 'testing effect')).toBe(0);
+  });
+
+  it('scores unrelated strings low', () => {
+    expect(textSimilarity('what is osmosis', 'name the three branches of government')).toBeLessThan(0.4);
+  });
+
+  it('scores a reworded phrasing of the same question high', () => {
+    expect(textSimilarity('what is the testing effect', 'what is the testing affect')).toBeGreaterThan(0.9);
+  });
+
+  it('keeps two questions about different subjects apart', () => {
+    expect(textSimilarity('what is the capital of france', 'what is the capital of spain')).toBeLessThan(0.88);
+  });
+});
 
 describe('normalizeAnswer', () => {
   it('lowercases and strips punctuation', () => {

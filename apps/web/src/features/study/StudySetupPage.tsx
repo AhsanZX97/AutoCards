@@ -10,6 +10,7 @@ import {
   applyModePreset,
   computeDeckStats,
   createDefaultStudySettings,
+  normalizeStudySettings,
   type StudySettings,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
@@ -25,7 +26,11 @@ export function StudySetupPage() {
   const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? EMPTY_ARRAY : EMPTY_ARRAY));
   const startSession = app.studyStore((s) => s.startSession);
 
-  const [settings, setSettings] = useState<StudySettings>(() => deck?.defaultSettings ?? createDefaultStudySettings());
+  // Decks saved before a mode was retired still name it, which would leave the
+  // picker with nothing selected — normalize before it reaches the UI.
+  const [settings, setSettings] = useState<StudySettings>(() =>
+    deck ? normalizeStudySettings(deck.defaultSettings) : createDefaultStudySettings(),
+  );
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
 

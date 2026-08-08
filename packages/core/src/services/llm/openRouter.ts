@@ -109,7 +109,7 @@ export class OpenRouterLlmService implements LlmService {
     }
   }
 
-  async generateDeck({ document, options, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
+  async generateDeck({ document, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
     const startedAt = Date.now();
     throwIfAborted(signal);
 
@@ -133,7 +133,7 @@ export class OpenRouterLlmService implements LlmService {
     const body = {
       model: options.model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(options) },
+        { role: 'system', content: buildSystemPrompt(options, avoidPrompts) },
         { role: 'user', content: buildUserPrompt(document.text) },
       ],
       response_format: { type: 'json_object' as const },
@@ -315,7 +315,7 @@ function startWaitingTicker(
   return () => clearInterval(timer);
 }
 
-function buildSystemPrompt(options: GenerateArgs['options']): string {
+function buildSystemPrompt(options: GenerateArgs['options'], avoidPrompts: string[] = []): string {
   const types = options.cardTypes;
   return [
     'You write flashcards from source documents. You reply with JSON only.',
@@ -345,9 +345,37 @@ function buildSystemPrompt(options: GenerateArgs['options']): string {
     // so spell out the contract per type rather than hoping the model infers it.
     'Type-specific fields — these are required, a card missing them is discarded:',
     describeTypes(types),
+    describeAvoided(avoidPrompts),
   ]
     .filter((line) => line !== '')
     .join('\n');
+}
+
+/** Existing prompts listed to the model. Bounded so a large deck cannot crowd
+ *  the document out of the context window. */
+const MAX_AVOID_PROMPTS = 150;
+/** Enough of a question to recognise it by; the full text is rarely needed. */
+const MAX_AVOID_PROMPT_CHARS = 160;
+
+/**
+ * Tells the model what the deck already asks. Cheaper than letting it write
+ * repeats and throwing them away afterwards, though `dropDuplicateCards` still
+ * runs on the result — models restate a question they were asked to skip.
+ */
+function describeAvoided(prompts: string[]): string {
+  const listed = prompts
+    .map((prompt) => prompt.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(0, MAX_AVOID_PROMPTS);
+  if (listed.length === 0) return '';
+
+  return [
+    '',
+    `These questions are already in the deck${
+      prompts.length > listed.length ? ` (showing ${listed.length} of ${prompts.length})` : ''
+    }. Do not write them again, and do not reword them — cover material they leave out:`,
+    ...listed.map((prompt) => `- ${truncate(prompt, MAX_AVOID_PROMPT_CHARS)}`),
+  ].join('\n');
 }
 
 function describeTypes(types: GenerateArgs['options']['cardTypes']): string {

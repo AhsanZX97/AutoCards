@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { PLAN_LIMITS, PLANS, type Plan } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
-import { Avatar, Badge, Button, Card, CardBody, Field, Input, Select, Switch, Tabs } from '../../components/ui';
+import { Avatar, Badge, Button, Card, CardBody, Field, Input, Progress, Select, Switch, Tabs } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
+import { useUploadQuota } from '../../lib/useUploadQuota';
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: '👤' },
@@ -147,36 +148,57 @@ function BillingTab() {
   const app = useApp();
   const user = app.authStore((s) => s.session?.user);
   const changePlan = app.authStore((s) => s.changePlan);
+  const quota = useUploadQuota();
 
   if (!user) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {PLANS.map((plan) => {
-        const limits = PLAN_LIMITS[plan];
-        const isCurrent = user.plan === plan;
-        return (
-          <Card key={plan} className={isCurrent ? 'border-2 border-brand-600 dark:border-brand-500' : undefined}>
-            <CardBody>
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold capitalize text-slate-900 dark:text-white">{plan}</h3>
-                {isCurrent && <Badge variant="info">Current</Badge>}
-              </div>
-              <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <li>{formatLimit(limits.monthlyUploads)} uploads/mo</li>
-                <li>{formatLimit(limits.maxDecks)} decks</li>
-                <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF</li>
-                <li>{limits.byoKey ? 'Bring your own key' : 'Shared generation'}</li>
-              </ul>
-              {!isCurrent && (
-                <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => changePlan(plan as Plan)}>
-                  Switch to {plan}
-                </Button>
-              )}
-            </CardBody>
-          </Card>
-        );
-      })}
+    <div className="space-y-4">
+      <Card>
+        <CardBody className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-semibold text-slate-900 dark:text-white">Uploads this month</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {quota.used} / {formatLimit(quota.limit)}
+            </p>
+          </div>
+          {quota.limit !== Number.POSITIVE_INFINITY && (
+            <Progress value={quota.used} max={quota.limit} />
+          )}
+          <p className="text-xs text-slate-400">
+            Each PDF you convert into cards uses one, whether it starts a new deck or adds to an existing one. Resets
+            on the 1st.
+          </p>
+        </CardBody>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {PLANS.map((plan) => {
+          const limits = PLAN_LIMITS[plan];
+          const isCurrent = user.plan === plan;
+          return (
+            <Card key={plan} className={isCurrent ? 'border-2 border-brand-600 dark:border-brand-500' : undefined}>
+              <CardBody>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold capitalize text-slate-900 dark:text-white">{plan}</h3>
+                  {isCurrent && <Badge variant="info">Current</Badge>}
+                </div>
+                <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <li>{formatLimit(limits.monthlyUploads)} uploads/mo</li>
+                  <li>{formatLimit(limits.maxDecks)} decks</li>
+                  <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF</li>
+                  <li>{limits.byoKey ? 'Bring your own key' : 'Shared generation'}</li>
+                </ul>
+                {!isCurrent && (
+                  <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => changePlan(plan as Plan)}>
+                    Switch to {plan}
+                  </Button>
+                )}
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

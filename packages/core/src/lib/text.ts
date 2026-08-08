@@ -33,6 +33,20 @@ export function levenshtein(a: string, b: string): number {
   return prev[b.length] as number;
 }
 
+/**
+ * How alike two strings are, 0 (nothing in common) to 1 (identical), as the
+ * share of the longer string that survives an edit-distance comparison.
+ *
+ * Callers comparing meaning rather than spelling should pass both sides through
+ * `normalizeAnswer` first, so case, accents and punctuation don't count against
+ * the score.
+ */
+export function textSimilarity(a: string, b: string): number {
+  const longest = Math.max(a.length, b.length);
+  if (longest === 0) return 1;
+  return 1 - levenshtein(a, b) / longest;
+}
+
 export interface TypeInVerdict {
   correct: boolean;
   /** Right idea, minor spelling slip. Counts as correct but is flagged in the UI. */

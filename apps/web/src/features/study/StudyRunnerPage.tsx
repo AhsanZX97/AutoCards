@@ -3,13 +3,12 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   autoGrade,
   currentCardId as getCurrentCardId,
-  hasCloze,
-  parseCloze,
   type Flashcard,
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Progress } from '../../components/ui';
+import { getAnswerText, getPromptText } from '../../lib/cardText';
 import { cn } from '../../lib/cn';
 import { EMPTY_ARRAY } from '../../lib/empty';
 import { CardFace } from './CardFace';
@@ -46,6 +45,10 @@ export function StudyRunnerPage() {
 
   const startedAtRef = useRef(Date.now());
 
+  // Keyed on the queue slot, not the card id. Cram re-queues a missed card to
+  // the end of the queue, so missing the *last* card puts the same id in the
+  // very next slot — keying on the id would skip this reset and leave the card
+  // stuck showing the previous answer.
   useEffect(() => {
     startedAtRef.current = Date.now();
     setFlipped(false);
@@ -54,7 +57,7 @@ export function StudyRunnerPage() {
     setTypedResponse('');
     setRevealed(null);
     setRemaining(session?.settings.timer.enabled ? session.settings.timer.perCardSeconds : null);
-  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.position]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (remaining === null || revealed !== null) return undefined;
@@ -242,20 +245,6 @@ export function StudyRunnerPage() {
       </div>
     </div>
   );
-}
-
-function getPromptText(card: Flashcard, reversed: boolean): string {
-  if (card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText)) {
-    return parseCloze(card.clozeText).prompt;
-  }
-  return reversed ? card.back : card.front;
-}
-
-function getAnswerText(card: Flashcard, reversed: boolean): string {
-  if (card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText)) {
-    return parseCloze(card.clozeText).answer;
-  }
-  return reversed ? card.front : card.back;
 }
 
 function AutoGradedCard({

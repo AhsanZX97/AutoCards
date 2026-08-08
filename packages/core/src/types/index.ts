@@ -6,3 +6,4 @@ export * from './study';
 export * from './stats';
 export * from './generation';
 export * from './sync';
+export * from './usage';

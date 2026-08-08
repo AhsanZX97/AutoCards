@@ -12,6 +12,7 @@ import {
   createSettingsStore,
   createStudyStore,
   createSyncStore,
+  createUsageStore,
 } from './store';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -64,6 +65,7 @@ export function createApp(options: CreateAppOptions) {
   const syncStore = options.supabase ? createSyncStore(options.storage) : null;
   const deckStore = createDeckStore(options.storage, (ops) => syncStore?.getState().enqueue(ops));
   const studyStore = createStudyStore(deckStore, options.storage);
+  const usageStore = createUsageStore(options.storage);
 
   let syncEngine: SyncEngine | null = null;
   if (options.supabase) {
@@ -92,6 +94,7 @@ export function createApp(options: CreateAppOptions) {
     deckStore,
     studyStore,
     settingsStore,
+    usageStore,
     syncStore,
     syncEngine,
     dispose: () => syncEngine?.stop(),

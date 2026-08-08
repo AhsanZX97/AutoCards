@@ -14,7 +14,7 @@ function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
     id: 'sesh_1',
     deckId: 'deck_1',
     deckTitle: 'Deck',
-    mode: 'classic',
+    mode: 'cram',
     answered: 10,
     correct: 8,
     accuracy: 0.8,

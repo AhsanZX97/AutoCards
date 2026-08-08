@@ -32,4 +32,5 @@ export const STORAGE_KEYS = {
   settings: 'autocards.settings',
   onboarding: 'autocards.onboarding',
   sync: 'autocards.sync',
+  usage: 'autocards.usage',
 } as const;

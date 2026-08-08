@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { applyModePreset, createDefaultStudySettings } from '../studySettings';
+import { applyModePreset, createDefaultStudySettings, normalizeStudySettings } from '../studySettings';
+import { STUDY_MODES } from '../../types';
+import type { StudySettings } from '../../types';
+
+describe('createDefaultStudySettings', () => {
+  it('defaults to a mode that still exists', () => {
+    expect(STUDY_MODES).toContain(createDefaultStudySettings().mode);
+  });
+
+  it('already has the default mode preset applied', () => {
+    const defaults = createDefaultStudySettings();
+    expect(applyModePreset(defaults, defaults.mode)).toEqual(defaults);
+  });
+});
 
 describe('applyModePreset', () => {
   it('turns the timer on for timed drill', () => {
@@ -8,11 +21,11 @@ describe('applyModePreset', () => {
     expect(settings.timer.enabled).toBe(true);
   });
 
-  it('turns the timer back off when returning to classic', () => {
+  it('turns the timer back off when leaving timed drill', () => {
     const timed = applyModePreset(createDefaultStudySettings(), 'timed');
-    const classic = applyModePreset(timed, 'classic');
-    expect(classic.mode).toBe('classic');
-    expect(classic.timer.enabled).toBe(false);
+    const cram = applyModePreset(timed, 'cram');
+    expect(cram.mode).toBe('cram');
+    expect(cram.timer.enabled).toBe(false);
   });
 
   it('restores the default grading scale when leaving exam mode', () => {
@@ -20,16 +33,20 @@ describe('applyModePreset', () => {
     expect(exam.gradingScale).toBe('binary');
     expect(exam.timer.perCardSeconds).toBe(45);
 
-    const classic = applyModePreset(exam, 'classic');
-    expect(classic.gradingScale).toBe(createDefaultStudySettings().gradingScale);
-    expect(classic.timer.enabled).toBe(false);
-    expect(classic.timer.perCardSeconds).toBe(createDefaultStudySettings().timer.perCardSeconds);
+    const cram = applyModePreset(exam, 'cram');
+    expect(cram.gradingScale).toBe(createDefaultStudySettings().gradingScale);
+    expect(cram.timer.enabled).toBe(false);
+    expect(cram.timer.perCardSeconds).toBe(createDefaultStudySettings().timer.perCardSeconds);
   });
 
-  it('restores the default shuffle when leaving cram mode', () => {
+  it('forces weakest-first ordering in cram mode', () => {
     const cram = applyModePreset({ ...createDefaultStudySettings(), shuffle: 'none' }, 'cram');
     expect(cram.shuffle).toBe('weakest-first');
-    expect(applyModePreset(cram, 'classic').shuffle).toBe(createDefaultStudySettings().shuffle);
+  });
+
+  it('restores the neutral shuffle when leaving cram mode', () => {
+    const cram = applyModePreset(createDefaultStudySettings(), 'cram');
+    expect(applyModePreset(cram, 'timed').shuffle).toBe('random');
   });
 
   it('keeps settings the mode does not control', () => {
@@ -43,28 +60,54 @@ describe('applyModePreset', () => {
     };
 
     const survival = applyModePreset(tweaked, 'survival');
-    const classic = applyModePreset(survival, 'classic');
+    const timed = applyModePreset(survival, 'timed');
 
-    expect(classic.reversed).toBe(true);
-    expect(classic.sound).toBe(false);
-    expect(classic.filters.cardLimit).toBe(25);
-    expect(classic.filters.starredOnly).toBe(true);
-    expect(classic.timer.autoAdvance).toBe(false);
+    expect(timed.reversed).toBe(true);
+    expect(timed.sound).toBe(false);
+    expect(timed.filters.cardLimit).toBe(25);
+    expect(timed.filters.starredOnly).toBe(true);
+    expect(timed.timer.autoAdvance).toBe(false);
   });
 
   it('does not accumulate presets when hopping between modes', () => {
-    let settings = createDefaultStudySettings();
-    for (const mode of ['timed', 'exam', 'survival', 'cram', 'classic'] as const) {
+    const defaults = createDefaultStudySettings();
+    let settings = defaults;
+    for (const mode of ['timed', 'exam', 'survival', 'cram'] as const) {
       settings = applyModePreset(settings, mode);
     }
-    const defaults = createDefaultStudySettings();
     expect(settings).toEqual(defaults);
   });
 
   it('does not mutate the settings it is given', () => {
     const settings = createDefaultStudySettings();
+    const before = structuredClone(settings);
     applyModePreset(settings, 'exam');
-    expect(settings.timer.enabled).toBe(false);
-    expect(settings.mode).toBe('classic');
+    expect(settings).toEqual(before);
+  });
+});
+
+describe('normalizeStudySettings', () => {
+  // Decks saved before Classic was retired still carry `mode: 'classic'` in
+  // local storage and in already-shared deck exports.
+  const legacy = {
+    ...createDefaultStudySettings(),
+    mode: 'classic',
+    reversed: true,
+    filters: { ...createDefaultStudySettings().filters, cardLimit: 30 },
+  } as unknown as StudySettings;
+
+  it('moves a retired mode onto the current default', () => {
+    expect(normalizeStudySettings(legacy).mode).toBe(createDefaultStudySettings().mode);
+  });
+
+  it('keeps the settings the retired mode did not control', () => {
+    const normalized = normalizeStudySettings(legacy);
+    expect(normalized.reversed).toBe(true);
+    expect(normalized.filters.cardLimit).toBe(30);
+  });
+
+  it('leaves a still-valid mode alone', () => {
+    const exam = applyModePreset(createDefaultStudySettings(), 'exam');
+    expect(normalizeStudySettings(exam)).toEqual(exam);
   });
 });
