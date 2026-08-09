@@ -28,7 +28,7 @@ export function AuthLayout({ children, title, subtitle }: { children: ReactNode;
             ))}
           </div>
           <h2 className="max-w-md text-2xl font-bold text-white">
-            Turn any PDF into a study-ready flashcard deck
+            Turn your slides and notes into a study-ready flashcard deck
           </h2>
           <p className="mt-3 max-w-sm text-slate-400">
             Upload lecture notes, textbooks, or reports — get customizable, gamified flashcards in seconds.

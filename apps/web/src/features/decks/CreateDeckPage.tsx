@@ -1,23 +1,31 @@
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CARD_TYPE_DESCRIPTIONS,
   CARD_TYPE_LABELS,
   CARD_TYPES,
+  DEFAULT_GENERATION_PRESET,
   DEFAULT_MODEL_ID,
   DIFFICULTIES,
+  GENERATION_PRESET_DESCRIPTIONS,
+  GENERATION_PRESET_LABELS,
+  GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
+  SUPPORTED_FORMATS_LABEL,
+  resolvePreset,
   type CardType,
   type Difficulty,
+  type GenerationPresetId,
   type GenerationProgress,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Card, CardBody, Chip, Field, InfoButton, Input, Modal, Progress, Slider, Switch, Tabs, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
+import { UploadDropzone } from './UploadDropzone';
 
 type Step = 'idle' | 'generating' | 'error';
-/** Deck cards come from a PDF, or the deck starts empty and is filled in by hand. */
+/** Deck cards come from uploads, or the deck starts empty and is filled in by hand. */
 type Mode = 'ai' | 'manual';
 
 const MODE_TABS = [
@@ -28,7 +36,6 @@ const MODE_TABS = [
 export function CreateDeckPage() {
   const app = useApp();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userId = app.authStore((s) => s.session?.user.id);
   const quota = useUploadQuota();
@@ -40,14 +47,16 @@ export function CreateDeckPage() {
 
   const [mode, setMode] = useState<Mode>('ai');
   const [step, setStep] = useState<Step>('idle');
-  const [file, setFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualDescription, setManualDescription] = useState('');
+  // Shared by both tabs: the deck is named by the person making it either way,
+  // so switching between them should not lose what has already been typed.
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
 
+  const [preset, setPreset] = useState<GenerationPresetId>(defaults.preset ?? DEFAULT_GENERATION_PRESET);
   const [cardCount, setCardCount] = useState(defaults.cardCount);
   const [cardTypes, setCardTypes] = useState<CardType[]>(defaults.cardTypes);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty);
@@ -55,17 +64,9 @@ export function CreateDeckPage() {
   const [includeHints, setIncludeHints] = useState(defaults.includeHints);
   const [includeExplanations, setIncludeExplanations] = useState(defaults.includeExplanations);
   const [includeSourceQuotes, setIncludeSourceQuotes] = useState(defaults.includeSourceQuotes);
+  const [readImages, setReadImages] = useState(defaults.readImages ?? false);
   const [instructions, setInstructions] = useState('');
   const [typeHelpOpen, setTypeHelpOpen] = useState(false);
-
-  const handleFile = useCallback((selected: File | null) => {
-    if (!selected) return;
-    if (selected.type !== 'application/pdf' && !selected.name.toLowerCase().endsWith('.pdf')) {
-      toast({ variant: 'error', title: 'Please upload a PDF file.' });
-      return;
-    }
-    setFile(selected);
-  }, []);
 
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
@@ -77,21 +78,37 @@ export function CreateDeckPage() {
     });
   }
 
+  /**
+   * Card types follow the preset, because the wrong ones quietly ruin it — a
+   * true/false card about an interview answer is a quiz about the job advert.
+   * The chips stay editable afterwards for anyone who disagrees.
+   */
+  function choosePreset(next: GenerationPresetId) {
+    setPreset(next);
+    setCardTypes(resolvePreset(next).suggestedCardTypes);
+  }
+
   async function startGeneration() {
-    if (!file || !userId || !quota.canUpload) return;
+    if (files.length === 0 || !title.trim() || !userId || !quota.canUpload) return;
     setStep('generating');
     setErrorMessage('');
 
-    updateDefaults({ cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes });
+    updateDefaults({ preset, cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes, readImages });
 
     try {
-      const document = await app.services.pdf.extract(file);
+      // Sequential rather than parallel: pdf.js pins a worker per document and
+      // several large files at once is what makes the tab stutter.
+      const documents = [];
+      for (const selected of files) {
+        documents.push(await app.services.documents.extract(selected));
+      }
       const result = await app.services.llm.generateDeck({
-        document,
+        documents,
         options: {
           // Model choice is not a decision to put in front of a student, so the
           // page always runs on the house default rather than exposing a picker.
           model: DEFAULT_MODEL_ID,
+          preset,
           cardCount,
           cardTypes,
           difficulty,
@@ -99,14 +116,15 @@ export function CreateDeckPage() {
           includeHints,
           includeExplanations,
           includeSourceQuotes,
+          readImages,
           instructions: instructions.trim() || undefined,
           language: 'en',
         },
         onProgress: setProgress,
       });
-      const deck = createDeckFromGeneration(result, userId);
+      const deck = createDeckFromGeneration(result, userId, { title, description });
       // Spent on the way out rather than the way in: a run that never reached
-      // the model — a bad key, an unreadable PDF — costs nothing to fix.
+      // the model — a bad key, an unreadable file — costs nothing to fix.
       quota.record();
       toast({ variant: 'success', title: 'Deck created!', description: `${result.cards.length} flashcards generated.` });
       navigate(`/app/decks/${deck.id}`);
@@ -117,11 +135,11 @@ export function CreateDeckPage() {
   }
 
   function createManualDeck() {
-    const title = manualTitle.trim();
-    if (!title || !userId) return;
-    // No PDF, no model call — so this never touches the upload quota.
-    const deck = createBlankDeck(userId, title);
-    if (manualDescription.trim()) updateDeck(deck.id, { description: manualDescription.trim() });
+    const name = title.trim();
+    if (!name || !userId) return;
+    // No upload, no model call — so this never touches the upload quota.
+    const deck = createBlankDeck(userId, name);
+    if (description.trim()) updateDeck(deck.id, { description: description.trim() });
     toast({ variant: 'success', title: 'Deck created!', description: 'Add your first card to get going.' });
     navigate(`/app/decks/${deck.id}`);
   }
@@ -137,7 +155,7 @@ export function CreateDeckPage() {
         <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Create a deck</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {mode === 'ai'
-            ? 'Upload a PDF and Auto Cards will write the flashcards for you.'
+            ? 'Upload your material and Auto Cards will write the flashcards for you.'
             : 'Start with an empty deck and write the cards yourself.'}
         </p>
       </div>
@@ -168,7 +186,9 @@ export function CreateDeckPage() {
             </p>
             {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
             <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-            <p className="mt-6 text-xs text-slate-400">Reading your PDF and writing cards. Larger decks take a minute.</p>
+            <p className="mt-6 text-xs text-slate-400">
+              Reading your files and writing cards. Larger decks take a minute.
+            </p>
           </CardBody>
         </Card>
       )}
@@ -180,8 +200,8 @@ export function CreateDeckPage() {
               <Input
                 autoFocus
                 placeholder="e.g. Financial Accounting — Chapter 4"
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') createManualDeck();
                 }}
@@ -191,12 +211,12 @@ export function CreateDeckPage() {
               <Textarea
                 rows={2}
                 placeholder="What this deck covers…"
-                value={manualDescription}
-                onChange={(e) => setManualDescription(e.target.value)}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
               />
             </Field>
             <div className="flex items-center justify-end">
-              <Button size="lg" disabled={!manualTitle.trim()} onClick={createManualDeck}>
+              <Button size="lg" disabled={!title.trim()} onClick={createManualDeck}>
                 Create empty deck
               </Button>
             </div>
@@ -208,55 +228,37 @@ export function CreateDeckPage() {
         <div className="space-y-6">
           {!quota.canUpload && (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              You have used all {quota.limit} of this month’s uploads. Upgrade your plan in Settings → Billing to
-              convert more PDFs.
+              You have used all {quota.limit} of this month’s uploads. Your allowance resets on the 1st — get in
+              touch if you need a bigger plan before then.
             </p>
           )}
           <Card>
+            <CardBody className="space-y-6">
+              <Field label="Deck name">
+                <Input
+                  autoFocus
+                  placeholder="e.g. Financial Accounting — Chapter 4"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </Field>
+              <Field label="Description" hint="optional">
+                <Textarea
+                  rows={2}
+                  placeholder="What this deck covers…"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </Field>
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardBody>
-              {file ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">📄</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{file.name}</p>
-                    <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
-                    Change
-                  </Button>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                    handleFile(e.dataTransfer.files[0] ?? null);
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-colors ${
-                    dragActive
-                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-                      : 'border-slate-300 hover:border-brand-400 dark:border-slate-700'
-                  }`}
-                >
-                  <span className="text-4xl">📄</span>
-                  <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
-                    Drop your PDF here, or click to browse
-                  </p>
-                  <p className="mt-1 text-sm text-slate-400">Lecture notes, textbook chapters, reports — up to 20 pages on the free plan.</p>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+              <UploadDropzone
+                files={files}
+                onChange={setFiles}
+                hint={`Slides, notes, a chapter, a past paper — ${SUPPORTED_FORMATS_LABEL}. Add several and the cards are written from all of them at once.`}
               />
             </CardBody>
           </Card>
@@ -264,6 +266,22 @@ export function CreateDeckPage() {
           <Card>
             <CardBody className="space-y-6">
               <h3 className="font-semibold text-slate-900 dark:text-white">Generation options</h3>
+
+              <Field
+                label="What are these cards for?"
+                hint="Sets the card types to match — change them below if you want"
+              >
+                <div className="flex flex-wrap gap-2">
+                  {GENERATION_PRESETS.map((id) => (
+                    <Chip key={id} active={preset === id} onClick={() => choosePreset(id)}>
+                      {GENERATION_PRESET_LABELS[id]}
+                    </Chip>
+                  ))}
+                </div>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  {GENERATION_PRESET_DESCRIPTIONS[preset]}
+                </p>
+              </Field>
 
               <Slider
                 label="Number of cards"
@@ -309,17 +327,27 @@ export function CreateDeckPage() {
               </Field>
 
               <div className="space-y-1 border-t border-slate-100 pt-4 dark:border-slate-800">
-                <Switch checked={autoCategories} onChange={setAutoCategories} label="Auto-categorize" description="Group cards into categories drawn from the document" />
+                <Switch checked={autoCategories} onChange={setAutoCategories} label="Auto-categorize" description="Group related cards under headings picked to suit what the cards are for" />
                 <Switch checked={includeHints} onChange={setIncludeHints} label="Include hints" description="Add a hint to harder cards" />
                 <Switch checked={includeExplanations} onChange={setIncludeExplanations} label="Include explanations" description="Explain why the answer is correct" />
                 <Switch checked={includeSourceQuotes} onChange={setIncludeSourceQuotes} label="Quote source passages" description="Show the original text each card was based on" />
+                <Switch
+                  checked={readImages}
+                  onChange={setReadImages}
+                  label="Read the pictures too"
+                  description="Looks at diagrams and charts, not just the words. Slower and costs more, so worth it for slides that are mostly pictures."
+                />
               </div>
             </CardBody>
           </Card>
 
           <div className="flex items-center justify-end gap-4">
             <span className="text-xs text-slate-400">{formatQuota(quota)}</span>
-            <Button size="lg" disabled={!file || !quota.canUpload} onClick={startGeneration}>
+            <Button
+              size="lg"
+              disabled={files.length === 0 || !title.trim() || !quota.canUpload}
+              onClick={startGeneration}
+            >
               Generate flashcards
             </Button>
           </div>

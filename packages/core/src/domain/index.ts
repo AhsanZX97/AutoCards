@@ -1,3 +1,4 @@
+export * from './admin';
 export * from './mastery';
 export * from './scoring';
 export * from './studyQueue';
@@ -11,3 +12,4 @@ export * from './cardOrder';
 export * from './cardDedupe';
 export * from './retiredCards';
 export * from './uploadQuota';
+export * from './tourPlacement';

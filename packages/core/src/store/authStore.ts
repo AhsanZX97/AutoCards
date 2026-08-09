@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { isAdmin } from '../domain/admin';
 import type { AuthService } from '../services/auth/types';
 import { AuthError } from '../services/auth/types';
 import type { StorageAdapter } from '../lib/storage';
@@ -105,6 +106,8 @@ export function createAuthStore(auth: AuthService, storage: StorageAdapter) {
         changePlan: async (plan) => {
           const { session } = get();
           if (!session) return;
+          // Plans are not self-serve — only the owner account switches them.
+          if (!isAdmin(session.user)) return;
           const user = await auth.changePlan(session.user, plan);
           set({ session: { ...session, user } });
         },

@@ -5,7 +5,7 @@ const FEATURES = [
   {
     icon: '⚡',
     title: 'Instant Generation',
-    description: 'Paste any text, PDF, or URL and get a full deck in seconds. No formatting needed.',
+    description: 'Upload slides, notes or a chapter and get a full deck in seconds. No formatting needed.',
   },
   {
     icon: '🧠',
@@ -28,7 +28,8 @@ const STEPS = [
   {
     step: '01',
     title: 'Upload your material',
-    description: 'Drop in a PDF, paste a block of text, or link a webpage. Auto Cards reads it all.',
+    description:
+      'Drop in a PDF, a Word document, a slide deck or your notes — several at once, and Auto Cards reads them together.',
   },
   {
     step: '02',
@@ -63,7 +64,7 @@ const PLANS = [
       'Unlimited decks',
       'Unlimited cards',
       'Advanced analytics',
-      'PDF & URL imports',
+      'PDF, Word & PowerPoint imports',
       'Priority AI generation',
     ],
     cta: 'Start free trial',
@@ -173,7 +174,7 @@ export function LandingPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Biology 101</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">24 cards · Generated from PDF</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">24 cards · Generated from your notes</p>
                 </div>
               </div>
               <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">

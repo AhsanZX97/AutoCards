@@ -5,3 +5,4 @@ export * from './studyStore';
 export * from './settingsStore';
 export * from './syncStore';
 export * from './usageStore';
+export * from './tourStore';

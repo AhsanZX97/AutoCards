@@ -1,10 +1,16 @@
 import { createId } from '../../lib/id';
 import { nowIso } from '../../lib/date';
 import { truncate } from '../../lib/text';
-import type { GenerationProgress, GenerationResult } from '../../types';
+import type {
+  DocumentImage,
+  ExtractedDocument,
+  GenerationProgress,
+  GenerationResult,
+} from '../../types';
 import { cardTypeLabel } from '../../types';
-import { costOf, MODEL_CATALOG } from './models';
+import { costOf, DEFAULT_VISION_MODEL_ID, isVisionModel, MODEL_CATALOG } from './models';
 import { allowedCardTypes, normalizeGeneratedCards } from './normalizeCards';
+import { promptRules, resolvePreset } from './presets';
 import { GenerationAbortedError } from './types';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 
@@ -12,11 +18,16 @@ const API_BASE = 'https://openrouter.ai/api/v1';
 const COMPLETIONS_ENDPOINT = `${API_BASE}/chat/completions`;
 const MODELS_ENDPOINT = `${API_BASE}/models`;
 
-/** Characters of PDF text sent to the model. Keeps a single call bounded. */
-const MAX_CONTEXT_CHARS = 60_000;
+/**
+ * Characters of source text sent to the model, across every uploaded file.
+ *
+ * Roughly 30k tokens, against the 128k window of the default model — well
+ * inside it, and a few tenths of a penny at DeepSeek's input price. The limit
+ * is here to bound a runaway upload, not to save money.
+ */
+const MAX_CONTEXT_CHARS = 120_000;
 
-/** Rough output budget per card, so a 60-card deck is not cut off mid-JSON. */
-const TOKENS_PER_CARD = 220;
+/** Floor and ceiling on the output budget; the per-card rate is the preset's. */
 const MIN_OUTPUT_TOKENS = 2_000;
 const MAX_OUTPUT_TOKENS = 32_000;
 
@@ -109,16 +120,21 @@ export class OpenRouterLlmService implements LlmService {
     }
   }
 
-  async generateDeck({ document, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
+  async generateDeck({ documents, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
     const startedAt = Date.now();
     throwIfAborted(signal);
 
+    if (documents.length === 0) {
+      throw new Error('No file was uploaded, so there is nothing to write cards from.');
+    }
+
     // A placeholder document would produce a deck of cards about the
-    // placeholder, at full token cost. Refuse before spending anything.
-    if (document.synthetic) {
-      throw new Error(
-        `We could not read any text out of ${document.filename}. If it is a scan or photos of pages, the words are really just pictures — try a PDF you can select text in.`,
-      );
+    // placeholder, at full token cost. Ones that could not be read are dropped
+    // here and the rest carry on; only an upload with nothing readable in it
+    // fails, and it fails before spending anything.
+    const readable = documents.filter((document) => !document.synthetic);
+    if (readable.length === 0) {
+      throw new Error(unreadableMessage(documents));
     }
 
     const report = (progress: GenerationProgress) => onProgress?.(progress);
@@ -126,18 +142,24 @@ export class OpenRouterLlmService implements LlmService {
     report({
       stage: 'chunking',
       progress: 0.05,
-      message: `Preparing ${document.filename}`,
+      message: describePreparing(readable),
       cardsGenerated: 0,
     });
 
+    // Pictures only reach the model when the user asked for it *and* the files
+    // actually contained some — an upload with none should not be quietly
+    // moved onto a model that costs ten times as much for nothing.
+    const pictures = options.readImages ? picturesIn(readable) : [];
+    const model = pictures.length > 0 ? visionModelFor(options.model) : options.model;
+
     const body = {
-      model: options.model,
+      model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(options, avoidPrompts) },
-        { role: 'user', content: buildUserPrompt(document.text) },
+        { role: 'system', content: buildSystemPrompt(options, avoidPrompts, readable, pictures.length) },
+        { role: 'user', content: buildUserContent(readable, pictures) },
       ],
       response_format: { type: 'json_object' as const },
-      max_tokens: outputBudget(options.cardCount),
+      max_tokens: outputBudget(options.cardCount, resolvePreset(options.preset).tokensPerCard),
     };
 
     // The call is one long await with no server-side progress events, so the
@@ -189,7 +211,7 @@ export class OpenRouterLlmService implements LlmService {
       throw new Error(
         discarded > 0
           ? 'None of the cards came back in a usable state. Try again, or turn off a card type or two.'
-          : 'No cards came back from this PDF. If it is a scan or photos of pages, there is no text in it to work from.',
+          : 'No cards came back from that. If it is a scan or photos of pages, there is no text in it to work from.',
       );
     }
 
@@ -198,25 +220,35 @@ export class OpenRouterLlmService implements LlmService {
     const promptTokens = payload.usage?.prompt_tokens ?? 0;
     const completionTokens = payload.usage?.completion_tokens ?? 0;
 
+    const first = documents[0] as ExtractedDocument;
+    const uploadedAt = nowIso();
+
     return {
-      deckTitle: document.title?.trim() || titleFromFilename(document.filename),
-      deckDescription: `Generated from ${document.filename}.`,
+      // Only a fallback now: both upload screens ask for a name up front. It
+      // still has to be something, for a caller that does not.
+      deckTitle: first.title?.trim() || titleFromFilename(first.filename),
+      deckDescription: describeGeneratedFrom(documents),
       deckIcon: '📄',
       categories,
       cards,
-      source: {
+      // Every file the user handed over, readable or not — the deck should
+      // record what was uploaded, not only what could be parsed.
+      sources: documents.map((document) => ({
         id: createId('src'),
         filename: document.filename,
         size: document.size,
-        pageCount: document.pageCount,
+        ...(document.pageCount === undefined ? {} : { pageCount: document.pageCount }),
         charCount: document.text.length,
-        uploadedAt: nowIso(),
-      },
-      model: options.model,
+        kind: document.kind ?? 'pdf',
+        uploadedAt,
+      })),
+      // The model that actually ran, which is not `options.model` when reading
+      // pictures moved the run onto one that can see.
+      model,
       usage: {
         promptTokens,
         completionTokens,
-        costUsd: costOf(this.modelCache, options.model, promptTokens, completionTokens),
+        costUsd: costOf(this.modelCache, model, promptTokens, completionTokens),
       },
       elapsedMs: Date.now() - startedAt,
     };
@@ -276,6 +308,30 @@ export class OpenRouterLlmService implements LlmService {
   }
 }
 
+/** Comma-separated filenames, e.g. `a.pdf, b.docx and c.pptx`. */
+function listFilenames(documents: ExtractedDocument[]): string {
+  const names = documents.map((document) => document.filename);
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** Said when nothing in the upload had readable text — usually all scans. */
+function unreadableMessage(documents: ExtractedDocument[]): string {
+  const subject =
+    documents.length === 1 ? (documents[0] as ExtractedDocument).filename : 'any of those files';
+  return `We could not read any text out of ${subject}. If they are scans or photos of pages, the words are really just pictures — try a version you can select text in.`;
+}
+
+function describePreparing(documents: ExtractedDocument[]): string {
+  return documents.length === 1
+    ? `Preparing ${(documents[0] as ExtractedDocument).filename}`
+    : `Preparing ${documents.length} documents`;
+}
+
+function describeGeneratedFrom(documents: ExtractedDocument[]): string {
+  return `Generated from ${listFilenames(documents)}.`;
+}
+
 /** `lecture-notes-week-3.pdf` -> `Lecture Notes Week 3`. */
 function titleFromFilename(filename: string): string {
   const base = filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
@@ -286,8 +342,8 @@ function titleFromFilename(filename: string): string {
     .join(' ');
 }
 
-function outputBudget(cardCount: number): number {
-  return Math.min(MAX_OUTPUT_TOKENS, Math.max(MIN_OUTPUT_TOKENS, cardCount * TOKENS_PER_CARD));
+function outputBudget(cardCount: number, tokensPerCard: number): number {
+  return Math.min(MAX_OUTPUT_TOKENS, Math.max(MIN_OUTPUT_TOKENS, cardCount * tokensPerCard));
 }
 
 /**
@@ -312,16 +368,22 @@ function startWaitingTicker(report: (progress: GenerationProgress) => void): () 
   return () => clearInterval(timer);
 }
 
-function buildSystemPrompt(options: GenerateArgs['options'], avoidPrompts: string[] = []): string {
+function buildSystemPrompt(
+  options: GenerateArgs['options'],
+  avoidPrompts: string[] = [],
+  documents: ExtractedDocument[] = [],
+  imageCount = 0,
+): string {
   const types = allowedCardTypes(options.cardTypes);
+  const preset = resolvePreset(options.preset);
   return [
-    'You write flashcards from source documents. You reply with JSON only.',
+    `${preset.persona} You reply with JSON only.`,
     '',
     `Write at most ${options.cardCount} cards, pitched at "${options.difficulty}" difficulty.`,
     `Use only these card types: ${types.join(', ')}.`,
-    'Cover the document evenly rather than exhausting its first section.',
-    'Each card must ask exactly one thing, and must be answerable from the document alone.',
-    'Never write a card about the document itself ("what does this chapter cover") — write cards about what it teaches.',
+    ...promptRules(preset, isTerseSource(documents)),
+    describeImages(imageCount),
+    describeMultipleDocuments(documents.length),
     options.instructions ? `\nThe user asked specifically: ${options.instructions}\n` : '',
     'Reply with a JSON object of this exact shape:',
     '{"cards": [{ ...card }]}',
@@ -336,7 +398,9 @@ function buildSystemPrompt(options: GenerateArgs['options'], avoidPrompts: strin
     options.includeHints ? '  "hint"        a nudge that does not give the answer away' : '',
     options.includeExplanations ? '  "explanation" why the answer is correct' : '',
     options.includeSourceQuotes ? '  "source"      {"page": number, "quote": "verbatim sentence the card came from"}' : '',
-    options.autoCategories ? '  "category"    a section name drawn from the document; reuse the same name across related cards' : '',
+    options.autoCategories
+      ? `  "category"    ${preset.categoryHint}; reuse the same name across related cards`
+      : '',
     '',
     // The runner cannot render or grade these types without their extra fields,
     // so spell out the contract per type rather than hoping the model infers it.
@@ -390,8 +454,189 @@ function describeTypes(types: GenerateArgs['options']['cardTypes']): string {
     .join('\n');
 }
 
-function buildUserPrompt(text: string): string {
-  return `Source document:\n\n${truncate(text, MAX_CONTEXT_CHARS)}`;
+/**
+ * Above this many characters per slide, a deck is carrying real prose and the
+ * ordinary source rule applies. Below it, the slides are a topic list: the
+ * sample that prompted this averaged 139.
+ */
+const TERSE_CHARS_PER_PAGE = 400;
+
+/**
+ * True when the upload is headings and bullet points rather than prose.
+ *
+ * Both halves matter. Only slide decks qualify, so a chapter uploaded
+ * alongside them still supplies real text to be faithful to; and a wordy deck
+ * with speaker notes on every slide is prose however it was authored, so the
+ * density has to be low as well.
+ */
+function isTerseSource(documents: ExtractedDocument[]): boolean {
+  if (documents.length === 0) return false;
+  if (!documents.every((document) => document.kind === 'slides')) return false;
+
+  const chars = documents.reduce((sum, document) => sum + document.text.length, 0);
+  const pages = documents.reduce((sum, document) => sum + (document.pageCount ?? 1), 0);
+  return pages > 0 && chars / pages < TERSE_CHARS_PER_PAGE;
+}
+
+/**
+ * What to do with the pictures, said only when some were actually sent.
+ *
+ * Without this the model treats them as illustration and writes cards from the
+ * text alone — which is the whole thing the setting exists to avoid.
+ */
+function describeImages(count: number): string {
+  if (count === 0) return '';
+  return [
+    '',
+    `${count} image${count === 1 ? '' : 's'} from the source material ${
+      count === 1 ? 'is' : 'are'
+    } included below, each labelled with the file and slide it came from. They are part of the material, not decoration:`,
+    '  - Read what they show — diagram labels, chart values, worked examples, anything written inside them.',
+    '  - Where an image teaches something the text does not, that is worth a card.',
+    '  - Do not write cards about an image as an object ("what does the diagram on slide 3 show") — write cards about what is in it.',
+    '  - Ignore an image that turns out to be a logo, a stock photo or decoration.',
+  ].join('\n');
+}
+
+/**
+ * The extra rules that only apply once there is more than one file.
+ *
+ * Silent for a single document: a lone upload should produce byte-identical
+ * prompts to the ones this wrote before multi-upload existed.
+ */
+function describeMultipleDocuments(count: number): string {
+  if (count < 2) return '';
+  return [
+    '',
+    `You have been given ${count} documents. They are one body of material, not ${count} separate jobs:`,
+    '  - Spread the cards across all of them rather than working through the first and stopping.',
+    '  - Where two documents make the same point, write one card, not one each.',
+    '  - Where one document explains or contradicts another, that connection is worth a card of its own.',
+    '  - Attribute nothing to the wrong document; each is labelled where it starts.',
+  ].join('\n');
+}
+
+/**
+ * Pictures across every uploaded file, capped for the whole run.
+ *
+ * Each extractor already limits its own file, but five illustrated decks at
+ * eight images each would be forty pictures and several dollars. The run-level
+ * cap is what the user is actually billed against, so it is enforced here.
+ */
+const MAX_IMAGES_PER_RUN = 12;
+
+interface LabelledImage {
+  image: DocumentImage;
+  filename: string;
+}
+
+function picturesIn(documents: ExtractedDocument[]): LabelledImage[] {
+  const all: LabelledImage[] = [];
+  for (const document of documents) {
+    for (const image of document.images ?? []) {
+      all.push({ image, filename: document.filename });
+    }
+  }
+  // Round-robin across the documents rather than filling up on the first one,
+  // so a deck uploaded second still gets looked at.
+  return interleaveByDocument(all).slice(0, MAX_IMAGES_PER_RUN);
+}
+
+function interleaveByDocument(images: LabelledImage[]): LabelledImage[] {
+  const byDocument = new Map<string, LabelledImage[]>();
+  for (const entry of images) {
+    const bucket = byDocument.get(entry.filename);
+    if (bucket) bucket.push(entry);
+    else byDocument.set(entry.filename, [entry]);
+  }
+
+  const buckets = [...byDocument.values()];
+  const ordered: LabelledImage[] = [];
+  for (let round = 0; ordered.length < images.length; round += 1) {
+    for (const bucket of buckets) {
+      const entry = bucket[round];
+      if (entry) ordered.push(entry);
+    }
+  }
+  return ordered;
+}
+
+/** The `{type: "image_url"}` part shape OpenRouter takes, OpenAI-compatible. */
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+/**
+ * The user turn: the document text, plus each picture behind a line saying
+ * where it came from so the model can attribute what it sees.
+ */
+function buildUserContent(
+  documents: ExtractedDocument[],
+  pictures: LabelledImage[],
+): string | ContentPart[] {
+  const text = buildUserPrompt(documents);
+  if (pictures.length === 0) return text;
+
+  const parts: ContentPart[] = [{ type: 'text', text }];
+  for (const { image, filename } of pictures) {
+    const where = image.page === undefined ? filename : `${filename}, slide ${image.page}`;
+    parts.push({ type: 'text', text: `Image from ${where}:` });
+    parts.push({ type: 'image_url', image_url: { url: image.dataUrl } });
+  }
+  return parts;
+}
+
+/** A model that can see, keeping the caller's choice when it already can. */
+function visionModelFor(requested: string): string {
+  return isVisionModel(requested) ? requested : DEFAULT_VISION_MODEL_ID;
+}
+
+function buildUserPrompt(documents: ExtractedDocument[]): string {
+  const budgets = shareBudget(
+    documents.map((document) => document.text.length),
+    MAX_CONTEXT_CHARS,
+  );
+
+  if (documents.length === 1) {
+    const only = documents[0] as ExtractedDocument;
+    return `Source document:\n\n${truncate(only.text, budgets[0] as number)}`;
+  }
+
+  return documents
+    .map((document, index) => {
+      const heading = `=== Document ${index + 1} of ${documents.length}: ${document.filename} ===`;
+      return `${heading}\n\n${truncate(document.text, budgets[index] as number)}`;
+    })
+    .join('\n\n');
+}
+
+/**
+ * Splits a character budget across documents so no document is cut off
+ * entirely.
+ *
+ * Concatenating everything and truncating the result would spend the whole
+ * budget on whichever file happened to be first, and the last one would never
+ * reach the model at all — silently, which is the worst part. Instead each
+ * document is offered an equal share; anything shorter than its share takes
+ * only what it needs and hands the remainder back for the longer ones to
+ * divide. Shortest first, so the handing back compounds.
+ */
+function shareBudget(lengths: number[], total: number): number[] {
+  const order = lengths.map((length, index) => ({ length, index }));
+  order.sort((a, b) => a.length - b.length);
+
+  const budgets = new Array<number>(lengths.length).fill(0);
+  let remaining = total;
+  let left = order.length;
+
+  for (const { length, index } of order) {
+    const share = Math.floor(remaining / left);
+    const taken = Math.min(length, share);
+    budgets[index] = taken;
+    remaining -= taken;
+    left -= 1;
+  }
+  return budgets;
 }
 
 const SUGGEST_CHOICE_SYSTEM_PROMPT = [

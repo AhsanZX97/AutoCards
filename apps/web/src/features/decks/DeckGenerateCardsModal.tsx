@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   CARD_TYPE_LABELS,
   CARD_TYPES,
+  DEFAULT_GENERATION_PRESET,
   DEFAULT_MODEL_ID,
   DIFFICULTIES,
+  GENERATION_PRESET_DESCRIPTIONS,
+  GENERATION_PRESET_LABELS,
+  GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
+  SUPPORTED_FORMATS_LABEL,
+  resolvePreset,
   type CardType,
   type Deck,
   type Difficulty,
   type Flashcard,
   type GeneratedCard,
+  type GenerationPresetId,
   type GenerationProgress,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
@@ -17,6 +24,7 @@ import { Button, Chip, Field, Modal, Progress, Select, Slider, Switch, Textarea 
 import { toast } from '../../components/ui/toastStore';
 import { getPromptText } from '../../lib/cardText';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
+import { UploadDropzone } from './UploadDropzone';
 
 /** Sentinels for the category picker, alongside the deck's real category ids. */
 const AUTO_CATEGORY = '__auto__';
@@ -33,7 +41,7 @@ interface DeckGenerateCardsModalProps {
 }
 
 /**
- * Adds cards to a deck that already exists, from a second PDF.
+ * Adds cards to a deck that already exists, from more uploaded material.
  *
  * Same pipeline as creating a deck (extract → generate → normalize) and the
  * same allowance is spent, so the options offered here are the generation
@@ -43,7 +51,6 @@ interface DeckGenerateCardsModalProps {
  */
 export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGenerateCardsModalProps) {
   const app = useApp();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const quota = useUploadQuota();
 
   const defaults = app.settingsStore((s) => s.generationDefaults);
@@ -51,11 +58,11 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
   const addGeneratedCards = app.deckStore((s) => s.addGeneratedCards);
 
   const [step, setStep] = useState<Step>('setup');
-  const [file, setFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const [preset, setPreset] = useState<GenerationPresetId>(defaults.preset ?? DEFAULT_GENERATION_PRESET);
   const [cardCount, setCardCount] = useState(defaults.cardCount);
   const [cardTypes, setCardTypes] = useState<CardType[]>(defaults.cardTypes);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty);
@@ -63,6 +70,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
   const [includeHints, setIncludeHints] = useState(defaults.includeHints);
   const [includeExplanations, setIncludeExplanations] = useState(defaults.includeExplanations);
   const [includeSourceQuotes, setIncludeSourceQuotes] = useState(defaults.includeSourceQuotes);
+  const [readImages, setReadImages] = useState(defaults.readImages ?? false);
   const [instructions, setInstructions] = useState('');
 
   // Reopening after a failed or finished run should start clean rather than on
@@ -70,19 +78,10 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
   useEffect(() => {
     if (!open) return;
     setStep('setup');
-    setFile(null);
+    setFiles([]);
     setProgress(null);
     setErrorMessage('');
   }, [open]);
-
-  const handleFile = useCallback((selected: File | null) => {
-    if (!selected) return;
-    if (selected.type !== 'application/pdf' && !selected.name.toLowerCase().endsWith('.pdf')) {
-      toast({ variant: 'error', title: 'Please upload a PDF file.' });
-      return;
-    }
-    setFile(selected);
-  }, []);
 
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
@@ -94,22 +93,33 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     });
   }
 
+  /** Card types follow the preset — see `CreateDeckPage` for why. */
+  function choosePreset(next: GenerationPresetId) {
+    setPreset(next);
+    setCardTypes(resolvePreset(next).suggestedCardTypes);
+  }
+
   async function startGeneration() {
-    if (!file || !quota.canUpload) return;
+    if (files.length === 0 || !quota.canUpload) return;
     const autoCategories = categoryTarget === AUTO_CATEGORY;
 
     setStep('generating');
     setErrorMessage('');
-    updateDefaults({ cardCount, cardTypes, difficulty, includeHints, includeExplanations, includeSourceQuotes });
+    updateDefaults({ preset, cardCount, cardTypes, difficulty, includeHints, includeExplanations, includeSourceQuotes, readImages });
 
     try {
-      const document = await app.services.pdf.extract(file);
+      // Sequential — see `CreateDeckPage`.
+      const documents = [];
+      for (const selected of files) {
+        documents.push(await app.services.documents.extract(selected));
+      }
       const result = await app.services.llm.generateDeck({
-        document,
+        documents,
         options: {
           // Fixed house model — see `CreateDeckPage`; picking one is not a
           // decision to put in front of a student.
           model: DEFAULT_MODEL_ID,
+          preset,
           cardCount,
           cardTypes,
           difficulty,
@@ -117,6 +127,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
           includeHints,
           includeExplanations,
           includeSourceQuotes,
+          readImages,
           instructions: instructions.trim() || undefined,
           language: 'en',
         },
@@ -163,7 +174,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     <Modal
       open={open}
       onClose={step === 'generating' ? () => {} : onClose}
-      title="Add cards from a PDF"
+      title="Add cards from a document"
       description={`New cards are checked against the ${cards.length} already in ${deck.title}.`}
       size="lg"
       footer={
@@ -173,7 +184,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={startGeneration} disabled={!file || !quota.canUpload}>
+            <Button onClick={startGeneration} disabled={files.length === 0 || !quota.canUpload}>
               Generate cards
             </Button>
           </>
@@ -195,7 +206,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
           </p>
           {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
           <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-          <p className="mt-6 text-xs text-slate-400">Reading your PDF and writing cards. This takes a minute.</p>
+          <p className="mt-6 text-xs text-slate-400">Reading your files and writing cards. This takes a minute.</p>
         </div>
       )}
 
@@ -211,55 +222,30 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
         <div className="space-y-5">
           {!quota.canUpload && (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              You have used all {quota.limit} of this month’s uploads. Upgrade your plan in Settings → Billing, or
-              write the card yourself.
+              You have used all {quota.limit} of this month’s uploads. Your allowance resets on the 1st — until
+              then you can still write cards yourself.
             </p>
           )}
 
-          {file ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-              <span className="text-2xl">📄</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{file.name}</p>
-                <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
-                Change
-              </Button>
-            </div>
-          ) : (
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                handleFile(e.dataTransfer.files[0] ?? null);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
-                dragActive
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-                  : 'border-slate-300 hover:border-brand-400 dark:border-slate-700'
-              }`}
-            >
-              <span className="text-3xl">📄</span>
-              <p className="mt-3 font-semibold text-slate-800 dark:text-slate-200">
-                Drop a PDF here, or click to browse
-              </p>
-              <p className="mt-1 text-sm text-slate-400">Another chapter, a past paper, a set of lecture slides.</p>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          <UploadDropzone
+            compact
+            files={files}
+            onChange={setFiles}
+            hint={`Another chapter, a past paper, a set of slides — ${SUPPORTED_FORMATS_LABEL}.`}
           />
+
+          <Field label="What are these cards for?" hint="Sets the card types to match">
+            <div className="flex flex-wrap gap-2">
+              {GENERATION_PRESETS.map((id) => (
+                <Chip key={id} active={preset === id} onClick={() => choosePreset(id)}>
+                  {GENERATION_PRESET_LABELS[id]}
+                </Chip>
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {GENERATION_PRESET_DESCRIPTIONS[preset]}
+            </p>
+          </Field>
 
           <Slider
             label="Number of cards"
@@ -326,6 +312,12 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
               onChange={setIncludeSourceQuotes}
               label="Quote source passages"
               description="Show the original text each card was based on"
+            />
+            <Switch
+              checked={readImages}
+              onChange={setReadImages}
+              label="Read the pictures too"
+              description="Looks at diagrams and charts, not just the words. Slower and costs more."
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
-import type { PdfSource } from '@autocards/core';
+import type { DocumentSource } from '@autocards/core';
 
-/** Adapts an `expo-document-picker` result to the `PdfSource` shape core expects. */
-export function pdfSourceFromUri(uri: string, name: string, size: number): PdfSource {
+/** Adapts an `expo-document-picker` result to the shape core's extractors expect. */
+export function documentSourceFromUri(uri: string, name: string, size: number): DocumentSource {
   return {
     name,
     size,

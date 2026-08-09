@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PLAN_LIMITS, PLANS, type Plan } from '@autocards/core';
+import { PLAN_LIMITS, PLANS, isAdmin, type Plan } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Avatar, Badge, Button, Card, CardBody, Field, Input, Progress, Select, Switch, Tabs } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
@@ -35,18 +35,8 @@ export function SettingsPage() {
 function ProfileTab() {
   const app = useApp();
   const user = app.authStore((s) => s.session?.user);
-  const updateProfile = app.authStore((s) => s.updateProfile);
-  const [username, setUsername] = useState(user?.username ?? '');
-  const [saving, setSaving] = useState(false);
 
   if (!user) return null;
-
-  async function save() {
-    setSaving(true);
-    await updateProfile({ username });
-    setSaving(false);
-    toast({ variant: 'success', title: 'Profile updated' });
-  }
 
   return (
     <Card>
@@ -58,17 +48,12 @@ function ProfileTab() {
             <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
           </div>
         </div>
-        <Field label="Username" hint="3–20 chars, lowercase, a–z, 0–9, _">
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" />
+        <Field label="Username">
+          <Input value={user.username} disabled />
         </Field>
         <Field label="Email">
           <Input value={user.email} disabled />
         </Field>
-        <div className="flex justify-end">
-          <Button onClick={save} loading={saving}>
-            Save changes
-          </Button>
-        </div>
       </CardBody>
     </Card>
   );
@@ -78,29 +63,52 @@ function AppearanceTab() {
   const app = useApp();
   const theme = app.settingsStore((s) => s.theme);
   const setTheme = app.settingsStore((s) => s.setTheme);
+  const completedTours = app.tourStore((s) => s.completedTours);
+  const resetTours = app.tourStore((s) => s.resetTours);
+
+  function replayTours() {
+    resetTours();
+    toast({ variant: 'success', title: 'Walkthroughs reset', description: 'They will run again on your next visit.' });
+  }
 
   return (
-    <Card>
-      <CardBody className="space-y-4">
-        <h3 className="font-semibold text-slate-900 dark:text-white">Theme</h3>
-        <div className="grid grid-cols-3 gap-3">
-          {(['light', 'dark', 'system'] as const).map((option) => (
-            <button
-              key={option}
-              onClick={() => setTheme(option)}
-              className={`rounded-xl border p-4 text-center text-sm font-medium capitalize transition-colors ${
-                theme === option
-                  ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
-              }`}
-            >
-              <span className="mb-2 block text-xl">{option === 'light' ? '☀️' : option === 'dark' ? '🌙' : '💻'}</span>
-              {option}
-            </button>
-          ))}
-        </div>
-      </CardBody>
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <CardBody className="space-y-4">
+          <h3 className="font-semibold text-slate-900 dark:text-white">Theme</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {(['light', 'dark', 'system'] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => setTheme(option)}
+                className={`rounded-xl border p-4 text-center text-sm font-medium capitalize transition-colors ${
+                  theme === option
+                    ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
+                }`}
+              >
+                <span className="mb-2 block text-xl">{option === 'light' ? '☀️' : option === 'dark' ? '🌙' : '💻'}</span>
+                {option}
+              </button>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-white">Guided walkthroughs</h3>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              The short tours that run the first time you open a deck and the study setup.
+            </p>
+          </div>
+          <Button variant="outline" onClick={replayTours} disabled={completedTours.length === 0}>
+            {completedTours.length === 0 ? 'Not seen yet' : 'Show them again'}
+          </Button>
+        </CardBody>
+      </Card>
+    </div>
   );
 }
 
@@ -152,6 +160,8 @@ function BillingTab() {
 
   if (!user) return null;
 
+  const canSwitchPlans = isAdmin(user);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -166,8 +176,8 @@ function BillingTab() {
             <Progress value={quota.used} max={quota.limit} />
           )}
           <p className="text-xs text-slate-400">
-            Each PDF you convert into cards uses one, whether it starts a new deck or adds to an existing one. Resets
-            on the 1st.
+            Each generation uses one, however many files it reads, whether it starts a new deck or adds to an
+            existing one. Resets on the 1st.
           </p>
         </CardBody>
       </Card>
@@ -186,9 +196,9 @@ function BillingTab() {
                 <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                   <li>{formatLimit(limits.monthlyUploads)} uploads/mo</li>
                   <li>{formatLimit(limits.maxDecks)} decks</li>
-                  <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF</li>
+                  <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF or slide deck</li>
                 </ul>
-                {!isCurrent && (
+                {!isCurrent && canSwitchPlans && (
                   <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => changePlan(plan as Plan)}>
                     Switch to {plan}
                   </Button>
@@ -198,6 +208,12 @@ function BillingTab() {
           );
         })}
       </div>
+
+      {!canSwitchPlans && (
+        <p className="text-xs text-slate-400">
+          Your plan is set by us — get in touch if you need to move to a different one.
+        </p>
+      )}
     </div>
   );
 }

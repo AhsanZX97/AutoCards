@@ -69,7 +69,7 @@ export function DeckLibraryPage() {
             Import
           </Button>
           <Link to="/app/decks/new">
-            <Button>+ Create deck from PDF</Button>
+            <Button>+ Create a deck</Button>
           </Link>
         </div>
       </div>

@@ -61,7 +61,7 @@ export interface Choice {
   correct: boolean;
 }
 
-/** Where in the source PDF this card came from. */
+/** Where in the source document this card came from. */
 export interface CardSource {
   page?: number;
   /** Verbatim snippet the generator based the card on. */

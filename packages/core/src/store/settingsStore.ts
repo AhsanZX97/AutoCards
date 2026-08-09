@@ -4,7 +4,7 @@ import { STORAGE_KEYS, type StorageAdapter } from '../lib/storage';
 import { toZustandStorage } from './persistBridge';
 import { DEFAULT_MODEL_ID } from '../services/llm/models';
 import type { CardType, Difficulty, GenerationOptions } from '../types';
-import { CARD_TYPES } from '../types';
+import { CARD_TYPES, DEFAULT_GENERATION_PRESET } from '../types';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -12,9 +12,14 @@ export interface SettingsState {
   theme: ThemePreference;
   /** Stored locally only; generation stays mocked until this is wired to a live call. */
   openRouterApiKey: string;
+  /**
+   * `preset` is optional here for the same reason it is on `GenerationOptions`:
+   * settings saved before presets existed persist without it, and an absent
+   * preset already means the default everywhere downstream.
+   */
   generationDefaults: Pick<
     GenerationOptions,
-    'model' | 'cardCount' | 'cardTypes' | 'difficulty' | 'autoCategories' | 'includeHints' | 'includeExplanations' | 'includeSourceQuotes' | 'language'
+    'model' | 'preset' | 'cardCount' | 'cardTypes' | 'difficulty' | 'autoCategories' | 'includeHints' | 'includeExplanations' | 'includeSourceQuotes' | 'readImages' | 'language'
   >;
   hasCompletedOnboarding: boolean;
 
@@ -35,6 +40,7 @@ export function createSettingsStore(storage: StorageAdapter) {
         openRouterApiKey: '',
         generationDefaults: {
           model: DEFAULT_MODEL_ID,
+          preset: DEFAULT_GENERATION_PRESET,
           cardCount: 15,
           cardTypes: DEFAULT_CARD_TYPES,
           difficulty: DEFAULT_DIFFICULTY,
@@ -42,6 +48,9 @@ export function createSettingsStore(storage: StorageAdapter) {
           includeHints: true,
           includeExplanations: true,
           includeSourceQuotes: false,
+          // Off by default: it needs a costlier model and buys nothing on the
+          // text uploads that make up most of them.
+          readImages: false,
           language: 'en',
         },
         hasCompletedOnboarding: false,

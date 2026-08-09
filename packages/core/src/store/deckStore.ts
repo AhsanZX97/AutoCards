@@ -37,11 +37,24 @@ export interface AddGeneratedCardsResult {
   duplicates: number;
 }
 
+/**
+ * What the person creating the deck called it, when they were asked.
+ *
+ * The generator still suggests a name off the filename, but a caller that put
+ * the question to the user wins — including an empty description, which is a
+ * choice rather than a gap. A blank title is the one thing not honoured: a deck
+ * has to be findable in the library, so that falls back to the suggestion.
+ */
+export interface DeckDetails {
+  title: string;
+  description: string;
+}
+
 export interface DeckState {
   decks: Deck[];
   cardsByDeck: Record<Id, Flashcard[]>;
 
-  createDeckFromGeneration: (result: GenerationResult, ownerId: Id) => Deck;
+  createDeckFromGeneration: (result: GenerationResult, ownerId: Id, details?: DeckDetails) => Deck;
   createBlankDeck: (ownerId: Id, title: string, accent?: Accent, icon?: string) => Deck;
   importDeck: (payload: DeckExport, ownerId: Id) => Deck;
   updateDeck: (deckId: Id, patch: Partial<Pick<Deck, 'title' | 'description' | 'icon' | 'accent' | 'tags'>>) => void;
@@ -113,7 +126,7 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
         decks: [],
         cardsByDeck: {},
 
-        createDeckFromGeneration: (result, ownerId) => {
+        createDeckFromGeneration: (result, ownerId, details) => {
           const timestamp = nowIso();
           const deckId = createId('deck');
           // A single pass restates itself often enough to be worth checking —
@@ -129,13 +142,13 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
           const deck: Deck = {
             id: deckId,
             ownerId,
-            title: result.deckTitle,
-            description: result.deckDescription,
+            title: details?.title.trim() || result.deckTitle,
+            description: details ? details.description.trim() : result.deckDescription,
             icon: result.deckIcon,
             accent: 'indigo',
             tags: [],
             categories: result.categories.filter((category) => usedCategoryIds.has(category.id)),
-            source: result.source,
+            sources: result.sources,
             generatedBy: result.model,
             defaultSettings: createDefaultStudySettings(),
             archived: false,

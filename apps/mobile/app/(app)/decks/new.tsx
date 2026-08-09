@@ -13,7 +13,7 @@ import {
   type ModelInfo,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
-import { pdfSourceFromUri } from '../../../src/lib/pdfSource';
+import { documentSourceFromUri } from '../../../src/lib/pdfSource';
 import { useTheme, spacing } from '../../../src/lib/theme';
 import { Button, Card, Chip, Field, ProgressBar, Screen, SwitchRow } from '../../../src/components';
 
@@ -70,10 +70,10 @@ export default function CreateDeckScreen() {
     setStep('generating');
     setErrorMessage('');
     try {
-      const source = pdfSourceFromUri(file.uri, file.name, file.size);
-      const document = await app.services.pdf.extract(source);
+      const source = documentSourceFromUri(file.uri, file.name, file.size);
+      const document = await app.services.documents.extract(source);
       const result = await app.services.llm.generateDeck({
-        document,
+        documents: [document],
         options: {
           model,
           cardCount,

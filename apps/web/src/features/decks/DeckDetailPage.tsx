@@ -14,7 +14,10 @@ import {
   type Flashcard,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useTour } from '../../lib/useTour';
 import { Badge, Button, Card, CardBody, Chip, InfoButton, Input, Modal, Progress, Select } from '../../components/ui';
+import { TourOverlay } from '../../components/tour';
+import { DECK_TOUR_STEPS } from './deckTourSteps';
 import { DIFFICULTY_BADGE, PRIORITY_BADGE } from '../../lib/badges';
 import { accentOf } from '../../lib/accent';
 import { AddCardMenu } from './AddCardMenu';
@@ -68,6 +71,9 @@ export function DeckDetailPage() {
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
   const quota = useUploadQuota();
+  // Runs once, the first time anyone opens a deck. Held off until the deck has
+  // loaded so the first step never lands on the "Deck not found" card.
+  const tour = useTour('deck-detail', Boolean(deck));
 
   // `cards` is stored in deck order, so a card's index is its place in the deck.
   const indexById = useMemo(() => new Map(cards.map((card, index) => [card.id, index])), [cards]);
@@ -236,7 +242,7 @@ export function DeckDetailPage() {
               ✍️ Write one
             </Button>
             <Button size="sm" onClick={() => setGenerateOpen(true)}>
-              📄 Generate from a PDF
+              📄 Generate from a document
             </Button>
           </div>
         )}
@@ -269,18 +275,33 @@ export function DeckDetailPage() {
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setDeckEditorOpen(true)}>
-            Edit deck
+          <Button
+            variant="outline"
+            size="icon"
+            data-tour="deck-edit"
+            onClick={() => setDeckEditorOpen(true)}
+            aria-label="Edit deck"
+            title="Edit deck"
+          >
+            <PencilIcon />
           </Button>
-          <AddCardMenu
-            onWriteCard={openNewCard}
-            onGenerateFromPdf={() => setGenerateOpen(true)}
-            quotaLabel={formatQuota(quota)}
-          />
-          <Button variant="outline" onClick={() => setShareOpen(true)}>
-            Share
+          <div data-tour="deck-add-card">
+            <AddCardMenu
+              onWriteCard={openNewCard}
+              onGenerateFromPdf={() => setGenerateOpen(true)}
+              quotaLabel={formatQuota(quota)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShareOpen(true)}
+            aria-label="Share deck"
+            title="Share deck"
+          >
+            <ShareIcon />
           </Button>
-          <Button onClick={() => navigate(`/app/study/${deckId}`)} disabled={stats.total === 0}>
+          <Button data-tour="deck-study" onClick={() => navigate(`/app/study/${deckId}`)} disabled={stats.total === 0}>
             Study now
           </Button>
         </div>
@@ -291,7 +312,7 @@ export function DeckDetailPage() {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Progress</p>
           <InfoButton label="What do these numbers mean?" onClick={() => setStatsHelpOpen(true)} />
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div data-tour="deck-progress" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <MiniStat label="Cards" value={stats.total} />
           <MiniStat label="New" value={stats.new} />
           <MiniStat label="Learning" value={stats.learning} />
@@ -345,34 +366,41 @@ export function DeckDetailPage() {
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="w-full max-w-xs">
-            <Input placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          {/* The search and the filters are grouped so the tour can highlight
+              them without also lighting up the view switcher beside them. */}
+          <div data-tour="deck-filters" className="flex flex-1 flex-wrap items-center gap-2">
+            <div className="w-full max-w-xs">
+              <Input placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <Select
+              className="w-auto"
+              value={difficultyFilter}
+              onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | 'all')}
+              aria-label="Filter by difficulty"
+            >
+              <option value="all">Any difficulty</option>
+              {DIFFICULTIES.map((d) => (
+                <option key={d} value={d}>
+                  {d[0]?.toUpperCase() + d.slice(1)}
+                </option>
+              ))}
+            </Select>
+            <Chip active={starredOnly} onClick={() => setStarredOnly((v) => !v)}>
+              ⭐ Starred
+            </Chip>
+            <Chip active={suspendedOnly} onClick={() => setSuspendedOnly((v) => !v)}>
+              ⏸ Suspended
+            </Chip>
+            {isFiltered && (
+              <Button size="sm" variant="ghost" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
           </div>
-          <Select
-            className="w-auto"
-            value={difficultyFilter}
-            onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | 'all')}
-            aria-label="Filter by difficulty"
+          <div
+            data-tour="deck-view"
+            className="ml-auto flex items-center gap-1 rounded-xl border border-slate-200 p-1 dark:border-slate-800"
           >
-            <option value="all">Any difficulty</option>
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {d[0]?.toUpperCase() + d.slice(1)}
-              </option>
-            ))}
-          </Select>
-          <Chip active={starredOnly} onClick={() => setStarredOnly((v) => !v)}>
-            ⭐ Starred
-          </Chip>
-          <Chip active={suspendedOnly} onClick={() => setSuspendedOnly((v) => !v)}>
-            ⏸ Suspended
-          </Chip>
-          {isFiltered && (
-            <Button size="sm" variant="ghost" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          )}
-          <div className="ml-auto flex items-center gap-1 rounded-xl border border-slate-200 p-1 dark:border-slate-800">
             <ViewTab active={view === 'list'} onClick={() => setView('list')}>
               ☰ List
             </ViewTab>
@@ -439,6 +467,8 @@ export function DeckDetailPage() {
         </div>
       )}
 
+      <TourOverlay open={tour.open} steps={DECK_TOUR_STEPS} onFinish={tour.finish} />
+
       <CardEditorModal
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
@@ -489,6 +519,31 @@ export function DeckDetailPage() {
         </dl>
       </Modal>
     </div>
+  );
+}
+
+/** Header actions are icon-only, so the deck title keeps the room it needs. */
+function PencilIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3l-7.3 7.3-3 .7.7-3 7.3-7.3Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="12" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="4" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12" cy="12.5" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="m5.8 7.1 4.4-2.2M5.8 8.9l4.4 2.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
   );
 }
 

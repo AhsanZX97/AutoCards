@@ -16,7 +16,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
     context: 128_000,
     inputPrice: 0.27,
     outputPrice: 1.1,
-    description: 'Best card quality per dollar on dense, technical PDFs. The default.',
+    description: 'Best card quality per dollar on dense, technical material. The default.',
     recommended: true,
   },
   {
@@ -36,6 +36,7 @@ export const MODEL_CATALOG: ModelInfo[] = [
     inputPrice: 1.2,
     outputPrice: 6,
     description: 'Alibaba’s flagship. Handles long, multilingual source documents well.',
+    vision: true,
   },
   {
     id: 'z-ai/glm-4.6',
@@ -53,7 +54,8 @@ export const MODEL_CATALOG: ModelInfo[] = [
     context: 1_000_000,
     inputPrice: 3,
     outputPrice: 15,
-    description: 'Near-frontier quality, noticeably pricier. Good for bulk decks that need extra polish.',
+    description: 'Near-frontier quality, noticeably pricier. Reads diagrams and screenshots well.',
+    vision: true,
   },
   {
     id: 'anthropic/claude-haiku-4.5',
@@ -62,11 +64,27 @@ export const MODEL_CATALOG: ModelInfo[] = [
     context: 200_000,
     inputPrice: 1,
     outputPrice: 5,
-    description: 'Fastest Claude option. Best for short handouts and lecture slides.',
+    description: 'Fastest Claude option. Reads pictures too, for a third of Sonnet’s price.',
+    vision: true,
   },
 ];
 
 export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v3.2';
+
+/**
+ * Used instead of {@link DEFAULT_MODEL_ID} when a run has to read pictures.
+ *
+ * The house default cannot see at all, so this is not a preference — a run
+ * with images has to move to a model that accepts them. Sonnet reads diagrams
+ * and handwriting best of the three in the catalog; `anthropic/claude-haiku-4.5`
+ * is the same capability at a third of the price if the bill matters more than
+ * the last few percent of accuracy.
+ */
+export const DEFAULT_VISION_MODEL_ID = 'anthropic/claude-sonnet-5';
+
+export function isVisionModel(id: string): boolean {
+  return findModel(id)?.vision === true;
+}
 
 export function findModel(id: string): ModelInfo | undefined {
   return MODEL_CATALOG.find((model) => model.id === id);

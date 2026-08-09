@@ -8,6 +8,6 @@
 export interface UploadUsage {
   /** `YYYY-MM`, UTC. The month `uploads` was counted in. */
   period: string;
-  /** PDFs converted into cards during `period`. */
+  /** Generations run during `period`. */
   uploads: number;
 }

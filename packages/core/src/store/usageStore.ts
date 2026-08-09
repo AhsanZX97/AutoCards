@@ -6,7 +6,7 @@ import { countUpload, usageForPeriod } from '../domain/uploadQuota';
 import type { Id, UploadUsage } from '../types';
 
 /**
- * The month's PDF spend, per account.
+ * The month's upload spend, per account.
  *
  * Keyed by user id rather than held as a single counter because one device can
  * carry more than one account — signing out and back in as someone else must

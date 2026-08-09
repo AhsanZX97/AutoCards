@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
-import { createApp, StubPdfExtractor, type App, type OpenRouterConfig } from '@autocards/core';
+import { createApp, StubDocumentExtractor, type App, type OpenRouterConfig } from '@autocards/core';
 import { createMobileStorage } from './storage';
 
 const AppContext = createContext<App | null>(null);
@@ -48,8 +48,10 @@ function getApp(): App {
       storage: createMobileStorage(),
       // Note: this stub synthesises page text, so live generation refuses the
       // document rather than writing cards about a placeholder. Real decks on
-      // mobile need a native PDF parser behind `PdfExtractor` first.
-      pdfExtractor: new StubPdfExtractor(),
+      // mobile need a native parser behind `DocumentExtractor` first — the
+      // Word/PowerPoint readers would run here, but there is no point routing
+      // to them while PDFs, the format people actually pick, cannot be read.
+      documentExtractor: new StubDocumentExtractor(),
       openRouter: buildTimeConfig(),
       supabase,
     });

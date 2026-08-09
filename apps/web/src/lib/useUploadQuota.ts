@@ -2,7 +2,7 @@ import { PLAN_LIMITS, remainingUploads, usageForPeriod } from '@autocards/core';
 import { useApp } from './appContext';
 
 export interface UploadQuota {
-  /** PDFs converted this month. */
+  /** Documents converted this month. */
   used: number;
   /** The plan's monthly allowance. `Infinity` when unlimited. */
   limit: number;
@@ -15,7 +15,7 @@ export interface UploadQuota {
 }
 
 /**
- * The signed-in account's monthly PDF allowance, shared by both paths that
+ * The signed-in account's monthly upload allowance, shared by both paths that
  * spend it: creating a deck from a document, and adding cards to an existing
  * deck from another one.
  */

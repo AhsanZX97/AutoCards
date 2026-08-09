@@ -150,7 +150,7 @@ export function slugify(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** Sentence-splitter good enough to chunk PDF text for the generator. */
+/** Sentence-splitter good enough to chunk source text for the generator. */
 export function splitSentences(text: string): string[] {
   return text
     .replace(/\s+/g, ' ')

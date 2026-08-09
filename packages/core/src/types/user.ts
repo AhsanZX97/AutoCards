@@ -4,7 +4,7 @@ export const PLANS = ['free', 'pro', 'team'] as const;
 export type Plan = (typeof PLANS)[number];
 
 export interface PlanLimits {
-  /** Max PDFs that can be converted per month. `Infinity` for unlimited. */
+  /** Max generations per month, however many files each reads. `Infinity` for unlimited. */
   monthlyUploads: number;
   /** Max pages accepted in a single PDF. */
   maxPagesPerPdf: number;

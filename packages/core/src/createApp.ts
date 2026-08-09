@@ -2,7 +2,7 @@ import type { StorageAdapter } from './lib/storage';
 import type { AuthService } from './services/auth/types';
 import { RoutingLlmService } from './services/llm';
 import type { LlmService, OpenRouterConfig } from './services/llm';
-import type { PdfExtractor } from './services/pdf';
+import type { DocumentExtractor } from './services/documents';
 import { SupabaseAuthService } from './services/auth/supabaseAuth';
 import { SupabaseSyncBackend } from './services/sync/supabaseSyncBackend';
 import { SyncEngine } from './services/sync/syncEngine';
@@ -12,13 +12,15 @@ import {
   createSettingsStore,
   createStudyStore,
   createSyncStore,
+  createTourStore,
   createUsageStore,
 } from './store';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CreateAppOptions {
   storage: StorageAdapter;
-  pdfExtractor: PdfExtractor;
+  /** Reads uploads of every supported format; see `RoutingDocumentExtractor`. */
+  documentExtractor: DocumentExtractor;
   /**
    * OpenRouter credentials generation runs on. Every user's generation calls
    * go through this one key — there is no per-user bring-your-own-key path.
@@ -66,6 +68,7 @@ export function createApp(options: CreateAppOptions) {
   const deckStore = createDeckStore(options.storage, (ops) => syncStore?.getState().enqueue(ops));
   const studyStore = createStudyStore(deckStore, options.storage);
   const usageStore = createUsageStore(options.storage);
+  const tourStore = createTourStore(options.storage);
 
   let syncEngine: SyncEngine | null = null;
   if (options.supabase) {
@@ -89,12 +92,13 @@ export function createApp(options: CreateAppOptions) {
   }
 
   return {
-    services: { auth, llm, pdf: options.pdfExtractor },
+    services: { auth, llm, documents: options.documentExtractor },
     authStore,
     deckStore,
     studyStore,
     settingsStore,
     usageStore,
+    tourStore,
     syncStore,
     syncEngine,
     dispose: () => syncEngine?.stop(),

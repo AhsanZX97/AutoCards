@@ -300,19 +300,68 @@ describe('createDeckStore.createDeckFromGeneration', () => {
       deckIcon: '📄',
       categories,
       cards,
-      source: {
-        id: 'src_1',
-        filename: 'notes.pdf',
-        size: 1_000,
-        pageCount: 2,
-        charCount: 500,
-        uploadedAt: '2026-01-01T00:00:00.000Z',
-      },
+      sources: [
+        {
+          id: 'src_1',
+          filename: 'notes.pdf',
+          size: 1_000,
+          pageCount: 2,
+          charCount: 500,
+          kind: 'pdf' as const,
+          uploadedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
       model: 'test/model',
       usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 },
       elapsedMs: 10,
     };
   }
+
+  it('names the deck what the caller asked for rather than what the generator suggested', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store
+      .getState()
+      .createDeckFromGeneration(result([generated('a', 'b')]), 'user_1', {
+        title: '  Cell Biology  ',
+        description: '  Week 3 seminar  ',
+      });
+
+    expect(deck.title).toBe('Cell Biology');
+    expect(deck.description).toBe('Week 3 seminar');
+  });
+
+  it('accepts an empty description as a deliberate choice, not a gap to fill', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store
+      .getState()
+      .createDeckFromGeneration(result([generated('a', 'b')]), 'user_1', {
+        title: 'Cell Biology',
+        description: '   ',
+      });
+
+    expect(deck.description).toBe('');
+  });
+
+  it('falls back to the generated name when the caller supplies a blank one', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store
+      .getState()
+      .createDeckFromGeneration(result([generated('a', 'b')]), 'user_1', {
+        title: '   ',
+        description: '',
+      });
+
+    // A deck with no name at all is worse than one named after the upload.
+    expect(deck.title).toBe('Biology');
+  });
+
+  it('keeps the generated name and description when no details are given', () => {
+    const store = createDeckStore(createMemoryStorage());
+    const deck = store.getState().createDeckFromGeneration(result([generated('a', 'b')]), 'user_1');
+
+    expect(deck.title).toBe('Biology');
+    expect(deck.description).toBe('From notes.pdf');
+  });
 
   it('drops a card the model wrote twice in one pass', () => {
     const store = createDeckStore(createMemoryStorage());

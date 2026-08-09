@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { ExtractedDocument } from '../../types';
-import { PdfExtractionError, type PdfExtractor, type PdfSource } from './types';
+import { DocumentExtractionError, type DocumentExtractor, type DocumentSource } from './types';
 
 // Vite resolves this to a hashed worker asset URL at build time; the bare
 // specifier form (rather than a relative path) is pdf.js's documented recipe
@@ -18,17 +18,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
  * Falls back to a synthetic page when a document has no text layer at all
  * (scanned/image-only PDFs).
  */
-export class BrowserPdfExtractor implements PdfExtractor {
+export class BrowserPdfExtractor implements DocumentExtractor {
   readonly id = 'pdfjs';
 
-  async extract(source: PdfSource): Promise<ExtractedDocument> {
+  async extract(source: DocumentSource): Promise<ExtractedDocument> {
     const buffer = await source.arrayBuffer();
 
     let pdfDocument: PDFDocumentProxy;
     try {
       pdfDocument = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
     } catch (error) {
-      throw new PdfExtractionError(describeLoadError(source.name, error));
+      throw new DocumentExtractionError(describeLoadError(source.name, error));
     }
 
     try {
@@ -42,6 +42,7 @@ export class BrowserPdfExtractor implements PdfExtractor {
       return {
         filename: source.name,
         size: source.size,
+        kind: 'pdf',
         pageCount: pdfDocument.numPages,
         pages,
         text: pages.join('\n\n'),

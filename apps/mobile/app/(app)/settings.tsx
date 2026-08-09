@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useApp } from '../../src/lib/appContext';
@@ -12,13 +11,10 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const user = app.authStore((s) => s.session?.user);
   const signOut = app.authStore((s) => s.signOut);
-  const updateProfile = app.authStore((s) => s.updateProfile);
   const themePref = app.settingsStore((s) => s.theme);
   const setTheme = app.settingsStore((s) => s.setTheme);
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
-
-  const [username, setUsername] = useState(user?.username ?? '');
 
   async function handleSignOut() {
     await signOut();
@@ -33,9 +29,8 @@ export default function SettingsScreen() {
 
       <Card style={{ marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Profile</Text>
-        <Field label="Username" hint="3–20 chars, lowercase, a–z, 0–9, _" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} />
+        <Field label="Username" value={user.username} editable={false} />
         <Field label="Email" value={user.email} editable={false} />
-        <Button title="Save changes" onPress={() => updateProfile({ username })} />
       </Card>
 
       <Card style={{ marginBottom: spacing.md }}>

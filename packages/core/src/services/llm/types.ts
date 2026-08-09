@@ -18,10 +18,18 @@ export interface ModelInfo {
   outputPrice: number;
   description: string;
   recommended?: boolean;
+  /** Accepts images as well as text. Only these can be used with `readImages`. */
+  vision?: boolean;
 }
 
 export interface GenerateArgs {
-  document: ExtractedDocument;
+  /**
+   * Every file the cards should be written from, in the order the user picked
+   * them. They go up in one call rather than one call each, so the model can
+   * see all of them at once — that is what lets it skip a fact the lecture
+   * slides and the handout both make, and draw a line between the two.
+   */
+  documents: ExtractedDocument[];
   options: GenerationOptions;
   /**
    * Question sides already in the deck being added to. The model is told not to

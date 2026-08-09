@@ -15,8 +15,11 @@ import {
   type StudySettings,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useTour } from '../../lib/useTour';
 import { Button, Card, CardBody, Chip, Field, FormNotice, Select, Slider, Switch } from '../../components/ui';
+import { TourOverlay } from '../../components/tour';
 import { EMPTY_ARRAY } from '../../lib/empty';
+import { STUDY_TOUR_STEPS } from './studyTourSteps';
 
 export function StudySetupPage() {
   const { deckId } = useParams<{ deckId: string }>();
@@ -37,6 +40,9 @@ export function StudySetupPage() {
   // What the session would actually queue up. `activeCount` below only counts
   // unsuspended cards, so it says nothing about whether the filters match.
   const matchingCount = useMemo(() => filterCards(cards, settings.filters).length, [cards, settings.filters]);
+  // Runs once, the first time anyone reaches the session setup. Held off until
+  // the deck has loaded so the first step never lands on "Deck not found".
+  const tour = useTour('study-setup', Boolean(deck));
 
   if (!deckId) return <Navigate to="/app/decks" replace />;
   if (!deck) {
@@ -99,7 +105,7 @@ export function StudySetupPage() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour="study-mode">
         <CardBody>
           <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">Study mode</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -128,7 +134,7 @@ export function StudySetupPage() {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card data-tour="study-pacing">
         <CardBody className="space-y-5">
           <h3 className="font-semibold text-slate-900 dark:text-white">Card order & pacing</h3>
 
@@ -174,7 +180,7 @@ export function StudySetupPage() {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card data-tour="study-filters">
         <CardBody className="space-y-4">
           <h3 className="font-semibold text-slate-900 dark:text-white">Filters</h3>
 
@@ -218,7 +224,7 @@ export function StudySetupPage() {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card data-tour="study-scoring">
         <CardBody className="space-y-1">
           <h3 className="mb-2 font-semibold text-slate-900 dark:text-white">Scoring</h3>
           <Switch checked={settings.streakBonus} onChange={(v) => update('streakBonus', v)} label="Streak bonus" description="Extra points for consecutive correct answers" />
@@ -240,10 +246,12 @@ export function StudySetupPage() {
         <Button variant="outline" onClick={() => navigate(`/app/decks/${deckId}`)}>
           Cancel
         </Button>
-        <Button size="lg" onClick={handleStart} disabled={matchingCount === 0}>
+        <Button size="lg" data-tour="study-start" onClick={handleStart} disabled={matchingCount === 0}>
           Start studying
         </Button>
       </div>
+
+      <TourOverlay open={tour.open} steps={STUDY_TOUR_STEPS} onFinish={tour.finish} />
     </div>
   );
 }

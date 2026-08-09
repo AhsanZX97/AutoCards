@@ -5,9 +5,9 @@ import { cn } from '../../lib/cn';
 interface AddCardMenuProps {
   /** Open the card editor and write one by hand. */
   onWriteCard: () => void;
-  /** Open the PDF uploader and let a model write a batch. */
+  /** Open the document uploader and let a model write a batch. */
   onGenerateFromPdf: () => void;
-  /** Shown under the PDF option, e.g. "2 of 5 uploads left this month". */
+  /** Shown under the upload option, e.g. "2 of 5 uploads left this month". */
   quotaLabel?: string;
 }
 
@@ -42,8 +42,18 @@ export function AddCardMenu({ onWriteCard, onGenerateFromPdf, quotaLabel }: AddC
 
   return (
     <div ref={containerRef} className="relative">
-      <Button variant="outline" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu">
-        + Add card ▾
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Add card"
+        title="Add card"
+      >
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
       </Button>
       {open && (
         <div
@@ -53,7 +63,7 @@ export function AddCardMenu({ onWriteCard, onGenerateFromPdf, quotaLabel }: AddC
           <MenuItem icon="✍️" label="Write one myself" hint="Open the card editor" onClick={() => choose(onWriteCard)} />
           <MenuItem
             icon="📄"
-            label="Generate from a PDF"
+            label="Generate from a document"
             hint={quotaLabel ?? 'Upload a document and let AI write them'}
             onClick={() => choose(onGenerateFromPdf)}
           />

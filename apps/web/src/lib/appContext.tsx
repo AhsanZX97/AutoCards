@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createApp, type App, type OpenRouterConfig } from '@autocards/core';
-import { BrowserPdfExtractor } from '@autocards/core';
+import { BrowserPdfExtractor, RoutingDocumentExtractor } from '@autocards/core';
 import { createWebStorage } from './webStorage';
 
 const AppContext = createContext<App | null>(null);
@@ -36,7 +36,9 @@ function getApp(): App {
   if (!singleton) {
     singleton = createApp({
       storage: createWebStorage(),
-      pdfExtractor: new BrowserPdfExtractor(),
+      // pdf.js is the only reader that needs the browser; the router handles
+      // Word, PowerPoint and text itself.
+      documentExtractor: new RoutingDocumentExtractor(new BrowserPdfExtractor()),
       openRouter: buildTimeConfig(),
       supabase: buildSupabase(),
     });

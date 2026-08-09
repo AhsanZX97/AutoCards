@@ -39,7 +39,7 @@ export function DashboardPage() {
           </p>
         </div>
         <Link to="/app/decks/new">
-          <Button size="lg">+ Create deck from PDF</Button>
+          <Button size="lg">+ Create a deck</Button>
         </Link>
       </div>
 
@@ -157,7 +157,7 @@ function EmptyDeckState() {
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-10 text-center dark:border-slate-800">
       <span className="text-3xl">📄</span>
       <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">No decks yet</p>
-      <p className="mt-1 max-w-xs text-xs text-slate-400">Upload a PDF and Auto Cards will build your first deck.</p>
+      <p className="mt-1 max-w-xs text-xs text-slate-400">Upload your notes and Auto Cards will build your first deck.</p>
       <Link to="/app/decks/new" className="mt-4">
         <Button size="sm">Create your first deck</Button>
       </Link>
