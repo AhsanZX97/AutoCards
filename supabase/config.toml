@@ -157,14 +157,9 @@ enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 #
-# Still the dev server while the app is pre-launch. Change this to the real origin at launch —
-# confirmation and password-reset emails are built from it, so a stale value sends every user to a
-# link that does not resolve.
-#
-# `supabase config push` sends this whole [auth] section to the hosted project — this line included.
-# Set it to the production origin in the same commit that pushes, or the push will point live
-# users at localhost.
-site_url = "http://localhost:5173"
+# autocards.study — the real origin. Confirmation and password-reset emails are built from this,
+# so until the site is actually hosted there, those links will not resolve.
+site_url = "https://autocards.study"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # Where auth is permitted to redirect after a confirmation or recovery link.
@@ -173,9 +168,11 @@ site_url = "http://localhost:5173"
 # email is refused before the page ever loads. Listed explicitly as well as by wildcard, since the
 # exact-match entry is the one that is guaranteed to be honoured.
 #
-# Add the production origin here at launch, alongside these rather than instead of them, so local
-# development keeps working.
+# Production origin alongside the localhost entries, not instead of them, so local development
+# keeps working.
 additional_redirect_urls = [
+  "https://autocards.study/**",
+  "https://autocards.study/reset-password",
   "http://localhost:5173/**",
   "http://localhost:5173/reset-password",
   "http://127.0.0.1:5173/**",
