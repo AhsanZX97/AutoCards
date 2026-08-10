@@ -6,6 +6,8 @@ import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Toaster } from './components/ui';
 import { LandingPage } from './features/marketing/LandingPage';
+import { PrivacyPage } from './features/marketing/PrivacyPage';
+import { TermsPage } from './features/marketing/TermsPage';
 import { SignInPage } from './features/auth/SignInPage';
 import { SignUpPage } from './features/auth/SignUpPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
@@ -26,6 +28,8 @@ export default function App() {
     <>
       <Routes>
         <Route path="/" element={<MarketingLayout><LandingPage /></MarketingLayout>} />
+        <Route path="/privacy" element={<MarketingLayout><PrivacyPage /></MarketingLayout>} />
+        <Route path="/terms" element={<MarketingLayout><TermsPage /></MarketingLayout>} />
         <Route
           path="/sign-in"
           element={

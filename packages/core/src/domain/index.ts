@@ -12,4 +12,5 @@ export * from './cardOrder';
 export * from './cardDedupe';
 export * from './retiredCards';
 export * from './uploadQuota';
+export * from './planLimits';
 export * from './tourPlacement';

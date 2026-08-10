@@ -36,7 +36,7 @@ export function ImportSharedDeck() {
   function handleImport() {
     if (!user?.id) return;
     const deck = importDeck(payload!, user.id);
-    toast({ variant: 'success', title: 'Deck imported', description: `${deck.title} — ${cardCount} cards` });
+    toast({ variant: 'success', title: 'Deck imported', description: `${deck.title} · ${cardCount} cards` });
     navigate(`/app/decks/${deck.id}`);
   }
 

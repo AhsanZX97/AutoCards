@@ -1,11 +1,13 @@
 import type { GenerationResult } from '../../types';
+import { EdgeLlmService, type EdgeLlmConfig } from './edgeTransport';
 import { OpenRouterLlmService, type OpenRouterConfig } from './openRouter';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 
 /**
- * Thrown when no usable OpenRouter key is configured at call time. The message
- * is what the user sees, so it says what it means for them rather than naming
- * the key — a missing key is our deployment problem, not theirs.
+ * Thrown when there is nowhere to send a generation: no server configured and
+ * no personal key either. The message is what the user sees, so it says what
+ * it means for them rather than naming what is missing — an app deployed
+ * without its backend is our problem, not theirs.
  */
 export class LlmConfigError extends Error {
   constructor() {
@@ -15,18 +17,31 @@ export class LlmConfigError extends Error {
 }
 
 /**
- * Resolves the OpenRouter key on every call rather than once at construction.
+ * Decides, per call, where a generation goes.
  *
- * The key is not known when the app is constructed: it lives in the settings
- * store, which can change at any point, and the app object is a page-load
- * singleton. Deciding once at startup would mean a key change did nothing
- * until a reload. So the decision is deferred to the moment of use, and the
- * underlying service is rebuilt only when the key actually changes.
+ * Normally it goes to our own server — that is where the OpenRouter key lives
+ * and where the monthly allowance is counted, and it is the only arrangement
+ * in which a plan limit means anything.
+ *
+ * A key pasted into settings overrides that and calls OpenRouter directly.
+ * That is someone spending their own money on their own account, so it does
+ * not touch our allowance and does not need our server.
+ *
+ * The choice is deferred to the moment of use rather than made at
+ * construction: the app object is a page-load singleton, and a key added or
+ * cleared in settings should take effect on the next generation instead of the
+ * next reload. The underlying service is rebuilt only when the key changes.
  */
 export class RoutingLlmService implements LlmService {
   private real?: { key: string; service: OpenRouterLlmService };
+  private readonly edge?: EdgeLlmService;
 
-  constructor(private readonly resolveConfig: () => OpenRouterConfig | undefined) {}
+  constructor(
+    private readonly resolveConfig: () => OpenRouterConfig | undefined,
+    edge?: EdgeLlmConfig,
+  ) {
+    this.edge = edge ? new EdgeLlmService(edge) : undefined;
+  }
 
   get id(): string {
     return this.active().id;
@@ -44,14 +59,17 @@ export class RoutingLlmService implements LlmService {
     return this.active().suggestChoice(args);
   }
 
-  /** The service the next call would use, given the key available right now. */
+  /** The service the next call would use, given the settings right now. */
   active(): LlmService {
     const config = this.resolveConfig();
     const key = config?.apiKey.trim();
+
     if (!config || !key) {
       this.real = undefined;
+      if (this.edge) return this.edge;
       throw new LlmConfigError();
     }
+
     if (this.real?.key !== key) {
       this.real = { key, service: new OpenRouterLlmService({ ...config, apiKey: key }) };
     }

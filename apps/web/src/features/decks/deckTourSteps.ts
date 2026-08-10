@@ -4,7 +4,7 @@ import type { TourStep } from '../../components/tour';
 export const DECK_TOUR_STEPS: TourStep[] = [
   {
     title: 'This is your deck',
-    body: 'A quick tour of what you can do here — about thirty seconds. You can skip it and it will not come back.',
+    body: 'A quick tour of what you can do here, about thirty seconds. You can skip it and it will not come back.',
   },
   {
     target: 'deck-add-card',
@@ -24,7 +24,7 @@ export const DECK_TOUR_STEPS: TourStep[] = [
   {
     target: 'deck-view',
     title: 'Two ways to look at it',
-    body: 'List view is for editing and reordering. Flashcards view flips through the deck — use ← → to move and space to flip.',
+    body: 'List view is for editing and reordering. Flashcards view flips through the deck: use ← → to move and space to flip.',
   },
   {
     target: 'deck-edit',

@@ -502,15 +502,15 @@ export function DeckDetailPage() {
       >
         <dl className="space-y-3.5 text-sm">
           <StatHelp term="Mastery">
-            The share of times you have answered a card right — 8 correct out of 10 tries is 80%. A brand new card
+            The share of times you have answered a card right, so 8 correct out of 10 tries is 80%. A brand new card
             starts at 0% because it has no answers behind it yet.
           </StatHelp>
           <StatHelp term="New">You have not studied these cards even once.</StatHelp>
           <StatHelp term="Learning">
-            Cards you are still getting wrong more often than not — under {LEARNING_THRESHOLD}% mastery.
+            Cards you are still getting wrong more often than you get them right: under {LEARNING_THRESHOLD}% mastery.
           </StatHelp>
           <StatHelp term="Mastered">
-            Cards you almost always get right — {MASTERED_THRESHOLD}% mastery or better. You can skip these in a
+            Cards you almost always get right: {MASTERED_THRESHOLD}% mastery or better. You can skip these in a
             session from the study screen.
           </StatHelp>
           <StatHelp term="Avg mastery">
@@ -764,7 +764,7 @@ function CardRow({
               <button
                 type="button"
                 onClick={onCyclePriority}
-                title="Click to change priority — it decides which cards come up first"
+                title="Click to change priority. It decides which cards come up first."
                 className={cn(
                   'rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-75',
                   PRIORITY_BADGE[card.priority].classes,

@@ -8,6 +8,7 @@ const PROFILE = {
   username: 'ada_lovelace',
   avatar_url: null,
   plan: 'free' as const,
+  is_admin: false,
   created_at: '2024-01-01T00:00:00.000Z',
 };
 
@@ -37,6 +38,7 @@ interface FakeClientOptions {
   signOut?: () => Promise<unknown>;
   getSession?: () => Promise<unknown>;
   profile?: { data: unknown; error: unknown };
+  rpc?: (name: string, args: unknown) => Promise<unknown>;
 }
 
 function fakeClient(options: FakeClientOptions = {}): SupabaseClient {
@@ -48,6 +50,7 @@ function fakeClient(options: FakeClientOptions = {}): SupabaseClient {
       getSession: options.getSession ?? (async () => ({ data: { session: null }, error: null })),
     },
     from: () => queryResult(options.profile ?? { data: PROFILE, error: null }),
+    rpc: options.rpc ?? (async () => ({ data: null, error: null })),
   } as unknown as SupabaseClient;
 }
 
@@ -66,6 +69,7 @@ describe('SupabaseAuthService.signIn', () => {
       initials: 'AD',
       avatarUrl: undefined,
       plan: 'free',
+      isAdmin: false,
       createdAt: '2024-01-01T00:00:00.000Z',
     });
     expect(session.token).toBe('token-abc');
@@ -128,5 +132,49 @@ describe('SupabaseAuthService.restore', () => {
     );
     const session = await service.restore();
     expect(session?.user.id).toBe('user-1');
+  });
+});
+
+describe('SupabaseAuthService.changePlan', () => {
+  const USER = {
+    id: 'user-1',
+    email: 'ada@example.com',
+    username: 'ada_lovelace',
+    initials: 'AD',
+    plan: 'free' as const,
+    isAdmin: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+  };
+
+  /**
+   * The column is not writable from the client any more — that was how anyone
+   * could hand themselves an unlimited allowance — so this has to go through
+   * the function that checks who is asking.
+   */
+  it('asks the server to set the plan rather than writing the column', async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const service = new SupabaseAuthService(
+      fakeClient({
+        rpc: async (name, args) => {
+          calls.push({ name, args });
+          return { data: null, error: null };
+        },
+      }),
+    );
+
+    const updated = await service.changePlan(USER, 'pro');
+
+    expect(calls).toEqual([{ name: 'admin_set_plan', args: { p_user: 'user-1', p_plan: 'pro' } }]);
+    expect(updated.plan).toBe('pro');
+  });
+
+  it('surfaces a refusal from the server rather than pretending it worked', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        rpc: async () => ({ data: null, error: { message: 'Only an administrator can change a plan' } }),
+      }),
+    );
+
+    await expect(service.changePlan(USER, 'pro')).rejects.toBeInstanceOf(AuthError);
   });
 });

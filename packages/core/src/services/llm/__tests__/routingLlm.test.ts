@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { LlmConfigError, RoutingLlmService } from '../routingLlm';
 import type { OpenRouterConfig } from '../openRouter';
+import type { EdgeLlmConfig } from '../edgeTransport';
+
+const EDGE: EdgeLlmConfig = {
+  supabaseUrl: 'https://proj.supabase.co',
+  anonKey: 'anon-key',
+  getAccessToken: () => 'user-jwt',
+};
 
 describe('RoutingLlmService', () => {
   it('throws LlmConfigError when no config is available', () => {
@@ -53,6 +60,30 @@ describe('RoutingLlmService', () => {
 
     key = 'sk-or-two';
     expect(service.active()).not.toBe(first);
+  });
+
+  it('sends generations to our server when nobody has pasted a key', () => {
+    const service = new RoutingLlmService(() => undefined, EDGE);
+    expect(service.active().id).toBe('edge');
+  });
+
+  it('prefers a personal key over our server, since it is their money', () => {
+    const service = new RoutingLlmService(() => ({ apiKey: 'sk-or-test' }), EDGE);
+    expect(service.active().id).toBe('openrouter');
+  });
+
+  it('falls back to our server when a personal key is cleared', () => {
+    let key = 'sk-or-test';
+    const service = new RoutingLlmService(() => ({ apiKey: key }), EDGE);
+    expect(service.active().id).toBe('openrouter');
+
+    key = '';
+    expect(service.active().id).toBe('edge');
+  });
+
+  it('keeps one server-side service rather than rebuilding it per call', () => {
+    const service = new RoutingLlmService(() => undefined, EDGE);
+    expect(service.active()).toBe(service.active());
   });
 
   it('re-reads the config on every call rather than caching it', () => {

@@ -10,6 +10,7 @@ import {
   GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
   SUPPORTED_FORMATS_LABEL,
+  UploadQuotaExceededError,
   resolvePreset,
   type CardType,
   type Deck,
@@ -24,6 +25,7 @@ import { Button, Chip, Field, Modal, Progress, Select, Slider, Switch, Textarea 
 import { toast } from '../../components/ui/toastStore';
 import { getPromptText } from '../../lib/cardText';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
+import { PlanLimitNotice } from '../billing/PlanLimitNotice';
 import { UploadDropzone } from './UploadDropzone';
 
 /** Sentinels for the category picker, alongside the deck's real category ids. */
@@ -144,8 +146,9 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
         autoCategories ? result.categories : [],
       );
       // The upload happened and was billed by OpenRouter whatever came back, so
-      // it is spent even when every card turned out to be a repeat.
-      quota.record();
+      // it is spent even when every card turned out to be a repeat. The server
+      // counted it too, and its number wins where it sent one.
+      quota.record(result.quota);
 
       if (added.length === 0) {
         setErrorMessage(
@@ -165,6 +168,9 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
       });
       onClose();
     } catch (err) {
+      // Being turned away is itself news about the allowance: the meter was
+      // showing uploads left or the button would have been disabled.
+      if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your cards.');
       setStep('error');
     }
@@ -221,17 +227,16 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
       {step === 'setup' && (
         <div className="space-y-5">
           {!quota.canUpload && (
-            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              You have used all {quota.limit} of this month’s uploads. Your allowance resets on the 1st — until
-              then you can still write cards yourself.
-            </p>
+            <PlanLimitNotice
+              message={`You have used all ${quota.limit} of this month’s generations. Your allowance resets on the 1st. Until then you can still write cards yourself.`}
+            />
           )}
 
           <UploadDropzone
             compact
             files={files}
             onChange={setFiles}
-            hint={`Another chapter, a past paper, a set of slides — ${SUPPORTED_FORMATS_LABEL}.`}
+            hint={`Another chapter, a past paper, a set of slides. Takes ${SUPPORTED_FORMATS_LABEL}.`}
           />
 
           <Field label="What are these cards for?" hint="Sets the card types to match">
@@ -293,7 +298,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
           <Field label="Custom instructions" hint="optional">
             <Textarea
               rows={2}
-              placeholder="e.g. Only cover chapter 5 — the deck already has chapters 1–4."
+              placeholder="e.g. Only cover chapter 5; the deck already has chapters 1–4."
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
             />
@@ -317,7 +322,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
               checked={readImages}
               onChange={setReadImages}
               label="Read the pictures too"
-              description="Looks at diagrams and charts, not just the words. Slower and costs more."
+              description="Reads diagrams and charts as well as the text. Slower and costs more."
             />
           </div>
         </div>

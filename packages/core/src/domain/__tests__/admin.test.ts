@@ -9,22 +9,19 @@ function user(patch: Partial<User> = {}): User {
     username: 'someone',
     initials: 'SO',
     plan: 'free',
+    isAdmin: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...patch,
   };
 }
 
 describe('isAdmin', () => {
-  it('returns true for the owner account', () => {
-    expect(isAdmin(user({ username: 'ahsandegreat' }))).toBe(true);
+  it('returns true for an account the server flagged', () => {
+    expect(isAdmin(user({ isAdmin: true }))).toBe(true);
   });
 
-  it('returns false for any other account', () => {
-    expect(isAdmin(user({ username: 'someone' }))).toBe(false);
-  });
-
-  it('ignores casing and surrounding whitespace on the username', () => {
-    expect(isAdmin(user({ username: ' AhsanDeGreat ' }))).toBe(true);
+  it('returns false for an ordinary account', () => {
+    expect(isAdmin(user())).toBe(false);
   });
 
   it('returns false when there is no signed-in user', () => {
@@ -32,7 +29,12 @@ describe('isAdmin', () => {
     expect(isAdmin(null)).toBe(false);
   });
 
-  it('does not match a username that merely contains the admin handle', () => {
-    expect(isAdmin(user({ username: 'notahsandegreat' }))).toBe(false);
+  /**
+   * The handle used to be the whole check, which meant registering the right
+   * username was enough to see the owner controls. It is just a name now.
+   */
+  it('pays no attention to the username', () => {
+    expect(isAdmin(user({ username: 'ahsandegreat' }))).toBe(false);
+    expect(isAdmin(user({ username: 'admin', isAdmin: true }))).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ interface ProfileRow {
   username: string;
   avatar_url: string | null;
   plan: Plan;
+  is_admin: boolean | null;
   created_at: string;
 }
 
@@ -24,6 +25,7 @@ function toUser(authUser: SupabaseUser, profile: ProfileRow): User {
     initials: initialsOf(profile.username),
     avatarUrl: profile.avatar_url ?? undefined,
     plan: profile.plan,
+    isAdmin: profile.is_admin === true,
     createdAt: profile.created_at,
   };
 }
@@ -47,7 +49,7 @@ export class SupabaseAuthService implements AuthService {
   private async fetchProfile(userId: string): Promise<ProfileRow> {
     const { data, error } = await this.client
       .from('profiles')
-      .select('id,username,avatar_url,plan,created_at')
+      .select('id,username,avatar_url,plan,is_admin,created_at')
       .eq('id', userId)
       .single();
     if (error || !data) throw new AuthError('Could not load your profile.');
@@ -128,7 +130,7 @@ export class SupabaseAuthService implements AuthService {
       .from('profiles')
       .update(update)
       .eq('id', user.id)
-      .select('id,username,avatar_url,plan,created_at')
+      .select('id,username,avatar_url,plan,is_admin,created_at')
       .single();
     if (error) {
       if (isUniqueViolation(error.message)) {
@@ -145,8 +147,16 @@ export class SupabaseAuthService implements AuthService {
     };
   }
 
+  /**
+   * The comp path, for support and testing.
+   *
+   * Goes through `admin_set_plan` rather than writing the column, because the
+   * client is no longer allowed to write it — that was how anyone could hand
+   * themselves an unlimited allowance. The function checks `is_admin` itself,
+   * so a non-admin calling this gets an error rather than a plan.
+   */
   async changePlan(user: User, plan: Plan): Promise<User> {
-    const { error } = await this.client.from('profiles').update({ plan }).eq('id', user.id);
+    const { error } = await this.client.rpc('admin_set_plan', { p_user: user.id, p_plan: plan });
     if (error) throw new AuthError('Could not update your plan.');
     return { ...user, plan };
   }

@@ -70,7 +70,7 @@ function readWordDocument(files: ZipEntries, filename: string): ExtractedParts {
   const xml = decodeEntry(files, 'word/document.xml');
   if (xml === undefined) {
     throw new DocumentExtractionError(
-      `${filename} does not look like a Word document — the main document part is missing.`,
+      `${filename} does not look like a Word document. The main document part is missing.`,
     );
   }
 
@@ -84,7 +84,7 @@ function readWordDocument(files: ZipEntries, filename: string): ExtractedParts {
 function readSlides(files: ZipEntries, filename: string): ExtractedParts {
   const slides = numericallyOrdered(files, /^ppt\/slides\/slide(\d+)\.xml$/);
   if (slides.length === 0) {
-    throw new DocumentExtractionError(`${filename} does not look like a PowerPoint deck — it has no slides.`);
+    throw new DocumentExtractionError(`${filename} does not look like a PowerPoint deck. It has no slides in it.`);
   }
 
   const pages = slides.map(({ path, number }) => {

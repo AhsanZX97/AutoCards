@@ -3,6 +3,7 @@ import type {
   GenerationOptions,
   GenerationProgress,
   GenerationResult,
+  UploadQuotaSnapshot,
 } from '../../types';
 
 export interface ModelInfo {
@@ -72,5 +73,26 @@ export class GenerationAbortedError extends Error {
   constructor() {
     super('Generation cancelled');
     this.name = 'GenerationAbortedError';
+  }
+}
+
+/**
+ * The account has no uploads left this month.
+ *
+ * Its own type because it is the one failure that is not a fault: nothing
+ * broke, the plan simply ran out. The UI should offer a way forward — wait for
+ * the reset, or move to a bigger plan — rather than a "try again".
+ */
+export class UploadQuotaExceededError extends Error {
+  /**
+   * The allowance as the server sees it. Carried on the refusal so a meter
+   * that was showing uploads left can correct itself the moment it is told no.
+   */
+  readonly quota?: UploadQuotaSnapshot;
+
+  constructor(message: string, quota?: UploadQuotaSnapshot) {
+    super(message);
+    this.name = 'UploadQuotaExceededError';
+    if (quota) this.quota = quota;
   }
 }

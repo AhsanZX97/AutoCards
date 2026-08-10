@@ -1,6 +1,7 @@
 import type { Difficulty, Id } from './common';
 import type { CardType, GeneratedCard } from './card';
 import type { Category, DocumentKind, SourceDocument } from './deck';
+import type { UploadQuotaSnapshot } from './usage';
 
 /**
  * A picture lifted out of an uploaded file, ready to send to a model that can
@@ -70,7 +71,7 @@ export const GENERATION_PRESET_LABELS: Record<GenerationPresetId, string> = {
 export const GENERATION_PRESET_DESCRIPTIONS: Record<GenerationPresetId, string> = {
   auto: 'Works out what the document is and picks the approach that fits it.',
   study: 'Recall questions covering the document evenly, answered straight from the text.',
-  concepts: 'Why and how rather than what — causes, mechanisms and trade-offs, with reasoned answers.',
+  concepts: 'Questions about causes, mechanisms and trade-offs, answered with the reasoning behind them.',
   exam: 'The questions an examiner would set, leaning on applying the material rather than reciting it.',
   interview: 'Reads a job spec as a syllabus and asks what an interviewer would, answered from professional knowledge.',
 };
@@ -154,6 +155,11 @@ export interface GenerationResult {
   model: string;
   /** Mock token accounting so the usage meter has something to show. */
   usage: { promptTokens: number; completionTokens: number; costUsd: number };
+  /**
+   * The monthly allowance as the server counted it after this run. Absent when
+   * the call did not go through the server — see {@link UploadQuotaSnapshot}.
+   */
+  quota?: UploadQuotaSnapshot;
   /** Wall-clock time the job took, in ms. */
   elapsedMs: number;
 }

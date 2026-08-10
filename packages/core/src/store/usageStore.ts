@@ -22,6 +22,13 @@ export interface UsageState {
 
   /** Spends one upload against `userId`'s allowance. */
   recordUpload: (userId: Id, now?: Date) => void;
+  /**
+   * Replaces the local count with the one the server reported alongside a
+   * generation. The server's number is the one that decides, so this overrides
+   * rather than merges — including downwards, which is how a device whose
+   * storage was cleared or copied gets back in step.
+   */
+  adoptServerCount: (userId: Id, usage: UploadUsage) => void;
   /** This month's count, zeroed if the stored record predates the month. */
   getUploads: (userId: Id, now?: Date) => UploadUsage;
 }
@@ -38,6 +45,12 @@ export function createUsageStore(storage: StorageAdapter) {
               ...state.uploadsByUser,
               [userId]: countUpload(state.uploadsByUser[userId], now),
             },
+          }));
+        },
+
+        adoptServerCount: (userId, usage) => {
+          set((state) => ({
+            uploadsByUser: { ...state.uploadsByUser, [userId]: usage },
           }));
         },
 

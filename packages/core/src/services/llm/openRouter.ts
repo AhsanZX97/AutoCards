@@ -13,6 +13,14 @@ import { allowedCardTypes, normalizeGeneratedCards } from './normalizeCards';
 import { promptRules, resolvePreset } from './presets';
 import { GenerationAbortedError } from './types';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
+import type {
+  ChatCompletionPayload,
+  ChatRequestBody,
+  ChatTransport,
+  CompletionOutcome,
+  CompletionPurpose,
+  ContentPart,
+} from './transport';
 
 const API_BASE = 'https://openrouter.ai/api/v1';
 const COMPLETIONS_ENDPOINT = `${API_BASE}/chat/completions`;
@@ -25,11 +33,11 @@ const MODELS_ENDPOINT = `${API_BASE}/models`;
  * inside it, and a few tenths of a penny at DeepSeek's input price. The limit
  * is here to bound a runaway upload, not to save money.
  */
-const MAX_CONTEXT_CHARS = 120_000;
+export const MAX_CONTEXT_CHARS = 120_000;
 
 /** Floor and ceiling on the output budget; the per-card rate is the preset's. */
 const MIN_OUTPUT_TOKENS = 2_000;
-const MAX_OUTPUT_TOKENS = 32_000;
+export const MAX_OUTPUT_TOKENS = 32_000;
 
 /** A single choice is a short phrase, not a paragraph. */
 const SUGGEST_CHOICE_MAX_TOKENS = 60;
@@ -45,18 +53,15 @@ export interface OpenRouterConfig {
 }
 
 /**
- * Live generation against OpenRouter's chat-completions API.
+ * Calls OpenRouter straight from wherever this is running, with a key held
+ * here.
  *
- * One call per deck: the whole document (truncated to `MAX_CONTEXT_CHARS`) goes
- * up, one JSON object comes back. There is no chunking across a long document
- * and no retry — a failed call surfaces to the caller as an error rather than
- * silently falling back to canned cards, so a broken key or a dead model slug
- * is visible instead of masquerading as a successful generation.
- *
- * Model output is never trusted: everything goes through
- * `normalizeGeneratedCards` before it becomes a deck.
+ * That is only safe where the key is genuinely private — a user's own key
+ * pasted into settings, or a script. The app's shared key is not: it lives on
+ * the server behind `EdgeFunctionTransport`, because a key in the bundle is a
+ * key anyone can read, and an allowance nobody can enforce.
  */
-export class OpenRouterLlmService implements LlmService {
+export class DirectOpenRouterTransport implements ChatTransport {
   readonly id = 'openrouter';
 
   /** Live catalog, fetched once per session. */
@@ -66,8 +71,13 @@ export class OpenRouterLlmService implements LlmService {
 
   constructor(private readonly config: OpenRouterConfig) {
     if (!config.apiKey) {
-      throw new Error('OpenRouterLlmService requires an API key');
+      throw new Error('DirectOpenRouterTransport requires an API key');
     }
+  }
+
+  /** Live prices, if the catalogue has already been fetched this session. */
+  cachedModels(): ModelInfo[] | undefined {
+    return this.modelCache;
   }
 
   /**
@@ -120,6 +130,70 @@ export class OpenRouterLlmService implements LlmService {
     }
   }
 
+  async complete(body: ChatRequestBody, _purpose: CompletionPurpose, signal?: AbortSignal): Promise<CompletionOutcome> {
+    let response: Response;
+    try {
+      response = await fetch(COMPLETIONS_ENDPOINT, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json', ...this.headers() },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      if (isAbortError(error)) throw new GenerationAbortedError();
+      throw new Error(offlineMessage(error));
+    }
+
+    if (!response.ok) {
+      throw new Error(await describeHttpFailure(response));
+    }
+
+    const payload = (await response.json()) as ChatCompletionPayload;
+
+    // OpenRouter can return a 200 carrying an upstream provider error.
+    if (payload.error?.message) {
+      throw new Error(upstreamMessage(payload.error.message));
+    }
+
+    return { payload };
+  }
+
+  private headers(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.config.apiKey}`,
+      ...(this.config.appUrl ? { 'HTTP-Referer': this.config.appUrl } : {}),
+      ...(this.config.appName ? { 'X-Title': this.config.appName } : {}),
+    };
+  }
+}
+
+/**
+ * Turns an upload into a deck of flashcards.
+ *
+ * One call per deck: the whole document (truncated to `MAX_CONTEXT_CHARS`) goes
+ * up, one JSON object comes back. There is no chunking across a long document
+ * and no retry — a failed call surfaces to the caller as an error rather than
+ * silently falling back to canned cards, so a broken key or a dead model slug
+ * is visible instead of masquerading as a successful generation.
+ *
+ * Model output is never trusted: everything goes through
+ * `normalizeGeneratedCards` before it becomes a deck.
+ *
+ * Everything here is about what to ask for and what came back. Who holds the
+ * key, and whether an upload allowance was spent, is the transport's business
+ * — see `transport.ts`.
+ */
+export class ChatCompletionLlmService implements LlmService {
+  constructor(private readonly transport: ChatTransport) {}
+
+  get id(): string {
+    return this.transport.id;
+  }
+
+  listModels(): Promise<ModelInfo[]> {
+    return this.transport.listModels();
+  }
+
   async generateDeck({ documents, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
     const startedAt = Date.now();
     throwIfAborted(signal);
@@ -152,49 +226,28 @@ export class OpenRouterLlmService implements LlmService {
     const pictures = options.readImages ? picturesIn(readable) : [];
     const model = pictures.length > 0 ? visionModelFor(options.model) : options.model;
 
-    const body = {
+    const body: ChatRequestBody = {
       model,
       messages: [
         { role: 'system', content: buildSystemPrompt(options, avoidPrompts, readable, pictures.length) },
         { role: 'user', content: buildUserContent(readable, pictures) },
       ],
-      response_format: { type: 'json_object' as const },
+      response_format: { type: 'json_object' },
       max_tokens: outputBudget(options.cardCount, resolvePreset(options.preset).tokensPerCard),
     };
 
-    // The call is one long await with no server-side progress events, so the
-    // bar creeps toward a ceiling instead of freezing for the whole wait.
+    // The call is one long await with no progress events coming back from the
+    // far end, so the bar creeps toward a ceiling instead of freezing for the
+    // whole wait.
     const stopTicking = startWaitingTicker(report);
 
-    let response: Response;
+    let outcome: CompletionOutcome;
     try {
-      response = await fetch(COMPLETIONS_ENDPOINT, {
-        method: 'POST',
-        signal,
-        headers: { 'Content-Type': 'application/json', ...this.headers() },
-        body: JSON.stringify(body),
-      });
-    } catch (error) {
-      if (isAbortError(error)) throw new GenerationAbortedError();
-      throw new Error(offlineMessage(error));
+      outcome = await this.transport.complete(body, 'deck', signal);
     } finally {
       stopTicking();
     }
-
-    if (!response.ok) {
-      throw new Error(await describeHttpFailure(response));
-    }
-
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-      error?: { message?: string };
-    };
-
-    // OpenRouter can return a 200 carrying an upstream provider error.
-    if (payload.error?.message) {
-      throw new Error(upstreamMessage(payload.error.message));
-    }
+    const payload = outcome.payload;
 
     report({
       stage: 'refining',
@@ -248,8 +301,11 @@ export class OpenRouterLlmService implements LlmService {
       usage: {
         promptTokens,
         completionTokens,
-        costUsd: costOf(this.modelCache, model, promptTokens, completionTokens),
+        costUsd: costOf(this.transport.cachedModels?.(), model, promptTokens, completionTokens),
       },
+      // Only the server-side path reports one; a direct call has no allowance
+      // to speak of, and the caller falls back to its own local count.
+      ...(outcome.quota === undefined ? {} : { quota: outcome.quota }),
       elapsedMs: Date.now() - startedAt,
     };
   }
@@ -257,7 +313,7 @@ export class OpenRouterLlmService implements LlmService {
   async suggestChoice({ front, back, existingChoices, model, signal }: SuggestChoiceArgs): Promise<string> {
     throwIfAborted(signal);
 
-    const body = {
+    const body: ChatRequestBody = {
       model,
       messages: [
         { role: 'system', content: SUGGEST_CHOICE_SYSTEM_PROMPT },
@@ -266,31 +322,7 @@ export class OpenRouterLlmService implements LlmService {
       max_tokens: SUGGEST_CHOICE_MAX_TOKENS,
     };
 
-    let response: Response;
-    try {
-      response = await fetch(COMPLETIONS_ENDPOINT, {
-        method: 'POST',
-        signal,
-        headers: { 'Content-Type': 'application/json', ...this.headers() },
-        body: JSON.stringify(body),
-      });
-    } catch (error) {
-      if (isAbortError(error)) throw new GenerationAbortedError();
-      throw new Error(offlineMessage(error));
-    }
-
-    if (!response.ok) {
-      throw new Error(await describeHttpFailure(response));
-    }
-
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message?: string };
-    };
-
-    if (payload.error?.message) {
-      throw new Error(upstreamMessage(payload.error.message));
-    }
+    const { payload } = await this.transport.complete(body, 'suggestion', signal);
 
     const text = stripSuggestionWrapping(payload.choices?.[0]?.message?.content ?? '');
     if (!text) {
@@ -298,13 +330,18 @@ export class OpenRouterLlmService implements LlmService {
     }
     return text;
   }
+}
 
-  private headers(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this.config.apiKey}`,
-      ...(this.config.appUrl ? { 'HTTP-Referer': this.config.appUrl } : {}),
-      ...(this.config.appName ? { 'X-Title': this.config.appName } : {}),
-    };
+/**
+ * The app's generator, talking to OpenRouter with a key held on this device.
+ *
+ * Kept as its own name because that is what a bring-your-own-key setup is, and
+ * because every test of the prompt and reply handling constructs one. The
+ * shared-key path is `EdgeLlmService`.
+ */
+export class OpenRouterLlmService extends ChatCompletionLlmService {
+  constructor(config: OpenRouterConfig) {
+    super(new DirectOpenRouterTransport(config));
   }
 }
 
@@ -319,7 +356,7 @@ function listFilenames(documents: ExtractedDocument[]): string {
 function unreadableMessage(documents: ExtractedDocument[]): string {
   const subject =
     documents.length === 1 ? (documents[0] as ExtractedDocument).filename : 'any of those files';
-  return `We could not read any text out of ${subject}. If they are scans or photos of pages, the words are really just pictures — try a version you can select text in.`;
+  return `We could not read any text out of ${subject}. If they are scans or photos of pages, the words are really just pictures, so try a version you can select text in.`;
 }
 
 function describePreparing(documents: ExtractedDocument[]): string {
@@ -561,11 +598,6 @@ function interleaveByDocument(images: LabelledImage[]): LabelledImage[] {
   return ordered;
 }
 
-/** The `{type: "image_url"}` part shape OpenRouter takes, OpenAI-compatible. */
-type ContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
-
 /**
  * The user turn: the document text, plus each picture behind a line saying
  * where it came from so the model can attribute what it sees.
@@ -716,7 +748,7 @@ function firstJsonObject(value: string): string | undefined {
  * do. The underlying detail goes to the console for whoever is on support.
  */
 const UNAVAILABLE_MESSAGE =
-  'Card generation is unavailable right now. This one is on us — please try again a little later.';
+  'Card generation is unavailable right now. This one is on us, so please try again a little later.';
 const BUSY_MESSAGE = 'Card generation is busy at the moment. Give it a minute and try again.';
 const GARBLED_MESSAGE = 'The cards came back garbled that time. Try generating again.';
 

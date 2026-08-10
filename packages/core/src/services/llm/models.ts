@@ -48,13 +48,13 @@ export const MODEL_CATALOG: ModelInfo[] = [
     description: 'Fast and cheap. Good for short handouts and lecture slides.',
   },
   {
-    id: 'anthropic/claude-sonnet-5',
-    name: 'Claude Sonnet 5',
-    vendor: 'Anthropic',
+    id: 'google/gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
+    vendor: 'Google',
     context: 1_000_000,
-    inputPrice: 3,
-    outputPrice: 15,
-    description: 'Near-frontier quality, noticeably pricier. Reads diagrams and screenshots well.',
+    inputPrice: 0.3,
+    outputPrice: 2.5,
+    description: 'Cheap and fast. Reads diagrams and screenshots well on a huge context window.',
     vision: true,
   },
   {
@@ -75,12 +75,10 @@ export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v3.2';
  * Used instead of {@link DEFAULT_MODEL_ID} when a run has to read pictures.
  *
  * The house default cannot see at all, so this is not a preference — a run
- * with images has to move to a model that accepts them. Sonnet reads diagrams
- * and handwriting best of the three in the catalog; `anthropic/claude-haiku-4.5`
- * is the same capability at a third of the price if the bill matters more than
- * the last few percent of accuracy.
+ * with images has to move to a model that accepts them. `google/gemini-2.5-flash-lite`
+ * is cheap and reads diagrams well.
  */
-export const DEFAULT_VISION_MODEL_ID = 'anthropic/claude-sonnet-5';
+export const DEFAULT_VISION_MODEL_ID = 'google/gemini-2.5-flash-lite';
 
 export function isVisionModel(id: string): boolean {
   return findModel(id)?.vision === true;

@@ -183,7 +183,7 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
         <div className="rounded-xl border border-rose-200 p-4 dark:border-rose-500/30">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Danger zone</p>
           <p className="mt-0.5 text-xs text-slate-400">
-            These apply straight away — they don’t wait for Save changes.
+            These apply straight away, without waiting for Save changes.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={onArchive}>

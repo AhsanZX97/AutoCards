@@ -1,12 +1,15 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Supabase project URL and anon key. Both required — see `.env.example`. */
+  readonly VITE_SUPABASE_URL?: string;
+  readonly VITE_SUPABASE_ANON_KEY?: string;
   /**
-   * Optional OpenRouter key for local development. Vite inlines this into the
-   * client bundle, so never set it for a deployed build — ship without it and
-   * let each user supply their own key in Settings → Generation.
+   * Where the Edge Functions live, when that is not the project URL — set it
+   * to `http://localhost:54321` to run generation against a local
+   * `supabase start` while everything else stays on the hosted project.
    */
-  readonly VITE_OPENROUTER_API_KEY?: string;
+  readonly VITE_SUPABASE_FUNCTIONS_URL?: string;
 }
 
 interface ImportMeta {

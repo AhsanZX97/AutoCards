@@ -49,7 +49,7 @@ export function DeckLibraryPage() {
       toast({
         variant: 'success',
         title: 'Deck imported',
-        description: `${deck.title} — ${payload.cards.length} cards`,
+        description: `${deck.title} · ${payload.cards.length} cards`,
       });
       navigate(`/app/decks/${deck.id}`);
     };

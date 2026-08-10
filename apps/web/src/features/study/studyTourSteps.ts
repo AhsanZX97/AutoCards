@@ -4,7 +4,7 @@ import type { TourStep } from '../../components/tour';
 export const STUDY_TOUR_STEPS: TourStep[] = [
   {
     title: 'Set up your session',
-    body: 'Nothing here is permanent — these choices shape this one session, and you can change them next time.',
+    body: 'Nothing here is permanent. These choices shape this one session, and you can change them next time.',
   },
   {
     target: 'study-mode',

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { nowIso } from '../../lib/date';
-import type { Deck, Flashcard, Id, IsoDate, RemoteRow } from '../../types';
+import type { Deck, Flashcard, Id, IsoDate, RemoteRow, SessionSummary } from '../../types';
 import type { PulledChanges, SyncBackend } from './syncBackend';
 
 const EPOCH: IsoDate = new Date(0).toISOString();
@@ -16,13 +16,18 @@ function toRemoteRow<T>(row: Row<T>): RemoteRow<T> {
   return { id: row.id, updatedAt: row.updated_at, deletedAt: row.deleted_at, data: row.data };
 }
 
-/** Sync backend against the `decks`/`cards` tables in `supabase/schema.sql`. */
+/** `study_sessions` has no `deleted_at` column — the rows are append-only. */
+function toSessionRow(row: Omit<Row<SessionSummary>, 'deleted_at'>): RemoteRow<SessionSummary> {
+  return { id: row.id, updatedAt: row.updated_at, deletedAt: null, data: row.data };
+}
+
+/** Sync backend against the `decks`/`cards`/`study_sessions` tables in `supabase/schema.sql`. */
 export class SupabaseSyncBackend implements SyncBackend {
   constructor(private readonly client: SupabaseClient) {}
 
   async pull(ownerId: Id, since: IsoDate | null): Promise<PulledChanges> {
     const sinceIso = since ?? EPOCH;
-    const [decksRes, cardsRes] = await Promise.all([
+    const [decksRes, cardsRes, sessionsRes] = await Promise.all([
       this.client
         .from('decks')
         .select('id,updated_at,deleted_at,data')
@@ -33,12 +38,19 @@ export class SupabaseSyncBackend implements SyncBackend {
         .select('id,updated_at,deleted_at,data')
         .eq('owner_id', ownerId)
         .gt('updated_at', sinceIso),
+      this.client
+        .from('study_sessions')
+        .select('id,updated_at,data')
+        .eq('owner_id', ownerId)
+        .gt('updated_at', sinceIso),
     ]);
     if (decksRes.error) throw decksRes.error;
     if (cardsRes.error) throw cardsRes.error;
+    if (sessionsRes.error) throw sessionsRes.error;
     return {
       decks: (decksRes.data as Row<Deck>[]).map(toRemoteRow),
       cards: (cardsRes.data as Row<Flashcard>[]).map(toRemoteRow),
+      sessions: (sessionsRes.data as Omit<Row<SessionSummary>, 'deleted_at'>[]).map(toSessionRow),
     };
   }
 
@@ -71,6 +83,24 @@ export class SupabaseSyncBackend implements SyncBackend {
     if (error) throw error;
   }
 
+  async pushSessions(ownerId: Id, sessions: SessionSummary[]): Promise<void> {
+    if (sessions.length === 0) return;
+    // `updated_at` is left to the column default so the server clock decides
+    // where a row falls in the pull window — see the migration.
+    const rows = sessions.map((session) => ({
+      id: session.id,
+      owner_id: ownerId,
+      data: session,
+    }));
+    // A finished run never changes, so a row that is already there is already
+    // correct. Ignoring the conflict keeps a retried flush from bumping
+    // `updated_at` and re-broadcasting the row to every other device.
+    const { error } = await this.client
+      .from('study_sessions')
+      .upsert(rows, { ignoreDuplicates: true });
+    if (error) throw error;
+  }
+
   async softDeleteDeck(id: Id): Promise<void> {
     const timestamp = nowIso();
     const { error } = await this.client
@@ -100,6 +130,11 @@ export class SupabaseSyncBackend implements SyncBackend {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cards', filter: `owner_id=eq.${ownerId}` },
+        onNotify,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'study_sessions', filter: `owner_id=eq.${ownerId}` },
         onNotify,
       )
       .subscribe();

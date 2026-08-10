@@ -11,7 +11,11 @@ import {
   GENERATION_PRESET_LABELS,
   GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
+  PLAN_LIMITS,
   SUPPORTED_FORMATS_LABEL,
+  UploadQuotaExceededError,
+  canCreateDeck,
+  oversizedDocuments,
   resolvePreset,
   type CardType,
   type Difficulty,
@@ -22,6 +26,7 @@ import { useApp } from '../../lib/appContext';
 import { Button, Card, CardBody, Chip, Field, InfoButton, Input, Modal, Progress, Slider, Switch, Tabs, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
+import { PlanLimitNotice } from '../billing/PlanLimitNotice';
 import { UploadDropzone } from './UploadDropzone';
 
 type Step = 'idle' | 'generating' | 'error';
@@ -37,7 +42,11 @@ export function CreateDeckPage() {
   const app = useApp();
   const navigate = useNavigate();
 
-  const userId = app.authStore((s) => s.session?.user.id);
+  const user = app.authStore((s) => s.session?.user);
+  const userId = user?.id;
+  const plan = user?.plan ?? 'free';
+  const deckCount = app.deckStore((s) => s.decks.length);
+  const hasDeckRoom = canCreateDeck(plan, deckCount);
   const quota = useUploadQuota();
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
@@ -89,7 +98,7 @@ export function CreateDeckPage() {
   }
 
   async function startGeneration() {
-    if (files.length === 0 || !title.trim() || !userId || !quota.canUpload) return;
+    if (files.length === 0 || !title.trim() || !userId || !quota.canUpload || !hasDeckRoom) return;
     setStep('generating');
     setErrorMessage('');
 
@@ -102,6 +111,16 @@ export function CreateDeckPage() {
       for (const selected of files) {
         documents.push(await app.services.documents.extract(selected));
       }
+      // Checked before the model runs, so an upload that is too long for the
+      // plan costs nothing to discover.
+      const tooLong = oversizedDocuments(plan, documents);
+      if (tooLong.length > 0) {
+        const names = tooLong.map((document) => document.filename).join(', ');
+        throw new Error(
+          `${names} ${tooLong.length === 1 ? 'is' : 'are'} longer than the ${PLAN_LIMITS[plan].maxPagesPerPdf} pages your plan reads in one document. Split it up, or move to a bigger plan.`,
+        );
+      }
+
       const result = await app.services.llm.generateDeck({
         documents,
         options: {
@@ -125,10 +144,14 @@ export function CreateDeckPage() {
       const deck = createDeckFromGeneration(result, userId, { title, description });
       // Spent on the way out rather than the way in: a run that never reached
       // the model — a bad key, an unreadable file — costs nothing to fix.
-      quota.record();
+      // The server counts it too, and its number wins where it sent one.
+      quota.record(result.quota);
       toast({ variant: 'success', title: 'Deck created!', description: `${result.cards.length} flashcards generated.` });
       navigate(`/app/decks/${deck.id}`);
     } catch (err) {
+      // Being turned away is itself news about the allowance: the meter was
+      // showing uploads left or the button would have been disabled.
+      if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your deck.');
       setStep('error');
     }
@@ -136,7 +159,7 @@ export function CreateDeckPage() {
 
   function createManualDeck() {
     const name = title.trim();
-    if (!name || !userId) return;
+    if (!name || !userId || !hasDeckRoom) return;
     // No upload, no model call — so this never touches the upload quota.
     const deck = createBlankDeck(userId, name);
     if (description.trim()) updateDeck(deck.id, { description: description.trim() });
@@ -161,6 +184,12 @@ export function CreateDeckPage() {
       </div>
 
       {step === 'idle' && <Tabs items={MODE_TABS} active={mode} onChange={(id) => setMode(id as Mode)} />}
+
+      {step === 'idle' && !hasDeckRoom && (
+        <PlanLimitNotice
+          message={`You have all ${PLAN_LIMITS[plan].maxDecks} decks your plan allows. Delete one to make room, or move to a plan with no limit.`}
+        />
+      )}
 
       {step === 'error' && (
         <Card>
@@ -199,7 +228,7 @@ export function CreateDeckPage() {
             <Field label="Deck name">
               <Input
                 autoFocus
-                placeholder="e.g. Financial Accounting — Chapter 4"
+                placeholder="e.g. Financial Accounting, Chapter 4"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -216,7 +245,7 @@ export function CreateDeckPage() {
               />
             </Field>
             <div className="flex items-center justify-end">
-              <Button size="lg" disabled={!title.trim()} onClick={createManualDeck}>
+              <Button size="lg" disabled={!title.trim() || !hasDeckRoom} onClick={createManualDeck}>
                 Create empty deck
               </Button>
             </div>
@@ -227,17 +256,16 @@ export function CreateDeckPage() {
       {step === 'idle' && mode === 'ai' && (
         <div className="space-y-6">
           {!quota.canUpload && (
-            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              You have used all {quota.limit} of this month’s uploads. Your allowance resets on the 1st — get in
-              touch if you need a bigger plan before then.
-            </p>
+            <PlanLimitNotice
+              message={`You have used all ${quota.limit} of this month’s generations. Your allowance resets on the 1st.`}
+            />
           )}
           <Card>
             <CardBody className="space-y-6">
               <Field label="Deck name">
                 <Input
                   autoFocus
-                  placeholder="e.g. Financial Accounting — Chapter 4"
+                  placeholder="e.g. Financial Accounting, Chapter 4"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
@@ -258,7 +286,7 @@ export function CreateDeckPage() {
               <UploadDropzone
                 files={files}
                 onChange={setFiles}
-                hint={`Slides, notes, a chapter, a past paper — ${SUPPORTED_FORMATS_LABEL}. Add several and the cards are written from all of them at once.`}
+                hint={`Slides, notes, a chapter, a past paper. Takes ${SUPPORTED_FORMATS_LABEL}. Add several and the cards are written from all of them at once.`}
               />
             </CardBody>
           </Card>
@@ -269,7 +297,7 @@ export function CreateDeckPage() {
 
               <Field
                 label="What are these cards for?"
-                hint="Sets the card types to match — change them below if you want"
+                hint="Sets the card types to match. Change them below if you want."
               >
                 <div className="flex flex-wrap gap-2">
                   {GENERATION_PRESETS.map((id) => (
@@ -335,7 +363,7 @@ export function CreateDeckPage() {
                   checked={readImages}
                   onChange={setReadImages}
                   label="Read the pictures too"
-                  description="Looks at diagrams and charts, not just the words. Slower and costs more, so worth it for slides that are mostly pictures."
+                  description="Reads diagrams and charts as well as the text. Slower and costs more, so best saved for slides that are mostly pictures."
                 />
               </div>
             </CardBody>
@@ -345,7 +373,7 @@ export function CreateDeckPage() {
             <span className="text-xs text-slate-400">{formatQuota(quota)}</span>
             <Button
               size="lg"
-              disabled={files.length === 0 || !title.trim() || !quota.canUpload}
+              disabled={files.length === 0 || !title.trim() || !quota.canUpload || !hasDeckRoom}
               onClick={startGeneration}
             >
               Generate flashcards

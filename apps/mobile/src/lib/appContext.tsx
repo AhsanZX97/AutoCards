@@ -3,21 +3,17 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
-import { createApp, StubDocumentExtractor, type App, type OpenRouterConfig } from '@autocards/core';
+import { createApp, StubDocumentExtractor, type App, type EdgeLlmConfig } from '@autocards/core';
 import { createMobileStorage } from './storage';
 
 const AppContext = createContext<App | null>(null);
 
 let singleton: App | null = null;
 
-/**
- * OpenRouter key generation runs on for every user — see `.env.example`.
- * `EXPO_PUBLIC_` values are inlined into the JS bundle.
- */
-function buildTimeConfig(): OpenRouterConfig | undefined {
-  const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
-  if (!apiKey) return undefined;
-  return { apiKey, appName: 'Auto Cards' };
+interface SupabaseSetup {
+  client: SupabaseClient;
+  url: string;
+  anonKey: string;
 }
 
 /**
@@ -25,11 +21,11 @@ function buildTimeConfig(): OpenRouterConfig | undefined {
  * `.env.example`. Uses AsyncStorage and auto token refresh, with URL
  * detection disabled on native.
  */
-function buildSupabase(): SupabaseClient | undefined {
+function buildSupabase(): SupabaseSetup | undefined {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) return undefined;
-  return createClient(url, anonKey, {
+  const client = createClient(url, anonKey, {
     auth: {
       storage: AsyncStorage,
       autoRefreshToken: true,
@@ -37,13 +33,36 @@ function buildSupabase(): SupabaseClient | undefined {
       detectSessionInUrl: false,
     },
   });
+  return { client, url, anonKey };
+}
+
+/**
+ * Where card generation is actually run.
+ *
+ * There is no OpenRouter key in this bundle, deliberately: `EXPO_PUBLIC_`
+ * values are inlined into the JavaScript, and a shipped app can be unpacked.
+ * The key lives in the `generate-deck` function, which also counts the
+ * monthly allowance. See `supabase/functions/`.
+ */
+function buildEdge(setup: SupabaseSetup): EdgeLlmConfig {
+  return {
+    supabaseUrl: setup.url,
+    anonKey: setup.anonKey,
+    // Read per call: the token is refreshed in the background, and only a
+    // current one gets past the gateway.
+    getAccessToken: async () => {
+      const { data } = await setup.client.auth.getSession();
+      return data.session?.access_token;
+    },
+  };
 }
 
 let supabase: SupabaseClient | undefined;
 
 function getApp(): App {
   if (!singleton) {
-    supabase = buildSupabase();
+    const setup = buildSupabase();
+    supabase = setup?.client;
     singleton = createApp({
       storage: createMobileStorage(),
       // Note: this stub synthesises page text, so live generation refuses the
@@ -52,8 +71,8 @@ function getApp(): App {
       // Word/PowerPoint readers would run here, but there is no point routing
       // to them while PDFs, the format people actually pick, cannot be read.
       documentExtractor: new StubDocumentExtractor(),
-      openRouter: buildTimeConfig(),
       supabase,
+      ...(setup ? { edge: buildEdge(setup) } : {}),
     });
   }
   return singleton;

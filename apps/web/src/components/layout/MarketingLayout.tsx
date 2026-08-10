@@ -63,9 +63,14 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           © {new Date().getFullYear()} Auto Cards. All rights reserved.
         </p>
         <div className="flex gap-5 text-xs text-slate-400 dark:text-slate-500">
-          <a href="#" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Privacy</a>
-          <a href="#" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Terms</a>
-          <a href="#" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Contact</a>
+          <Link to="/privacy" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Privacy</Link>
+          <Link to="/terms" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Terms</Link>
+          <a
+            href="mailto:autocardssupport@gmail.com"
+            className="transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+          >
+            Contact
+          </a>
         </div>
       </footer>
     </DottedSpotlight>

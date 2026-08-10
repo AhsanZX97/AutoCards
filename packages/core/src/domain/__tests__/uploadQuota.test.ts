@@ -58,7 +58,7 @@ describe('remainingUploads', () => {
   });
 
   it('stays infinite on an unlimited plan', () => {
-    expect(remainingUploads('team', { period: '2026-01', uploads: 400 }, JAN)).toBe(Number.POSITIVE_INFINITY);
+    expect(remainingUploads('lifetime', { period: '2026-01', uploads: 400 }, JAN)).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

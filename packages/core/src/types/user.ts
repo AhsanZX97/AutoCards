@@ -1,6 +1,11 @@
 import type { Id, IsoDate } from './common';
 
-export const PLANS = ['free', 'pro', 'team'] as const;
+/**
+ * `lifetime` is bought once rather than monthly — see `services/billing` and
+ * the `payment`-mode branch in `create-checkout-session`. It sits last because
+ * the order here is the order the plans are shown in.
+ */
+export const PLANS = ['free', 'pro', 'lifetime'] as const;
 export type Plan = (typeof PLANS)[number];
 
 export interface PlanLimits {
@@ -25,14 +30,18 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     advancedStats: false,
   },
   pro: {
-    monthlyUploads: 200,
-    maxPagesPerPdf: 500,
+    monthlyUploads: 50,
+    maxPagesPerPdf: 50,
     maxDecks: Number.POSITIVE_INFINITY,
     byoKey: true,
     advancedStats: true,
   },
-  team: {
+  lifetime: {
     monthlyUploads: Number.POSITIVE_INFINITY,
+    // Not infinite, unlike the other two. A single document still has to fit
+    // in one model request — see `MAX_CONTEXT_CHARS` in `openRouter.ts` — so
+    // advertising "unlimited pages" would be a promise the product breaks in
+    // front of the person who believed it.
     maxPagesPerPdf: 2000,
     maxDecks: Number.POSITIVE_INFINITY,
     byoKey: true,
@@ -49,6 +58,12 @@ export interface User {
   initials: string;
   avatarUrl?: string;
   plan: Plan;
+  /**
+   * Set on the profile row, which the client cannot write — see the column
+   * grants in `supabase/schema.sql`. Unlocks the comp controls in the UI, and
+   * is checked again by `admin_set_plan` where it counts.
+   */
+  isAdmin: boolean;
   createdAt: IsoDate;
 }
 

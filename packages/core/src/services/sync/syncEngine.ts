@@ -1,14 +1,16 @@
 import { nowIso } from '../../lib/date';
 import type { AuthStore } from '../../store/authStore';
 import type { DeckStore } from '../../store/deckStore';
+import type { StudyStore } from '../../store/studyStore';
 import { syncOpKey, type SyncStore } from '../../store/syncStore';
-import type { Deck, Flashcard, Id, IsoDate, RemoteRow } from '../../types';
+import type { Deck, Flashcard, Id, IsoDate, RemoteRow, SessionSummary } from '../../types';
 import { resolveMerge } from './mergePolicy';
 import type { SyncBackend } from './syncBackend';
 
 export interface SyncEngineOptions {
   authStore: AuthStore;
   deckStore: DeckStore;
+  studyStore: StudyStore;
   syncStore: SyncStore;
   backend: SyncBackend;
   /** Flush + pull cadence in ms. Defaults to 10s. */
@@ -18,14 +20,17 @@ export interface SyncEngineOptions {
 /**
  * Local-first background sync. Watches `authStore`; once a session is active
  * it pulls the initial snapshot, then keeps a periodic flush+pull timer and a
- * realtime subscription running. On sign-out it tears everything down and
- * clears local deck/sync state so a second account never inherits the first.
+ * realtime subscription running. When the account it was syncing goes away —
+ * sign-out, or a straight switch to another user — it tears everything down
+ * and wipes local deck/history/sync state so the next account never inherits
+ * the previous one's decks, streak or XP.
  */
 export class SyncEngine {
   private readonly flushIntervalMs: number;
   private readonly backend: SyncBackend;
   private readonly authStore: AuthStore;
   private readonly deckStore: DeckStore;
+  private readonly studyStore: StudyStore;
   private readonly syncStore: SyncStore;
 
   private unsubscribeAuth: () => void = () => {};
@@ -39,6 +44,7 @@ export class SyncEngine {
     this.backend = options.backend;
     this.authStore = options.authStore;
     this.deckStore = options.deckStore;
+    this.studyStore = options.studyStore;
     this.syncStore = options.syncStore;
   }
 
@@ -65,16 +71,27 @@ export class SyncEngine {
   private onAuthState(status: string, userId: Id | null): void {
     if (status === 'authenticated' && userId) {
       if (this.ownerId === userId) return;
+      // A different account without a signed-out state in between — which is
+      // what `syncFromProvider` produces when Supabase hands over a session
+      // for another user. The previous owner's local state has to go before
+      // this one's pull lands on top of it.
+      if (this.ownerId !== null) this.wipeLocalState();
       this.startSync(userId);
       return;
     }
     // Any non-authenticated state for a session we were syncing is a sign-out.
     if (this.ownerId !== null) {
-      this.teardown();
-      this.deckStore.getState().clear();
-      this.syncStore.getState().clear();
-      this.ownerId = null;
+      this.wipeLocalState();
     }
+  }
+
+  /** Everything local that belongs to the account being left behind. */
+  private wipeLocalState(): void {
+    this.teardown();
+    this.deckStore.getState().clear();
+    this.studyStore.getState().clear();
+    this.syncStore.getState().clear();
+    this.ownerId = null;
   }
 
   private startSync(ownerId: Id): void {
@@ -113,13 +130,19 @@ export class SyncEngine {
     if (captured.length === 0) return;
 
     const deckState = this.deckStore.getState();
+    const history = this.studyStore.getState().history;
     const deckUpserts: Deck[] = [];
     const cardUpserts: Flashcard[] = [];
+    const sessionUpserts: SessionSummary[] = [];
     const deckDeletes: Id[] = [];
     const cardDeletes: Id[] = [];
 
     for (const op of captured) {
-      if (op.kind === 'deck') {
+      if (op.kind === 'session') {
+        // Append-only: there is no delete op for a finished run.
+        const summary = history.find((s) => s.id === op.id);
+        if (summary) sessionUpserts.push(summary);
+      } else if (op.kind === 'deck') {
         if (op.op === 'delete') {
           deckDeletes.push(op.id);
         } else {
@@ -137,6 +160,7 @@ export class SyncEngine {
     try {
       if (deckUpserts.length) await this.backend.pushDecks(ownerId, deckUpserts);
       if (cardUpserts.length) await this.backend.pushCards(ownerId, cardUpserts);
+      if (sessionUpserts.length) await this.backend.pushSessions(ownerId, sessionUpserts);
       for (const id of deckDeletes) await this.backend.softDeleteDeck(id);
       for (const id of cardDeletes) await this.backend.softDeleteCard(id);
 
@@ -178,6 +202,13 @@ export class SyncEngine {
         const action = resolveMerge(localAt ? { updatedAt: localAt } : undefined, row);
         if (action.type === 'upsert') this.deckStore.getState().applyRemoteCard(row.data);
         else if (action.type === 'remove') this.deckStore.getState().applyRemoteDeleteCard(row.data.deckId, row.id);
+      }
+
+      // No merge policy for study history: a finished run is immutable, so
+      // there is nothing to resolve. `applyRemoteSession` ignores ids it
+      // already holds, which is what makes the echo of our own push harmless.
+      for (const row of changes.sessions) {
+        this.studyStore.getState().applyRemoteSession(row.data);
       }
 
       this.syncStore.getState().setLastPulledAt(cursorAt);
