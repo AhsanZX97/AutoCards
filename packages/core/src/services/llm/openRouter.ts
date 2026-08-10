@@ -9,7 +9,12 @@ import type {
 } from '../../types';
 import { cardTypeLabel } from '../../types';
 import { costOf, DEFAULT_VISION_MODEL_ID, isVisionModel, MODEL_CATALOG } from './models';
-import { allowedCardTypes, normalizeGeneratedCards } from './normalizeCards';
+import {
+  MAX_AUTO_CATEGORIES,
+  allowedCardTypes,
+  categoryTargetFor,
+  normalizeGeneratedCards,
+} from './normalizeCards';
 import { promptRules, resolvePreset } from './presets';
 import { GenerationAbortedError } from './types';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
@@ -370,7 +375,7 @@ function describeGeneratedFrom(documents: ExtractedDocument[]): string {
 }
 
 /** `lecture-notes-week-3.pdf` -> `Lecture Notes Week 3`. */
-function titleFromFilename(filename: string): string {
+export function titleFromFilename(filename: string): string {
   const base = filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
   if (!base) return 'Generated deck';
   return base
@@ -423,8 +428,11 @@ function buildSystemPrompt(
     describeMultipleDocuments(documents.length),
     options.instructions ? `\nThe user asked specifically: ${options.instructions}\n` : '',
     'Reply with a JSON object of this exact shape:',
-    '{"cards": [{ ...card }]}',
+    options.autoCategories
+      ? '{"categories": ["…", "…"], "cards": [{ ...card }]}'
+      : '{"cards": [{ ...card }]}',
     '',
+    ...describeCategoryPlan(options, resolvePreset(options.preset).categoryHint),
     'Every card carries:',
     '  "type"        one of the allowed types above',
     '  "front"       the question side',
@@ -436,7 +444,7 @@ function buildSystemPrompt(
     options.includeExplanations ? '  "explanation" why the answer is correct' : '',
     options.includeSourceQuotes ? '  "source"      {"page": number, "quote": "verbatim sentence the card came from"}' : '',
     options.autoCategories
-      ? `  "category"    ${preset.categoryHint}; reuse the same name across related cards`
+      ? '  "category"    exactly one name, copied verbatim from the "categories" list above'
       : '',
     '',
     // The runner cannot render or grade these types without their extra fields,
@@ -474,6 +482,31 @@ function describeAvoided(prompts: string[]): string {
     }. Do not write them again, and do not reword them — cover material they leave out:`,
     ...listed.map((prompt) => `- ${truncate(prompt, MAX_AVOID_PROMPT_CHARS)}`),
   ].join('\n');
+}
+
+/**
+ * Makes the model settle on its categories before it writes a single card.
+ *
+ * Asking for a `"category"` per card and hoping for repetition does not work:
+ * each card is written in isolation, the most natural name for it is the one
+ * describing that card exactly, and a 25-card deck comes back with 25
+ * categories. Naming the whole list up front turns it into one decision about
+ * the deck, which the cards are then assigned against — and gives
+ * `buildCategories` a canonical spelling to fold near-misses onto.
+ *
+ * The count is `categoryTargetFor`, the same number the normalizer enforces.
+ */
+function describeCategoryPlan(
+  options: GenerateArgs['options'],
+  hint: string,
+): string[] {
+  if (!options.autoCategories) return [];
+  const target = categoryTargetFor(options.cardCount);
+  return [
+    `Before writing any cards, decide on about ${target} categories for this deck — each one ${hint}. List them in "categories", then give every card one of them.`,
+    `Rules for "categories": at most ${MAX_AUTO_CATEGORIES} names, each broad enough to hold several cards. Do not invent a category for a single card, and do not name one that only rewords another — if two would overlap, use one name for both.`,
+    '',
+  ];
 }
 
 function describeTypes(types: GenerateArgs['options']['cardTypes']): string {

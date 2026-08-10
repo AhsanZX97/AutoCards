@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedCardTypes, normalizeGeneratedCards } from '../normalizeCards';
+import { MAX_AUTO_CATEGORIES, allowedCardTypes, normalizeGeneratedCards } from '../normalizeCards';
 import { CARD_TYPES, type CardType, type GenerationOptions } from '../../../types';
 
 const BASE_OPTIONS: GenerationOptions = {
@@ -488,6 +488,61 @@ describe('normalizeGeneratedCards', () => {
         options({ autoCategories: true, cardCount: 1 }),
       );
       expect(categories.map((c) => c.name)).toEqual(['Kept']);
+    });
+
+    it('folds a card onto the declared category it names, ignoring case and spacing', () => {
+      const { categories, cards } = normalizeGeneratedCards(
+        {
+          categories: ['Memory', 'Techniques'],
+          cards: [
+            { front: 'Q1', back: 'A1', category: '  memory ' },
+            { front: 'Q2', back: 'A2', category: 'Techniques' },
+          ],
+        },
+        options({ autoCategories: true }),
+      );
+      expect(categories.map((c) => c.name)).toEqual(['Memory', 'Techniques']);
+      expect(cards[0]?.categoryId).toBe(categories[0]?.id);
+      expect(cards[1]?.categoryId).toBe(categories[1]?.id);
+    });
+
+    it('caps how many categories a deck may end up with', () => {
+      // The failure this exists for: one category per card, which is clutter
+      // rather than grouping.
+      const { categories } = normalizeGeneratedCards(
+        {
+          cards: Array.from({ length: 25 }, (_unused, index) => ({
+            front: `Q${index}`,
+            back: `A${index}`,
+            category: `Topic ${index}`,
+          })),
+        },
+        options({ autoCategories: true, cardCount: 25 }),
+      );
+      expect(categories.length).toBeLessThanOrEqual(MAX_AUTO_CATEGORIES);
+    });
+
+    it('keeps the categories carrying the most cards when it has to cut', () => {
+      const { categories, cards } = normalizeGeneratedCards(
+        {
+          cards: [
+            { front: 'Q1', back: 'A1', category: 'Big' },
+            { front: 'Q2', back: 'A2', category: 'Big' },
+            { front: 'Q3', back: 'A3', category: 'Big' },
+            { front: 'Q4', back: 'A4', category: 'Tiny' },
+          ],
+        },
+        // A cap of one, reached via a deck too small to justify more.
+        options({ autoCategories: true, cardCount: 4 }),
+      );
+      expect(categories.map((c) => c.name)).toContain('Big');
+      // A card whose category did not survive is uncategorized, not misfiled.
+      const tiny = cards.find((card) => card.front === 'Q4');
+      const big = cards.find((card) => card.front === 'Q1');
+      expect(big?.categoryId).toBe(categories.find((c) => c.name === 'Big')?.id);
+      if (!categories.some((c) => c.name === 'Tiny')) {
+        expect(tiny?.categoryId).toBeUndefined();
+      }
     });
   });
 

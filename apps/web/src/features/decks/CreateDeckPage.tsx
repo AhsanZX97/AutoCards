@@ -18,6 +18,7 @@ import {
   canCreateDeck,
   oversizedDocuments,
   resolvePreset,
+  titleFromFilename,
   type CardType,
   type Difficulty,
   type GenerationPresetId,
@@ -84,6 +85,19 @@ export function CreateDeckPage() {
   // ticker calling setState on an unmounted page.
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  /**
+   * Names the deck after the first file as soon as it lands, rather than
+   * waiting until generation, so the field never sits blank while there is
+   * already a name to give it. Only when nothing has been typed yet — a name
+   * the user chose or a name we already filled in is never overwritten.
+   */
+  function handleFilesChange(next: File[]) {
+    if (!title.trim() && files.length === 0 && next.length > 0) {
+      setTitle(titleFromFilename((next[0] as File).name));
+    }
+    setFiles(next);
+  }
+
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
       if (prev.includes(type)) {
@@ -105,7 +119,7 @@ export function CreateDeckPage() {
   }
 
   async function startGeneration() {
-    if (files.length === 0 || !title.trim() || !userId || !quota.canUpload || !hasDeckRoom) return;
+    if (files.length === 0 || !userId || !quota.canUpload || !hasDeckRoom) return;
     setStep('generating');
     setErrorMessage('');
 
@@ -311,7 +325,7 @@ export function CreateDeckPage() {
             <CardBody>
               <UploadDropzone
                 files={files}
-                onChange={setFiles}
+                onChange={handleFilesChange}
                 hint={`Slides, notes, a chapter, a past paper. Takes ${SUPPORTED_FORMATS_LABEL}. Add several and the cards are written from all of them at once.`}
               />
             </CardBody>
@@ -399,7 +413,7 @@ export function CreateDeckPage() {
             <span className="text-xs text-slate-400">{formatQuota(quota)}</span>
             <Button
               size="lg"
-              disabled={files.length === 0 || !title.trim() || !quota.canUpload || !hasDeckRoom}
+              disabled={files.length === 0 || !quota.canUpload || !hasDeckRoom}
               onClick={startGeneration}
             >
               Generate flashcards

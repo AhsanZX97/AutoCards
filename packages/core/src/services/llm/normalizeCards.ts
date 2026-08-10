@@ -42,6 +42,30 @@ export interface NormalizedGeneration {
 /** Emoji cycled through for auto-discovered categories, so each looks distinct. */
 const CATEGORY_ICONS = ['📘', '🛠️', '🧠', '🎯', '🔬', '📐', '🗺️', '⚗️'];
 
+/**
+ * Ceiling on auto-discovered categories, whatever the deck size.
+ *
+ * Past about this many, the category strip stops being a way to find things
+ * and becomes a second list of the cards.
+ */
+export const MAX_AUTO_CATEGORIES = 10;
+/** Below this, categories group nothing — a heading per card or two. */
+const MIN_AUTO_CATEGORIES = 3;
+/** Cards each category should hold, give or take. */
+const CARDS_PER_CATEGORY = 5;
+
+/**
+ * How many categories a deck of this size should end up with.
+ *
+ * Shared with the prompt builder deliberately: the model is asked for this
+ * number and held to it here, and the two drifting apart would mean asking for
+ * one grouping and enforcing another.
+ */
+export function categoryTargetFor(cardCount: number): number {
+  const scaled = Math.round(cardCount / CARDS_PER_CATEGORY);
+  return Math.min(MAX_AUTO_CATEGORIES, Math.max(MIN_AUTO_CATEGORIES, scaled));
+}
+
 const TRUE_WORDS = new Set(['true', 't', 'yes', 'correct']);
 const FALSE_WORDS = new Set(['false', 'f', 'no', 'incorrect']);
 
@@ -76,6 +100,8 @@ export function normalizeGeneratedCards(
 
   const { categories, categoryIdFor } = buildCategories(
     options.autoCategories ? kept.map((k) => k.categoryName) : [],
+    options.autoCategories ? extractDeclaredCategories(payload) : [],
+    categoryTargetFor(options.cardCount),
   );
 
   const cards = kept.map(({ card, categoryName }) => {
@@ -84,6 +110,22 @@ export function normalizeGeneratedCards(
   });
 
   return { cards, categories, discarded };
+}
+
+/**
+ * The category list the model committed to before writing the cards.
+ *
+ * Absent whenever the model ignored the instruction to declare one, which is
+ * fine — the names on the cards are still read either way.
+ */
+function extractDeclaredCategories(payload: unknown): string[] {
+  if (!isRecord(payload)) return [];
+  const value = payload.categories;
+  if (!Array.isArray(value)) return [];
+  // Objects too: a model told to list names sometimes lists `{name: "…"}`.
+  return value
+    .map((entry) => (isRecord(entry) ? readString(entry.name ?? entry.category) : readString(entry)))
+    .filter(Boolean);
 }
 
 /** Accepts `{cards: [...]}`, a bare array, or a single-key wrapper like `{flashcards: [...]}`. */
@@ -283,27 +325,75 @@ function readTruth(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function buildCategories(names: Array<string | undefined>): {
+/**
+ * Turns the category names the cards claim into the deck's category list.
+ *
+ * Two things beyond collecting distinct names. `declared` is the list the model
+ * committed to before writing any cards, which gives the canonical spelling and
+ * ordering for anything the cards then name. And the result is capped: asked
+ * for a handful of groupings a model will still sometimes emit one per card,
+ * and a deck of 25 headings over 25 cards organizes nothing. When the cap
+ * bites, the categories holding the most cards win and the long tail is left
+ * uncategorized — a card with no heading is honest, a card filed under a
+ * heading invented for it alone is not.
+ */
+function buildCategories(
+  names: Array<string | undefined>,
+  declared: string[],
+  limit: number,
+): {
   categories: Category[];
   categoryIdFor: (name: string) => string | undefined;
 } {
-  const byKey = new Map<string, Category>();
+  interface Bucket {
+    name: string;
+    count: number;
+  }
+
+  // Seeded with the declared names, so they keep the model's own spelling and
+  // order, and win ties against a name only one card mentions.
+  const buckets = new Map<string, Bucket>();
+  for (const name of declared) {
+    const key = categoryKey(name);
+    if (key && !buckets.has(key)) buckets.set(key, { name: name.trim(), count: 0 });
+  }
+
   for (const name of names) {
     if (!name) continue;
-    const key = name.trim().toLowerCase();
-    if (!key || byKey.has(key)) continue;
-    const index = byKey.size;
+    const key = categoryKey(name);
+    if (!key) continue;
+    const existing = buckets.get(key);
+    if (existing) existing.count += 1;
+    else buckets.set(key, { name: name.trim(), count: 1 });
+  }
+
+  const ranked = [...buckets.entries()]
+    // A declared category no card actually used would render as an empty chip.
+    .filter(([, bucket]) => bucket.count > 0)
+    // Sort is stable, so equal counts keep insertion order — declared first,
+    // then first-mentioned.
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, Math.max(1, limit));
+
+  const byKey = new Map<string, Category>();
+  ranked.forEach(([key, bucket], index) => {
     byKey.set(key, {
       id: createId('cat'),
-      name: name.trim(),
+      name: bucket.name,
       accent: ACCENTS[index % ACCENTS.length] as Accent,
       icon: CATEGORY_ICONS[index % CATEGORY_ICONS.length] as string,
     });
-  }
+  });
+
   return {
     categories: [...byKey.values()],
-    categoryIdFor: (name) => byKey.get(name.trim().toLowerCase())?.id,
+    categoryIdFor: (name) => byKey.get(categoryKey(name))?.id,
   };
+}
+
+/** Case and surrounding/repeated whitespace never distinguish two categories. */
+function categoryKey(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function readSource(
