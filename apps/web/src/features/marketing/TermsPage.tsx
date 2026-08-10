@@ -69,8 +69,12 @@ export function TermsPage() {
 
       <LegalSection heading="Termination">
         <p>
-          You can delete your account at any time. We may suspend or terminate accounts that
-          violate these terms.
+          You can close your account at any time by emailing us at{' '}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline hover:text-slate-900 dark:hover:text-white">
+            {CONTACT_EMAIL}
+          </a>
+          . We&apos;ll delete your account and everything stored with it. We may suspend or
+          terminate accounts that violate these terms.
         </p>
       </LegalSection>
 

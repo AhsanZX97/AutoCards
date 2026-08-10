@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
-import { Avatar, ThemeToggle, Wordmark } from '../ui';
+import { Avatar, Button, Modal, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
 
 const NAV_ITEMS = [
@@ -18,9 +18,32 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const signOut = app.authStore((s) => s.signOut);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [unsyncedWarning, setUnsyncedWarning] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
+  /**
+   * Signing out clears this device's decks and history, so anything that has
+   * not reached the server is gone with it. `signOut` pushes first and reports
+   * false when it could not — being offline, usually — and that is a decision
+   * for the person holding the unsaved work, not for us.
+   */
   async function handleSignOut() {
-    await signOut();
+    setSigningOut(true);
+    const done = await signOut();
+    setSigningOut(false);
+    if (done) {
+      navigate('/');
+      return;
+    }
+    setMenuOpen(false);
+    setUnsyncedWarning(true);
+  }
+
+  async function signOutAnyway() {
+    setSigningOut(true);
+    await signOut({ force: true });
+    setSigningOut(false);
+    setUnsyncedWarning(false);
     navigate('/');
   }
 
@@ -80,10 +103,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     Settings
                   </NavLink>
                   <button
-                    onClick={handleSignOut}
-                    className="block w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                    onClick={() => void handleSignOut()}
+                    disabled={signingOut}
+                    className="block w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-400 dark:hover:bg-rose-500/10"
                   >
-                    Sign out
+                    {signingOut ? 'Saving your work…' : 'Sign out'}
                   </button>
                 </div>
               </>
@@ -92,6 +116,30 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </header>
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
+
+      <Modal
+        open={unsyncedWarning}
+        onClose={() => setUnsyncedWarning(false)}
+        title="Some changes haven’t saved yet"
+        description="We couldn’t reach the server to save your most recent work."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setUnsyncedWarning(false)}>
+              Stay signed in
+            </Button>
+            <Button variant="danger" onClick={() => void signOutAnyway()} disabled={signingOut}>
+              Sign out and lose them
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Signing out clears this device, so anything not yet saved to your account would be lost.
+          Staying signed in until you&apos;re back online is usually what you want — it saves on its
+          own once the connection returns.
+        </p>
+      </Modal>
     </div>
   );
 }

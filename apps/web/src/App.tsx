@@ -6,15 +6,17 @@ import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Toaster } from './components/ui';
 import { LandingPage } from './features/marketing/LandingPage';
+import { NotFoundPage } from './features/marketing/NotFoundPage';
 import { PrivacyPage } from './features/marketing/PrivacyPage';
 import { TermsPage } from './features/marketing/TermsPage';
 import { SignInPage } from './features/auth/SignInPage';
 import { SignUpPage } from './features/auth/SignUpPage';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { DeckLibraryPage } from './features/decks/DeckLibraryPage';
 import { CreateDeckPage } from './features/decks/CreateDeckPage';
 import { DeckDetailPage } from './features/decks/DeckDetailPage';
-import { ImportSharedDeck } from './features/decks/ImportSharedDeck';
 import { StudySetupPage } from './features/study/StudySetupPage';
 import { StudyRunnerPage } from './features/study/StudyRunnerPage';
 import { StudyResultsPage } from './features/study/StudyResultsPage';
@@ -43,6 +45,27 @@ export default function App() {
           element={
             <AuthLayout title="Create your account" subtitle="Free to start. No credit card required.">
               <SignUpPage />
+            </AuthLayout>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <AuthLayout
+              title="Reset your password"
+              subtitle="We'll email you a link to set a new one."
+            >
+              <ForgotPasswordPage />
+            </AuthLayout>
+          }
+        />
+        {/* Outside RequireAuth on purpose: whoever lands here is mid-recovery,
+            holding a temporary session rather than a signed-in one. */}
+        <Route
+          path="/reset-password"
+          element={
+            <AuthLayout title="Choose a new password" subtitle="Then you're straight back in.">
+              <ResetPasswordPage />
             </AuthLayout>
           }
         />
@@ -135,9 +158,11 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* The host serves index.html for every path so a refresh works, which
+            means an unknown URL reaches the router rather than a 404 page. */}
+        <Route path="*" element={<MarketingLayout><NotFoundPage /></MarketingLayout>} />
       </Routes>
       <Toaster />
-      <ImportSharedDeck />
     </>
   );
 }

@@ -158,6 +158,40 @@ export function readCheckoutPurchase(raw: unknown): PurchaseFacts | undefined {
   };
 }
 
+/**
+ * When Stripe says an event happened, as an ISO instant.
+ *
+ * Undefined for anything without a usable `created`. That is deliberately not
+ * treated as "now": an event we cannot date must still be applied, because
+ * dropping it would leave somebody who paid on the free plan.
+ */
+export function eventTimestamp(event: unknown): string | undefined {
+  if (!isRecord(event)) return undefined;
+  const created = numberOrUndefined(event.created);
+  return created === undefined ? undefined : new Date(created * 1000).toISOString();
+}
+
+/**
+ * Whether an event is older than the one already applied to this account.
+ *
+ * Stripe guarantees delivery, not order. A `customer.subscription.updated`
+ * held up in a retry can land after a newer one, and without this the older
+ * state would win — cancelling an account that has since resubscribed, or
+ * restoring a plan somebody just dropped.
+ *
+ * Everything unknown resolves to "apply it". A tie is not stale either:
+ * Stripe stamps whole seconds, and a checkout completing and its subscription
+ * being created routinely share one, so treating a tie as stale would drop
+ * the second of the pair.
+ */
+export function isStaleEvent(appliedAt: unknown, incomingAt: string | undefined): boolean {
+  if (typeof appliedAt !== 'string' || !incomingAt) return false;
+  const applied = Date.parse(appliedAt);
+  const incoming = Date.parse(incomingAt);
+  if (!Number.isFinite(applied) || !Number.isFinite(incoming)) return false;
+  return incoming < applied;
+}
+
 /** Events worth acting on. Everything else is acknowledged and ignored. */
 export const HANDLED_EVENTS = [
   'checkout.session.completed',

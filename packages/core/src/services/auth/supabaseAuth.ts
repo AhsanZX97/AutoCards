@@ -5,7 +5,7 @@ import type {
 } from '@supabase/supabase-js';
 import { initialsOf, isValidUsername, normalizeUsername } from '../../lib/text';
 import type { Credentials, Plan, Session, SignUpInput, SignUpResult, User } from '../../types';
-import { AuthError } from './types';
+import { AuthError, MIN_PASSWORD_LENGTH } from './types';
 import type { AuthService } from './types';
 
 interface ProfileRow {
@@ -98,6 +98,41 @@ export class SupabaseAuthService implements AuthService {
   async signOut(): Promise<void> {
     const { error } = await this.client.auth.signOut();
     if (error) throw error;
+  }
+
+  /**
+   * Deliberately silent about whether the address has an account.
+   *
+   * Supabase already answers the same way either way, and this keeps it that
+   * way: a form that said "no account with that email" would let anyone check
+   * whether a given person is a customer. Errors are logged rather than shown,
+   * so a provider outage does not read to the user as "wrong email".
+   */
+  async requestPasswordReset(email: string, redirectTo: string): Promise<void> {
+    const { error } = await this.client.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo,
+    });
+    if (error) console.error('[autocards] could not send the reset email', error);
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new AuthError(
+        `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
+        'password',
+      );
+    }
+    const { error } = await this.client.auth.updateUser({ password });
+    if (error) {
+      // The usual cause is an expired or already-used recovery link — the user
+      // needs a fresh email rather than another go at the same form.
+      throw new AuthError(
+        /expired|invalid|not authenticated|session/i.test(error.message)
+          ? 'That reset link has expired. Ask for a new one and try again.'
+          : error.message,
+        'password',
+      );
+    }
   }
 
   /**

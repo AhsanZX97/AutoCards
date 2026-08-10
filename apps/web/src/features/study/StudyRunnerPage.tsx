@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   autoGrade,
   currentCardId as getCurrentCardId,
@@ -99,8 +99,19 @@ export function StudyRunnerPage() {
   if (session.status === 'completed') {
     return <Navigate to={`/app/study/${deckId}/results/${session.id}`} replace />;
   }
+  // The card in the queue is no longer in the deck — deleted on another device
+  // mid-run, or the deck itself was. This used to redirect silently, which
+  // looked like the app had thrown the session away for no reason.
   if (!currentCard) {
-    return <Navigate to={`/app/decks/${deckId}`} replace />;
+    return (
+      <MissingCard
+        deckId={deckId}
+        onEnd={() => {
+          pauseAndAbandon();
+          navigate(`/app/decks/${deckId}`);
+        }}
+      />
+    );
   }
 
   const total = session.queue.length;
@@ -265,6 +276,37 @@ export function StudyRunnerPage() {
               onRevealHint={() => setHintRevealed(true)}
             />
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shown when the queue points at a card the deck no longer has.
+ *
+ * Whatever has been answered so far is real and worth keeping, so ending the
+ * run here files it rather than discarding it — `pauseAndAbandon` writes the
+ * summary as long as at least one answer was given.
+ */
+function MissingCard({ deckId, onEnd }: { deckId: string; onEnd: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+      <div className="max-w-sm text-center">
+        <span className="text-4xl">🃏</span>
+        <h1 className="mt-4 text-lg font-semibold text-white">This card isn&apos;t here any more</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          It was deleted somewhere else while you were studying. Everything you answered up to now
+          has been counted.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Button onClick={onEnd}>End session</Button>
+          <Link
+            to={`/app/study/${deckId}`}
+            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+          >
+            Start a new one
+          </Link>
         </div>
       </div>
     </div>

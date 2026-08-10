@@ -34,6 +34,8 @@ function fakeAuth(): AuthService {
     restore: async () => SESSION,
     updateProfile: async (user) => user,
     changePlan: async (user, plan) => ({ ...user, plan }),
+    requestPasswordReset: async () => {},
+    updatePassword: async () => {},
   };
 }
 
@@ -418,6 +420,148 @@ describe('SyncEngine', () => {
     fail = false;
     await engine.syncNow();
     expect(syncStore.getState().pendingOps).toEqual({});
+    engine.stop();
+  });
+});
+
+describe('SyncEngine cursor', () => {
+  function engineWith(backend: SyncBackend) {
+    const storage = createMemoryStorage();
+    const stores = makeDeckAndCard(storage);
+    const engine = new SyncEngine({ ...stores, backend, flushIntervalMs: 10 ** 9 });
+    return { ...stores, engine };
+  }
+
+  function deckRow(updatedAt: string, id = 'deck_remote') {
+    return { id, updatedAt, deletedAt: null, data: { id } as unknown as Deck };
+  }
+
+  /**
+   * The cursor used to be `nowIso()` from this device. A machine running fast
+   * wrote one into the future, and every row another device committed before
+   * that instant was skipped for good.
+   */
+  it('advances the cursor to a server timestamp, not the device clock', async () => {
+    const newest = '2020-01-01T00:00:00.000Z'; // deliberately long past
+    const { syncStore, engine } = engineWith(
+      fakeBackend({
+        pull: vi.fn(async () => ({ decks: [deckRow(newest)], cards: [], sessions: [] })),
+      }),
+    );
+
+    engine.start();
+    await settle();
+
+    const cursor = syncStore.getState().lastPulledAt as string;
+    expect(Date.parse(cursor)).toBeLessThanOrEqual(Date.parse(newest));
+    expect(Date.parse(cursor)).toBeLessThan(Date.now());
+    engine.stop();
+  });
+
+  it('leaves the cursor alone when a pull returns nothing', async () => {
+    const { syncStore, engine } = engineWith(fakeBackend());
+
+    engine.start();
+    await settle();
+
+    expect(syncStore.getState().lastPulledAt).toBeNull();
+    engine.stop();
+  });
+
+  it('asks for changes from the cursor the previous pull set', async () => {
+    const backend = fakeBackend({
+      pull: vi.fn(async () => ({
+        decks: [deckRow('2026-03-01T12:00:00.000Z')],
+        cards: [],
+        sessions: [],
+      })),
+    });
+    const { syncStore, engine } = engineWith(backend);
+
+    engine.start();
+    await settle();
+    await engine.syncNow();
+
+    const calls = (backend.pull as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[0]![1]).toBeNull();
+    expect(calls[1]![1]).toBe(syncStore.getState().lastPulledAt);
+    engine.stop();
+  });
+
+  it('does not rewind the cursor when an older row arrives late', async () => {
+    let batch = 0;
+    const backend = fakeBackend({
+      pull: vi.fn(async () => {
+        batch += 1;
+        return {
+          decks: [
+            deckRow(batch === 1 ? '2026-03-01T12:00:00.000Z' : '2020-01-01T00:00:00.000Z', 'deck_a'),
+          ],
+          cards: [],
+          sessions: [],
+        };
+      }),
+    });
+    const { syncStore, engine } = engineWith(backend);
+
+    engine.start();
+    await settle();
+    const afterFirst = syncStore.getState().lastPulledAt;
+    await engine.syncNow();
+
+    expect(syncStore.getState().lastPulledAt).toBe(afterFirst);
+    engine.stop();
+  });
+});
+
+describe('SyncEngine.flushPending', () => {
+  it('reports success when there was nothing waiting', async () => {
+    const storage = createMemoryStorage();
+    const stores = makeDeckAndCard(storage);
+    const engine = new SyncEngine({ ...stores, backend: fakeBackend(), flushIntervalMs: 10 ** 9 });
+    engine.start();
+    await settle();
+
+    await expect(engine.flushPending()).resolves.toBe(true);
+    engine.stop();
+  });
+
+  it('pushes what is queued and reports the outbox empty', async () => {
+    const storage = createMemoryStorage();
+    const stores = makeDeckAndCard(storage);
+    const backend = fakeBackend();
+    const engine = new SyncEngine({ ...stores, backend, flushIntervalMs: 10 ** 9 });
+    engine.start();
+    await settle();
+
+    stores.deckStore.getState().createBlankDeck('user-1', 'Unsaved work');
+
+    await expect(engine.flushPending()).resolves.toBe(true);
+    expect(backend.pushDecks).toHaveBeenCalled();
+    expect(stores.syncStore.getState().pendingOps).toEqual({});
+    engine.stop();
+  });
+
+  /**
+   * Sign-out wipes local decks, so a push that failed has to be reported —
+   * otherwise the work is gone and the server's older copy replaces it.
+   */
+  it('reports failure and keeps the outbox when the push cannot land', async () => {
+    const storage = createMemoryStorage();
+    const stores = makeDeckAndCard(storage);
+    const backend = fakeBackend({
+      pushDecks: vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    });
+    const engine = new SyncEngine({ ...stores, backend, flushIntervalMs: 10 ** 9 });
+    engine.start();
+    await settle();
+
+    stores.deckStore.getState().createBlankDeck('user-1', 'Unsaved work');
+
+    await expect(engine.flushPending()).resolves.toBe(false);
+    expect(Object.keys(stores.syncStore.getState().pendingOps)).toHaveLength(1);
     engine.stop();
   });
 });

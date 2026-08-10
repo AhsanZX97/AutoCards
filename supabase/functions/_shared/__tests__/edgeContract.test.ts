@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { PLANS, PLAN_LIMITS as CLIENT_PLAN_LIMITS } from '../../../../packages/core/src/types/user';
 import { MODEL_CATALOG } from '../../../../packages/core/src/services/llm/models';
 import { usagePeriod as clientUsagePeriod } from '../../../../packages/core/src/domain/uploadQuota';
-import { MAX_IMAGES as CLIENT_MAX_IMAGES } from '../../../../packages/core/src/services/documents/selectImages';
+import { MAX_IMAGES as MAX_IMAGES_PER_DOCUMENT } from '../../../../packages/core/src/services/documents/selectImages';
 import {
   MAX_CONTEXT_CHARS,
+  MAX_IMAGES_PER_RUN,
   MAX_OUTPUT_TOKENS as CLIENT_MAX_OUTPUT_TOKENS,
 } from '../../../../packages/core/src/services/llm/openRouter';
 import {
@@ -54,7 +55,20 @@ describe('edge and app agree on what may be asked of the model', () => {
   it('leaves room for the largest request the client will build', () => {
     expect(MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(CLIENT_MAX_OUTPUT_TOKENS);
     expect(MAX_TEXT_CHARS).toBeGreaterThan(MAX_CONTEXT_CHARS);
-    expect(MAX_IMAGES).toBe(CLIENT_MAX_IMAGES);
+  });
+
+  /**
+   * The limit that matters is the one bounding a whole request. Comparing
+   * against the per-document cap is what let these drift: the client picks up
+   * to 8 pictures out of *each* file and sends up to 12 in total, so a
+   * multi-file run was refused at the door while this contract still passed.
+   */
+  it('accepts as many pictures as one run can send, not as many as one file holds', () => {
+    expect(MAX_IMAGES).toBeGreaterThanOrEqual(MAX_IMAGES_PER_RUN);
+  });
+
+  it('bounds a run by the run limit rather than the per-document one', () => {
+    expect(MAX_IMAGES_PER_RUN).toBeGreaterThanOrEqual(MAX_IMAGES_PER_DOCUMENT);
   });
 });
 

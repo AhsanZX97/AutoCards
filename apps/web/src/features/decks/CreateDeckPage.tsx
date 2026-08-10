@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CARD_TYPE_DESCRIPTIONS,
@@ -11,6 +11,7 @@ import {
   GENERATION_PRESET_LABELS,
   GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
+  GenerationAbortedError,
   PLAN_LIMITS,
   SUPPORTED_FORMATS_LABEL,
   UploadQuotaExceededError,
@@ -77,6 +78,12 @@ export function CreateDeckPage() {
   const [instructions, setInstructions] = useState('');
   const [typeHelpOpen, setTypeHelpOpen] = useState(false);
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Navigating away otherwise leaves the request running and the progress
+  // ticker calling setState on an unmounted page.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
       if (prev.includes(type)) {
@@ -104,6 +111,9 @@ export function CreateDeckPage() {
 
     updateDefaults({ preset, cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes, readImages });
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       // Sequential rather than parallel: pdf.js pins a worker per document and
       // several large files at once is what makes the tab stutter.
@@ -123,6 +133,7 @@ export function CreateDeckPage() {
 
       const result = await app.services.llm.generateDeck({
         documents,
+        signal: controller.signal,
         options: {
           // Model choice is not a decision to put in front of a student, so the
           // page always runs on the house default rather than exposing a picker.
@@ -149,12 +160,24 @@ export function CreateDeckPage() {
       toast({ variant: 'success', title: 'Deck created!', description: `${result.cards.length} flashcards generated.` });
       navigate(`/app/decks/${deck.id}`);
     } catch (err) {
+      // Cancelling is a choice, not a failure — back to the form, no error
+      // screen, and the files still selected so it can be started again.
+      if (err instanceof GenerationAbortedError) {
+        setStep('idle');
+        return;
+      }
       // Being turned away is itself news about the allowance: the meter was
       // showing uploads left or the button would have been disabled.
       if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your deck.');
       setStep('error');
+    } finally {
+      abortRef.current = null;
     }
+  }
+
+  function cancelGeneration() {
+    abortRef.current?.abort();
   }
 
   function createManualDeck() {
@@ -218,6 +241,9 @@ export function CreateDeckPage() {
             <p className="mt-6 text-xs text-slate-400">
               Reading your files and writing cards. Larger decks take a minute.
             </p>
+            <Button variant="ghost" className="mt-4" onClick={cancelGeneration}>
+              Cancel
+            </Button>
           </CardBody>
         </Card>
       )}

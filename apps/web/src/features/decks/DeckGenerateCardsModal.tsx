@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CARD_TYPE_LABELS,
   CARD_TYPES,
@@ -9,8 +9,11 @@ import {
   GENERATION_PRESET_LABELS,
   GENERATION_PRESETS,
   GENERATION_STAGE_LABELS,
+  GenerationAbortedError,
+  PLAN_LIMITS,
   SUPPORTED_FORMATS_LABEL,
   UploadQuotaExceededError,
+  oversizedDocuments,
   resolvePreset,
   type CardType,
   type Deck,
@@ -55,9 +58,11 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
   const app = useApp();
   const quota = useUploadQuota();
 
+  const plan = app.authStore((s) => s.session?.user.plan) ?? 'free';
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const addGeneratedCards = app.deckStore((s) => s.addGeneratedCards);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [step, setStep] = useState<Step>('setup');
   const [files, setFiles] = useState<File[]>([]);
@@ -85,6 +90,10 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     setErrorMessage('');
   }, [open]);
 
+  // A run outlives this modal otherwise: the request keeps going and the
+  // progress ticker keeps calling setState on something no longer mounted.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
       if (prev.includes(type)) {
@@ -109,13 +118,29 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     setErrorMessage('');
     updateDefaults({ preset, cardCount, cardTypes, difficulty, includeHints, includeExplanations, includeSourceQuotes, readImages });
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       // Sequential — see `CreateDeckPage`.
       const documents = [];
       for (const selected of files) {
         documents.push(await app.services.documents.extract(selected));
       }
+
+      // The same check deck creation makes. Without it this path was a way
+      // around the plan's page limit, and the only one that spent an upload
+      // doing it.
+      const tooLong = oversizedDocuments(plan, documents);
+      if (tooLong.length > 0) {
+        const names = tooLong.map((document) => document.filename).join(', ');
+        throw new Error(
+          `${names} ${tooLong.length === 1 ? 'is' : 'are'} longer than the ${PLAN_LIMITS[plan].maxPagesPerPdf} pages your plan reads in one document. Split it up, or move to a bigger plan.`,
+        );
+      }
+
       const result = await app.services.llm.generateDeck({
+        signal: controller.signal,
         documents,
         options: {
           // Fixed house model — see `CreateDeckPage`; picking one is not a
@@ -168,18 +193,29 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
       });
       onClose();
     } catch (err) {
+      // Cancelling is a choice, not a failure — back to the form, no error.
+      if (err instanceof GenerationAbortedError) {
+        setStep('setup');
+        return;
+      }
       // Being turned away is itself news about the allowance: the meter was
       // showing uploads left or the button would have been disabled.
       if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your cards.');
       setStep('error');
+    } finally {
+      abortRef.current = null;
     }
+  }
+
+  function cancelGeneration() {
+    abortRef.current?.abort();
   }
 
   return (
     <Modal
       open={open}
-      onClose={step === 'generating' ? () => {} : onClose}
+      onClose={step === 'generating' ? cancelGeneration : onClose}
       title="Add cards from a document"
       description={`New cards are checked against the ${cards.length} already in ${deck.title}.`}
       size="lg"
@@ -201,7 +237,11 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
             </Button>
             <Button onClick={() => setStep('setup')}>Try again</Button>
           </>
-        ) : undefined
+        ) : (
+          <Button variant="ghost" onClick={cancelGeneration}>
+            Cancel generation
+          </Button>
+        )
       }
     >
       {step === 'generating' && (

@@ -91,6 +91,11 @@ export interface SubscriptionRow {
   plan: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  /**
+   * When Stripe says the event behind this row happened. Read back on the next
+   * event to spot one that arrived out of order — see `isStaleEvent`.
+   */
+  last_event_at?: string | null;
 }
 
 export async function subscriptionForUser(
@@ -101,7 +106,14 @@ export async function subscriptionForUser(
   return (data as SubscriptionRow | null) ?? undefined;
 }
 
-/** The way back from a Stripe customer to an account, for events that carry no metadata. */
+/**
+ * The way back from a Stripe customer to an account, for events that carry no
+ * metadata.
+ *
+ * Checks `profiles` as well as `subscriptions`, because the customer is
+ * recorded on the profile the moment a checkout starts — a webhook for a
+ * customer who has not completed one yet would otherwise have nowhere to land.
+ */
 export async function userForCustomer(
   admin: SupabaseClient,
   customerId: string,
@@ -111,7 +123,48 @@ export async function userForCustomer(
     .select('user_id')
     .eq('customer_id', customerId)
     .maybeSingle();
-  return (data as { user_id: string } | null)?.user_id;
+  const fromSubscription = (data as { user_id: string } | null)?.user_id;
+  if (fromSubscription) return fromSubscription;
+
+  const profile = await admin
+    .from('profiles')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  return (profile.data as { id: string } | null)?.id;
+}
+
+/**
+ * The Stripe customer already on file for an account, if there is one.
+ *
+ * Recorded on the profile at checkout rather than only when a payment lands,
+ * so abandoning a checkout and starting another reuses the same customer
+ * instead of leaving a trail of empty ones in the Stripe dashboard.
+ */
+export async function customerForUser(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<string | undefined> {
+  const { data } = await admin
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle();
+  return (data as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? undefined;
+}
+
+/** Remembers the Stripe customer for an account. Best effort: a checkout that
+ *  cannot record it still works, it just may mint a second customer later. */
+export async function rememberCustomer(
+  admin: SupabaseClient,
+  userId: string,
+  customerId: string,
+): Promise<void> {
+  const { error } = await admin
+    .from('profiles')
+    .update({ stripe_customer_id: customerId })
+    .eq('id', userId);
+  if (error) console.error('could not record the Stripe customer', { userId, error: error.message });
 }
 
 /**
@@ -131,7 +184,10 @@ export async function applySubscription(
     .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   if (saved.error) throw new Error(`Could not record the subscription: ${saved.error.message}`);
 
-  const profile = await admin.from('profiles').update({ plan: entitlement }).eq('id', row.user_id);
+  const profile = await admin
+    .from('profiles')
+    .update({ plan: entitlement, stripe_customer_id: row.customer_id })
+    .eq('id', row.user_id);
   if (profile.error) throw new Error(`Could not update the plan: ${profile.error.message}`);
 }
 

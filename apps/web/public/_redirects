@@ -1,0 +1,7 @@
+# Every path serves the app, because routing happens in the browser.
+#
+# Without this a refresh on /app/decks, a bookmarked /privacy, or a link
+# straight to /reset-password asks the host for a file that was never built and
+# gets its 404 page instead of Auto Cards. Netlify and Cloudflare Pages read
+# this file; Vercel reads ../vercel.json.
+/*  /index.html  200

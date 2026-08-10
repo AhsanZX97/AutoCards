@@ -62,8 +62,43 @@ function getApp(): App {
   return singleton;
 }
 
+/**
+ * Says what is missing instead of rendering nothing.
+ *
+ * Without the Supabase pair, `createApp` throws inside the `useMemo` below and
+ * takes the whole tree with it — a deploy that forgot an environment variable
+ * looked exactly like a dead site. This is the one error worth naming
+ * precisely, because the only person who can ever see it is whoever deployed.
+ */
+function ConfigurationNeeded() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div className="w-full max-w-md text-center">
+        <span className="text-4xl">🔌</span>
+        <h1 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">
+          Auto Cards isn&apos;t connected to its database
+        </h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          This build is missing <code className="font-mono text-xs">VITE_SUPABASE_URL</code> and{' '}
+          <code className="font-mono text-xs">VITE_SUPABASE_ANON_KEY</code>. Set both on the
+          deployment and build again.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const app = useMemo(getApp, []);
+  const app = useMemo(() => {
+    try {
+      return getApp();
+    } catch (error) {
+      console.error('[autocards] the app could not start', error);
+      return null;
+    }
+  }, []);
+
+  if (!app) return <ConfigurationNeeded />;
   return <AppContext.Provider value={app}>{children}</AppContext.Provider>;
 }
 

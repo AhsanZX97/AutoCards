@@ -16,8 +16,18 @@ create table public.profiles (
   -- the client sends decides what someone is entitled to.
   plan text not null default 'free' check (plan in ('free','pro','lifetime')),
   is_admin boolean not null default false,
+  -- Recorded the moment a checkout is started, not when a payment lands, so a
+  -- checkout somebody abandoned does not leave a second Stripe customer behind
+  -- for the next attempt. Server-written like the two columns above.
+  stripe_customer_id text,
   created_at timestamptz not null default now()
 );
+
+-- How the webhook resolves a Stripe customer back to an account before there
+-- is any subscription row to look in.
+create unique index profiles_stripe_customer_uidx
+  on public.profiles (stripe_customer_id)
+  where stripe_customer_id is not null;
 
 -- Username handles are the student-facing identity. Uniqueness is enforced on
 -- the lowercased value so "AlexR" and "alexr" can't both exist; sign-up/update
@@ -74,11 +84,16 @@ create trigger cards_owner_from_deck
 
 -- a deck soft-delete cascades to its cards (a plain FK cascade only fires on
 -- a hard DELETE, which never happens here).
+--
+-- `updated_at` moves with `deleted_at`, because pulls page through
+-- `updated_at` — a tombstone written without it is one no incremental pull can
+-- ever see, leaving the card rows unable to carry their own deletion.
 create function public.cascade_deck_delete() returns trigger
 language plpgsql as $$
 begin
   if new.deleted_at is not null and old.deleted_at is null then
-    update public.cards set deleted_at = new.deleted_at
+    update public.cards
+      set deleted_at = new.deleted_at, updated_at = new.deleted_at
     where deck_id = new.id and deleted_at is null;
   end if;
   return new;

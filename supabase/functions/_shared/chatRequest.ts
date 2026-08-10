@@ -32,14 +32,26 @@ export const ALLOWED_MODEL_IDS = [
  */
 export const MAX_TEXT_CHARS = 150_000;
 
-/** Mirrors `MAX_IMAGES` in `services/documents/selectImages.ts`. */
-export const MAX_IMAGES = 8;
+/**
+ * Mirrors `MAX_IMAGES_PER_RUN` in `services/llm/openRouter.ts` — the *run*
+ * limit, not the per-document one.
+ *
+ * These were mismatched: the client picks up to 8 pictures out of each file
+ * and then caps the whole run at 12, while this refused anything above 8. A
+ * generation reading two illustrated slide decks therefore failed at the door
+ * every time. The run limit is the one that bounds a single request, so it is
+ * the one to mirror here.
+ */
+export const MAX_IMAGES = 12;
 
 /**
- * Ceiling on the data URLs. The client caps the pictures it picks at 4MB of
- * raw bytes, which is roughly 5.4MB once base64 encoded.
+ * Ceiling on the data URLs.
+ *
+ * The client caps each document's pictures at 4MB of raw bytes — roughly 5.4MB
+ * base64 — and a run can draw from more than one file. This leaves room for
+ * two full-size documents' worth without accepting an unbounded payload.
  */
-export const MAX_IMAGE_URL_CHARS = 6_000_000;
+export const MAX_IMAGE_URL_CHARS = 10_000_000;
 
 /** Mirrors `MAX_OUTPUT_TOKENS` in `services/llm/openRouter.ts`. */
 export const MAX_OUTPUT_TOKENS = 32_000;

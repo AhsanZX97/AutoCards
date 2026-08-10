@@ -233,12 +233,16 @@ function describeSubscription(subscription: AccountSubscription): string {
  * webhook has reached us — so the plan on screen would still say free. Rather
  * than show that and be wrong, the session is re-read a few times until the
  * upgrade lands.
+ *
+ * Waits for the plan they actually bought, not merely for something other than
+ * free. Watching for "not free" meant a Pro subscriber buying Lifetime matched
+ * on the very first read and was congratulated on the plan they already had.
  */
-async function waitForUpgrade(app: App): Promise<Plan | null> {
+async function waitForUpgrade(app: App, purchased: Plan): Promise<Plan | null> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await app.authStore.getState().restore();
     const plan = app.authStore.getState().session?.user.plan;
-    if (plan && plan !== 'free') return plan;
+    if (plan === purchased) return plan;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   return null;
@@ -276,10 +280,18 @@ function BillingTab() {
     const outcome = params.get('checkout');
     if (!outcome) return;
 
+    // What checkout says was bought — see the success URL in
+    // `create-checkout-session`.
+    const purchasedParam = params.get('plan');
+    const purchased: Plan = PURCHASABLE_PLANS.includes(purchasedParam as Plan)
+      ? (purchasedParam as Plan)
+      : 'pro';
+
     // Cleared straight away so a refresh does not replay the message, and so a
     // bookmarked settings URL is not permanently mid-checkout.
     const next = new URLSearchParams(params);
     next.delete('checkout');
+    next.delete('plan');
     setParams(next, { replace: true });
 
     if (outcome === 'cancelled') {
@@ -289,7 +301,7 @@ function BillingTab() {
     if (outcome !== 'success') return;
 
     setActivating(true);
-    void waitForUpgrade(app)
+    void waitForUpgrade(app, purchased)
       .then((upgraded) => {
         toast(
           upgraded
@@ -329,6 +341,23 @@ function BillingTab() {
         title: error instanceof Error ? error.message : 'Could not start the checkout.',
       });
       setStarting(null);
+    }
+  }
+
+  /**
+   * The admin comp path. `admin_set_plan` refuses a non-admin server-side, and
+   * this used to be called without awaiting or catching — so the refusal
+   * rejected into nothing and the button looked like it had worked.
+   */
+  async function comp(plan: Plan) {
+    try {
+      await changePlan(plan);
+      toast({ variant: 'success', title: `Switched to ${plan}` });
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: error instanceof Error ? error.message : 'Could not change that plan.',
+      });
     }
   }
 
@@ -434,7 +463,12 @@ function BillingTab() {
                   </Button>
                 )}
                 {!isCurrent && canSwitchPlans && (
-                  <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => changePlan(plan)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={() => void comp(plan)}
+                  >
                     Switch to {plan}
                   </Button>
                 )}

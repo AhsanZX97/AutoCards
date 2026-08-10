@@ -1,12 +1,5 @@
-import { useState } from 'react';
-import {
-  SHARE_CODE_MAX_LENGTH,
-  encodeShareCode,
-  serializeDeckExport,
-  shareUrlForDeck,
-  slugify,
-} from '@autocards/core';
-import { Button, Input, Modal } from '../../components/ui';
+import { serializeDeckExport, slugify } from '@autocards/core';
+import { Button, Modal } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useApp } from '../../lib/appContext';
 
@@ -16,31 +9,25 @@ interface DeckShareModalProps {
   deckId: string;
 }
 
+/**
+ * Sends a deck somewhere else, as a file.
+ *
+ * There used to be a share link alongside this, with the whole deck packed
+ * into a `?deck=` query parameter. It could not be made to work: a deck of any
+ * real size produced a URL past what hosts and CDNs accept, so the recipient
+ * got a server error rather than a deck — and the ones short enough to survive
+ * still broke whenever a signed-out recipient was bounced through sign-in. A
+ * file has none of those limits and works offline, so it is the whole feature.
+ */
 export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
   const app = useApp();
-  const [copied, setCopied] = useState(false);
 
   if (!open) return null;
 
   const payload = app.deckStore.getState().getDeckExport(deckId);
   if (!payload) return null;
-  // Capture the narrowed value so closures (download, copyLink) see DeckExport.
+  // Capture the narrowed value so the download closure sees a DeckExport.
   const data = payload;
-
-  const shareUrl = shareUrlForDeck(payload, `${window.location.origin}/app/decks`);
-  const codeLength = encodeShareCode(payload).length;
-  const tooLong = codeLength > SHARE_CODE_MAX_LENGTH;
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast({ variant: 'success', title: 'Share link copied' });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast({ variant: 'error', title: 'Could not copy link' });
-    }
-  }
 
   function download() {
     const blob = new Blob([serializeDeckExport(data)], { type: 'application/json' });
@@ -52,7 +39,12 @@ export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    toast({ variant: 'success', title: 'Deck downloaded' });
+    toast({
+      variant: 'success',
+      title: 'Deck downloaded',
+      description: 'Send the file on — they can import it from their deck library.',
+    });
+    onClose();
   }
 
   return (
@@ -65,41 +57,27 @@ export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Done
+            Cancel
           </Button>
           <Button onClick={download}>Download .json</Button>
         </>
       }
     >
-      <div className="space-y-5">
-        <div>
-          <p className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">Share link</p>
-          <p className="mb-2 text-xs text-slate-400">
-            Anyone with the link can import this deck into their own library. Cards arrive with a fresh
-            study schedule, so your mastery stays yours.
-          </p>
-          <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} />
-          <Button variant="outline" className="mt-2 w-full" onClick={copyLink}>
-            {copied ? 'Copied!' : 'Copy share link'}
-          </Button>
-          {tooLong && (
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              This deck is large, so the link is very long and some apps may truncate it. Download the file
-              instead to share it reliably.
-            </p>
-          )}
-        </div>
-
-        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-          <p className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">Export as a file</p>
-          <p className="mb-2 text-xs text-slate-400">
-            A single <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-800">.json</code>{' '}
-            file you can keep or send anywhere. Re-import it any time from the deck library.
-          </p>
-          <Button variant="outline" className="w-full" onClick={download}>
-            Download .json
-          </Button>
-        </div>
+      <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+        <p>
+          This saves the deck as a single{' '}
+          <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-800">.json</code>{' '}
+          file. Send it however you like — email, a chat, a shared drive — and whoever receives it
+          can bring it in from{' '}
+          <span className="font-medium text-slate-800 dark:text-slate-100">
+            My Decks → Import deck
+          </span>
+          .
+        </p>
+        <p className="text-xs text-slate-400">
+          Cards arrive with a fresh study schedule, so your mastery, streak and review history stay
+          yours. The file works offline and doesn&apos;t expire.
+        </p>
       </div>
     </Modal>
   );

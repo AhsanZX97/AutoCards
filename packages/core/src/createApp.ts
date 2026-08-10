@@ -88,7 +88,15 @@ export function createApp(options: CreateAppOptions) {
     ? new SupabaseAccountBackend(options.supabase)
     : null;
 
-  const authStore = createAuthStore(auth, options.storage);
+  // Declared up front so the auth store can reach the engine that does not
+  // exist yet: signing out has to push the outbox before local state is wiped,
+  // and only the engine knows how. Without a backend there is nothing to
+  // flush, so sign-out is never blocked.
+  let syncEngine: SyncEngine | null = null;
+
+  const authStore = createAuthStore(auth, options.storage, {
+    flushBeforeSignOut: async () => (syncEngine ? syncEngine.flushPending() : true),
+  });
   const syncStore = options.supabase ? createSyncStore(options.storage) : null;
   const deckStore = createDeckStore(options.storage, (ops) => syncStore?.getState().enqueue(ops));
   const studyStore = createStudyStore(deckStore, options.storage, (ops) =>
@@ -97,7 +105,6 @@ export function createApp(options: CreateAppOptions) {
   const usageStore = createUsageStore(options.storage);
   const tourStore = createTourStore(options.storage);
 
-  let syncEngine: SyncEngine | null = null;
   if (options.supabase) {
     syncEngine = new SyncEngine({
       authStore,
@@ -110,12 +117,18 @@ export function createApp(options: CreateAppOptions) {
     syncEngine.start();
     // Keep the store in step with Supabase's own session lifecycle (silent
     // token refresh, sign-in/out) rather than only when restore() runs.
+    //
+    // `fromProvider` matters most for password recovery: the link in the email
+    // is consumed by the Supabase client on page load, which fires here with a
+    // session the app has never persisted. Without the flag, restore() sees an
+    // empty store, concludes signed-out, and the reset page reports a link that
+    // is in fact perfectly good as expired.
     options.supabase.auth.onAuthStateChange((_event, supabaseSession) => {
       if (!supabaseSession) {
         authStore.getState().syncFromProvider(null);
         return;
       }
-      void authStore.getState().restore();
+      void authStore.getState().restore({ fromProvider: true });
     });
   }
 

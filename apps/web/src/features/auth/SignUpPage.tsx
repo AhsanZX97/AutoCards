@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { MIN_PASSWORD_LENGTH } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Field, Input } from '../../components/ui';
 
@@ -71,10 +72,11 @@ export function SignUpPage() {
             error={errorField === 'email' ? error ?? undefined : undefined}
           />
         </Field>
-        <Field label="Password" hint="8+ characters">
+        <Field label="Password" hint={`${MIN_PASSWORD_LENGTH}+ characters`}>
           <Input
             type="password"
             required
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

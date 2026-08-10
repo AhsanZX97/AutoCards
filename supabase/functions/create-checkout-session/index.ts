@@ -2,7 +2,13 @@ import { checkoutMode, isOneTimePlan, ownsOutright, priceForPlan, readPriceMap }
 import { failure, json, preflight } from '../_shared/http.ts';
 import { isPlan } from '../_shared/plans.ts';
 import { appUrl, stripeClient } from '../_shared/stripe.ts';
-import { adminClient, authenticate, subscriptionForUser } from '../_shared/supabase.ts';
+import {
+  adminClient,
+  authenticate,
+  customerForUser,
+  rememberCustomer,
+  subscriptionForUser,
+} from '../_shared/supabase.ts';
 
 /** Names this checkout flow in the Stripe dashboard. */
 const CHECKOUT_LABEL = 'autocards-plan-qhzlkwtn';
@@ -75,14 +81,19 @@ Deno.serve(async (request) => {
       return failure('You already own Auto Cards for life, so there is nothing left to buy.', 400, 'bad_request');
     }
 
-    const customer =
-      existing?.customer_id ??
-      (
+    // The customer is remembered on the profile as soon as one is made, not
+    // only once a payment lands. Without that, every abandoned checkout minted
+    // a fresh customer and the Stripe dashboard filled up with empty ones.
+    let customer = existing?.customer_id ?? (await customerForUser(admin, caller.id));
+    if (!customer) {
+      customer = (
         await stripe.customers.create({
           ...(caller.email ? { email: caller.email } : {}),
           metadata: { user_id: caller.id },
         })
       ).id;
+      await rememberCustomer(admin, caller.id, customer);
+    }
 
     const oneTime = isOneTimePlan(plan);
     const session = await stripe.checkout.sessions.create({
@@ -110,7 +121,10 @@ Deno.serve(async (request) => {
             invoice_creation: { enabled: true },
           }
         : { subscription_data: { metadata: { user_id: caller.id } } }),
-      success_url: `${appUrl()}/app/settings?checkout=success`,
+      // The plan travels back so the settings page knows what to wait for.
+      // Watching only for "no longer free" congratulated a Pro subscriber who
+      // had just bought lifetime on being on Pro.
+      success_url: `${appUrl()}/app/settings?checkout=success&plan=${plan}`,
       cancel_url: `${appUrl()}/app/settings?checkout=cancelled`,
       allow_promotion_codes: true,
     });

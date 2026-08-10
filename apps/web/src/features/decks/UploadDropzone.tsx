@@ -2,8 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import {
   DOCUMENT_KIND_ICONS,
   UPLOAD_ACCEPT,
+  describeOversized,
   describeUnsupported,
   documentKindOf,
+  formatFileSize,
+  isOversizedUpload,
   isSupportedDocument,
 } from '@autocards/core';
 import { Button } from '../../components/ui';
@@ -43,11 +46,19 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
 
       const accepted: File[] = [];
       const rejected: string[] = [];
+      const oversized: File[] = [];
       let duplicates = 0;
 
       for (const file of Array.from(incoming)) {
         if (!isSupportedDocument(file.name)) {
           rejected.push(file.name);
+          continue;
+        }
+        // Turned away here rather than at extraction time: reading one of
+        // these means pulling the whole file into memory and parsing it on the
+        // main thread, which does not fail so much as freeze the tab.
+        if (isOversizedUpload(file.size)) {
+          oversized.push(file);
           continue;
         }
         // Same name and size twice is the same file picked twice, which costs
@@ -65,6 +76,13 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
 
       for (const name of rejected) {
         toast({ variant: 'error', title: 'Cannot read that file', description: describeUnsupported(name) });
+      }
+      for (const file of oversized) {
+        toast({
+          variant: 'error',
+          title: 'That file is too big',
+          description: describeOversized(file.name, file.size),
+        });
       }
       if (duplicates > 0) {
         toast({
@@ -106,7 +124,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
               <span className="text-xl">{DOCUMENT_KIND_ICONS[documentKindOf(file.name) ?? 'pdf']}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{file.name}</p>
-                <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+                <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => removeAt(index)}>
                 Remove
@@ -166,9 +184,4 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
       />
     </div>
   );
-}
-
-function formatSize(bytes: number): string {
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }

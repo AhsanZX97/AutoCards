@@ -3,6 +3,22 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
 import { Button, Field, Input } from '../../components/ui';
 
+/**
+ * Where to land after signing in, rebuilt from the location `RequireAuth`
+ * stored.
+ *
+ * The query string and fragment are part of that destination, not decoration —
+ * reading only `pathname` dropped them, which is how anything carrying state
+ * in the URL lost it the moment sign-in stood in the way.
+ */
+function returnTo(state: unknown): string {
+  const from = (state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
+  if (!from?.pathname) return '/app';
+  // Only ever an internal path — this comes from our own router state, and a
+  // relative path cannot be turned into an off-site redirect.
+  return `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`;
+}
+
 export function SignInPage() {
   const app = useApp();
   const navigate = useNavigate();
@@ -18,10 +34,7 @@ export function SignInPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const ok = await signIn({ email, password });
-    if (ok) {
-      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/app';
-      navigate(from, { replace: true });
-    }
+    if (ok) navigate(returnTo(location.state), { replace: true });
   }
 
   return (
@@ -49,6 +62,14 @@ export function SignInPage() {
             error={errorField === 'password' ? error ?? undefined : undefined}
           />
         </Field>
+        <div className="flex justify-end">
+          <Link
+            to="/forgot-password"
+            className="text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-400"
+          >
+            Forgot your password?
+          </Link>
+        </div>
         {error && !errorField && <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>}
         <Button type="submit" className="w-full" loading={status === 'loading'}>
           Sign in

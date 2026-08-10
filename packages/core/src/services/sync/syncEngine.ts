@@ -1,9 +1,9 @@
-import { nowIso } from '../../lib/date';
 import type { AuthStore } from '../../store/authStore';
 import type { DeckStore } from '../../store/deckStore';
 import type { StudyStore } from '../../store/studyStore';
 import { syncOpKey, type SyncStore } from '../../store/syncStore';
-import type { Deck, Flashcard, Id, IsoDate, RemoteRow, SessionSummary } from '../../types';
+import type { Deck, Flashcard, Id, IsoDate, SessionSummary } from '../../types';
+import { nextCursor } from './cursor';
 import { resolveMerge } from './mergePolicy';
 import type { SyncBackend } from './syncBackend';
 
@@ -66,6 +66,25 @@ export class SyncEngine {
    *  that wants an immediate, known-flushed state) can wait for completion. */
   async syncNow(): Promise<void> {
     await this.sync();
+  }
+
+  /**
+   * Pushes whatever is waiting and reports whether the outbox came out empty.
+   *
+   * Called before sign-out, which is the one moment local state is about to be
+   * thrown away: anything still queued at that point would be lost outright,
+   * and the server's older copy would come back in its place next time the
+   * account signed in.
+   *
+   * False means something is still queued — offline, or the push failed — and
+   * the caller has to decide whether losing it is acceptable.
+   */
+  async flushPending(): Promise<boolean> {
+    if (Object.keys(this.syncStore.getState().pendingOps).length === 0) return true;
+    if (!this.ownerId) return false;
+
+    await this.flush(this.ownerId);
+    return Object.keys(this.syncStore.getState().pendingOps).length === 0;
   }
 
   private onAuthState(status: string, userId: Id | null): void {
@@ -178,10 +197,6 @@ export class SyncEngine {
 
   private async pull(ownerId: Id): Promise<void> {
     const since = this.syncStore.getState().lastPulledAt;
-    // Capture the cursor *before* the round trip so rows written while this
-    // pull is in flight aren't silently skipped; the realtime subscription
-    // would catch them anyway, but this removes the window.
-    const cursorAt: IsoDate = nowIso();
     try {
       const changes = await this.backend.pull(ownerId, since);
 
@@ -211,7 +226,18 @@ export class SyncEngine {
         this.studyStore.getState().applyRemoteSession(row.data);
       }
 
-      this.syncStore.getState().setLastPulledAt(cursorAt);
+      // Advanced to the newest row the *server* stamped, never to this
+      // device's idea of now — see `nextCursor`. A pull that returned nothing
+      // leaves the cursor exactly where it was.
+      const seen: IsoDate[] = [
+        ...changes.decks.map((row) => row.updatedAt),
+        ...changes.cards.map((row) => row.updatedAt),
+        ...changes.sessions.map((row) => row.updatedAt),
+      ];
+      const advanced = nextCursor(since, seen);
+      if (advanced !== null && advanced !== since) {
+        this.syncStore.getState().setLastPulledAt(advanced);
+      }
     } catch (err) {
       this.syncStore.getState().setStatus('error', err instanceof Error ? err.message : 'Sync failed.');
     }

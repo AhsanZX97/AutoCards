@@ -42,11 +42,11 @@ holds the key, checks the caller's plan and counts the upload in Postgres before
 
 ## What's implemented
 
-**Flashcards:** six types (basic, reversed, cloze deletion, multiple choice, true/false, type-the-answer), each with difficulty, priority, categories, tags, hints, explanations, starring, suspension, and manual weighting.
+**Flashcards:** four types (basic, multiple choice, true/false, type-the-answer), each with difficulty, priority, categories, tags, hints, explanations, starring, suspension, and manual weighting. Reversed and cloze cards were retired; a shared deck that still contains cloze cards is read into plain question/answer pairs on import rather than rejected.
 
 **Generation:** upload a PDF, tune card count/types/difficulty/instructions, watch a staged progress indicator, land on a generated deck. `RoutingLlmService` decides per call where the work goes: normally to `EdgeLlmService`, which posts to the `generate-deck` function; to `OpenRouterLlmService` if someone has supplied their own key, since that is their own money. With neither it throws `LlmConfigError` rather than degrading to canned content.
 
-Model output is never trusted. `normalizeGeneratedCards` repairs what a model actually returns (assigning choice ids, marking the correct answer from a `correctIndex` or a matching `back`, defaulting `acceptedAnswers`, filling cloze front/back from the `{{c1::}}` markers), demotes a card to `basic` when its claimed type can't be honoured, and drops it only when even that fails. Invented card types, missing choices and unparseable JSON therefore produce a plainer deck rather than cards the study runner can't render or grade.
+Model output is never trusted. `normalizeGeneratedCards` repairs what a model actually returns (assigning choice ids, marking the correct answer from a `correctIndex` or a matching `back`, defaulting `acceptedAnswers`), demotes a card to `basic` when its claimed type can't be honoured, and drops it only when even that fails. Invented card types, missing choices and unparseable JSON therefore produce a plainer deck rather than cards the study runner can't render or grade.
 
 **Plans and billing:** free, pro ($4/month) and lifetime ($39 once), with the monthly generation allowance counted in Postgres rather than in the browser. Upgrading opens Stripe Checkout through `create-checkout-session`, which asks by *plan* and never by price; `stripe-webhook` is the only thing that writes `profiles.plan`, and it claims each event id once so a Stripe redelivery cannot apply twice. A failed card keeps access while Stripe retries, and drops it when Stripe gives up. Lifetime is a `payment`-mode checkout rather than a subscription, and `ownsOutright` stops any later subscription event revoking a plan somebody owns.
 
@@ -59,20 +59,23 @@ Model output is never trusted. `normalizeGeneratedCards` repairs what a model ac
 **Stats:** streaks (with "at risk today" detection), a 12-week activity heatmap, per-deck performance, and an achievements grid.
 
 **Sharing & import/export:** decks leave one account and re-enter another as a self-contained
-`DeckExport` (`packages/core/src/lib/deckTransfer.ts`). A deck can be **exported** as a
-`.autocards.json` file or **shared** as a link whose `?deck=` query parameter carries a URL-safe
-base64 code of the same payload. Opening that link prompts the receiver to import it. On import the
+`DeckExport` (`packages/core/src/lib/deckTransfer.ts`). A deck is **exported** as a
+`.autocards.json` file, which the receiver imports from their own deck library. On import the
 deck, category and card ids are all remapped to fresh ones, so nothing collides with ids the
 receiving account already owns, and cards start on a new SRS schedule: the export deliberately
 carries card *content* (the `CardDraft`), never the sharer's mastery or review state.
 
+There is no share *link*. One existed, carrying the whole deck in a `?deck=` query parameter, and it
+could not be made to work: any deck of real size produced a URL longer than hosts and CDNs accept,
+so the recipient got a server error instead of a deck. A file has no length limit, works offline,
+and doesn't expire.
+
 The export format is versioned (`format: "autocards-deck"`, `version: 1`) and, like model output,
 parse-time normalization repairs what it can (bad enum values, unmarked choice ids, cloze markers
 that need filling in) and drops only cards that can't be salvaged, so a hand-edited or third-party
-file degrades into a plainer deck rather than a broken one. Large decks are warned about on the web
-(some chat apps truncate very long URLs) and a file export is offered as the reliable alternative.
-Web wiring lives in the deck detail share modal, the library's import button, and
-`ImportSharedDeck`; mobile uses the native share sheet and `expo-document-picker`.
+file degrades into a plainer deck rather than a broken one. Web wiring lives in the deck detail
+share modal and the library's import button; mobile uses the native share sheet and
+`expo-document-picker`.
 
 ## What's still mocked
 
@@ -85,7 +88,7 @@ Web wiring lives in the deck detail share modal, the library's import button, an
 
 ### The PDF extractor
 
-`BrowserPdfExtractor` (`packages/core/src/services/pdf`) parses the document with `pdf.js`, walking
+`BrowserPdfExtractor` (`packages/core/src/services/documents`) parses the document with `pdf.js`, walking
 every page's text content rather than scanning for `Tj`/`TJ` operators in the raw bytes. That way
 Flate-compressed content streams, which are how the vast majority of real PDFs are encoded, read
 correctly. Scanned/image-only PDFs still have no text layer for `pdf.js` to find, so that case is
@@ -93,15 +96,25 @@ still flagged rather than papered over: the extractor marks the document `synthe
 `ChatCompletionLlmService` refuses it up front with "no text could be read out of …" instead of
 billing you for cards written about a placeholder.
 
+`pdf.js` is loaded on first use rather than imported at the top of the file. It is the heaviest
+dependency here by a wide margin and only one screen needs it, so a dynamic import keeps it out of
+the bundle everyone downloads.
+
+Uploads are capped at 25MB per file (`MAX_UPLOAD_BYTES`), checked when the file is picked. Reading
+one means holding it in memory and parsing it on the main thread, so a larger file does not fail so
+much as freeze the tab.
+
 ## Testing
 
-`packages/core` has 200 vitest unit tests covering the shuffle/filter engine, scoring math, SRS
+`packages/core` has 600+ vitest unit tests covering the shuffle/filter engine, scoring math, SRS
 scheduling, stats aggregation, model-output normalization, both generation transports (against a
 stubbed `fetch`: request shape, error mapping, cancellation, quota exhaustion, and the
 fenced/prose JSON a model actually returns), Supabase auth, and deck sync. The Edge Functions'
 request clamping is tested by the same runner, which also fails if their copy of the plan limits
-drifts from the app's. Deck transfer is covered too: export/parse
-round-trips, lenient normalization of malformed input, and lossless unicode base64 share-code
-round-trips. The web app was smoke-tested end to end in a real browser. The mobile app typechecks
-cleanly against the same core but hasn't been run in a simulator in this environment, so review it
-before shipping.
+drifts from the app's. Deck transfer is covered too: export/parse round-trips and lenient
+normalization of malformed input. The web app was smoke-tested end to end in a real browser.
+
+The mobile app is **not** currently shippable and is excluded from the web release: `npm run
+typecheck` fails for it, because the core barrel pulls `pdf.js` (and its `import.meta` usage) into a
+bundle Hermes cannot evaluate. Deck generation there is also a stub. Both are deliberately left for
+after the web launch.

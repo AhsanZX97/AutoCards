@@ -1,6 +1,8 @@
 import {
   entitledPlan,
+  eventTimestamp,
   isHandled,
+  isStaleEvent,
   ownsOutright,
   paymentSettled,
   planForPrice,
@@ -105,6 +107,10 @@ async function handle(
   stripe: ReturnType<typeof stripeClient>,
   event: { type: string; data: { object: unknown } },
 ): Promise<void> {
+  // When Stripe says this happened, carried through so a delivery that arrived
+  // out of order can be recognised as older than what is already on file.
+  const occurredAt = eventTimestamp(event);
+
   if (
     event.type === 'checkout.session.completed' ||
     event.type === 'checkout.session.async_payment_succeeded'
@@ -119,7 +125,7 @@ async function handle(
     // mention it. This one event is the whole of what we are told.
     const purchase = readCheckoutPurchase(event.data.object);
     if (purchase) {
-      await grant(admin, purchase);
+      await grant(admin, purchase, occurredAt);
       return;
     }
 
@@ -133,14 +139,14 @@ async function handle(
     // The session carries only the subscription's id, so the subscription
     // itself has to be fetched to know what was actually bought.
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    await apply(admin, subscription, session.client_reference_id ?? undefined);
+    await apply(admin, subscription, session.client_reference_id ?? undefined, occurredAt);
     return;
   }
 
   // customer.subscription.created / updated / deleted all carry the
   // subscription itself, including the cancelled state — `deleted` arrives
   // with status 'canceled', which reads as no entitlement like any other.
-  await apply(admin, event.data.object, undefined);
+  await apply(admin, event.data.object, undefined, occurredAt);
 }
 
 /**
@@ -150,7 +156,11 @@ async function handle(
  * subscription id and no period end — that pair is what `ownsOutright` reads
  * to know this entitlement has no expiry and must not be revoked.
  */
-async function grant(admin: SupabaseClient, purchase: PurchaseFacts): Promise<void> {
+async function grant(
+  admin: SupabaseClient,
+  purchase: PurchaseFacts,
+  occurredAt: string | undefined,
+): Promise<void> {
   if (!paymentSettled(purchase.paymentStatus)) {
     // A bank debit that has not cleared. Stripe follows up with
     // `checkout.session.async_payment_succeeded`, and that is when it counts.
@@ -177,6 +187,7 @@ async function grant(admin: SupabaseClient, purchase: PurchaseFacts): Promise<vo
       plan: purchase.plan,
       current_period_end: null,
       cancel_at_period_end: false,
+      last_event_at: occurredAt ?? null,
     },
     purchase.plan,
   );
@@ -186,6 +197,7 @@ async function apply(
   admin: SupabaseClient,
   rawSubscription: unknown,
   userIdHint: string | undefined,
+  occurredAt: string | undefined,
 ): Promise<void> {
   const facts: SubscriptionFacts | undefined = readSubscription(rawSubscription);
   if (!facts) {
@@ -221,6 +233,20 @@ async function apply(
     return;
   }
 
+  // Stripe guarantees delivery, not order. An update held up in a retry can
+  // land after a newer one, and applying it would roll the account back to a
+  // state it has already left — cancelling someone who has resubscribed, or
+  // restoring a plan they just dropped.
+  if (isStaleEvent(existing?.last_event_at, occurredAt)) {
+    console.log('ignored a Stripe event older than the one already applied', {
+      user: userId,
+      subscription: facts.subscriptionId,
+      applied: existing?.last_event_at,
+      arrived: occurredAt,
+    });
+    return;
+  }
+
   const purchased = planForPrice(facts.priceId, readPriceMap((key) => Deno.env.get(key)));
   const entitlement = entitledPlan(facts.status, purchased);
 
@@ -235,6 +261,7 @@ async function apply(
       plan: purchased,
       current_period_end: facts.currentPeriodEnd ?? null,
       cancel_at_period_end: facts.cancelAtPeriodEnd,
+      last_event_at: occurredAt ?? null,
     },
     entitlement,
   );

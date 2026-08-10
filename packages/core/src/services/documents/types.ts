@@ -61,6 +61,47 @@ const UNSUPPORTED_EXTENSIONS: Record<string, string> = {
   key: 'Keynote files cannot be read here. Export the deck as a PDF or PowerPoint file and upload that.',
 };
 
+/**
+ * The largest file this app will try to read.
+ *
+ * Not a plan limit — a browser one. Extraction pulls the whole file into
+ * memory as an `ArrayBuffer` and pdf.js parses it on the main thread, so a
+ * genuinely large upload does not fail, it freezes the tab. 25MB clears a
+ * scanned chapter or an image-heavy slide deck, which are the biggest things
+ * people actually upload, and stops the rest before anything is read.
+ */
+export const MAX_UPLOAD_BYTES = 25_000_000;
+
+/**
+ * Whether a file is too large to read here.
+ *
+ * A missing or nonsensical size reads as fine: some browsers report 0 for a
+ * file picked from a network drive, and refusing on that would block a
+ * perfectly readable upload. The extractor still fails on its own if it turns
+ * out to be unreadable.
+ */
+export function isOversizedUpload(size: number): boolean {
+  if (!Number.isFinite(size) || size <= 0) return false;
+  return size > MAX_UPLOAD_BYTES;
+}
+
+/** File size in the units a file picker shows, e.g. `2.4 MB` or `47 KB`. */
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes >= 1_000_000) {
+    const megabytes = bytes / 1_000_000;
+    return `${megabytes >= 10 ? Math.round(megabytes) : megabytes.toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** Why a file was too big, with both numbers so the gap is obvious. */
+export function describeOversized(filename: string, size: number): string {
+  return `${filename} is ${formatFileSize(size)}, and the limit is ${formatFileSize(
+    MAX_UPLOAD_BYTES,
+  )} per file. Split it up, or upload a smaller export of it.`;
+}
+
 export function extensionOf(filename: string): string {
   const match = /\.([^.]+)$/.exec(filename.trim().toLowerCase());
   return match?.[1] ?? '';

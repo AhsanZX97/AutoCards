@@ -5,6 +5,25 @@ import type { PulledChanges, SyncBackend } from './syncBackend';
 
 const EPOCH: IsoDate = new Date(0).toISOString();
 
+/**
+ * Rows per request.
+ *
+ * PostgREST caps a response at 1,000 rows by default and says nothing about
+ * having done so. Asking for everything in one query therefore returned a
+ * silently truncated page, and the engine then advanced its cursor past the
+ * rows it never received — a new device belonging to anyone with a decent
+ * library lost the remainder for good. Staying under the cap and paging is
+ * what makes a full pull actually full.
+ */
+const PAGE_SIZE = 500;
+
+/**
+ * Hard stop on paging, so a bug upstream cannot spin here forever. At this
+ * size it is not a real library, so it fails loudly rather than truncating —
+ * the cursor stays put and the next pass starts over.
+ */
+const MAX_PAGES = 200;
+
 interface Row<T> {
   id: string;
   updated_at: string;
@@ -27,31 +46,62 @@ export class SupabaseSyncBackend implements SyncBackend {
 
   async pull(ownerId: Id, since: IsoDate | null): Promise<PulledChanges> {
     const sinceIso = since ?? EPOCH;
-    const [decksRes, cardsRes, sessionsRes] = await Promise.all([
-      this.client
-        .from('decks')
-        .select('id,updated_at,deleted_at,data')
-        .eq('owner_id', ownerId)
-        .gt('updated_at', sinceIso),
-      this.client
-        .from('cards')
-        .select('id,updated_at,deleted_at,data')
-        .eq('owner_id', ownerId)
-        .gt('updated_at', sinceIso),
-      this.client
-        .from('study_sessions')
-        .select('id,updated_at,data')
-        .eq('owner_id', ownerId)
-        .gt('updated_at', sinceIso),
+    const [decks, cards, sessions] = await Promise.all([
+      this.fetchPaged<Row<Deck>>('decks', 'id,updated_at,deleted_at,data', ownerId, sinceIso),
+      this.fetchPaged<Row<Flashcard>>('cards', 'id,updated_at,deleted_at,data', ownerId, sinceIso),
+      this.fetchPaged<Omit<Row<SessionSummary>, 'deleted_at'>>(
+        'study_sessions',
+        'id,updated_at,data',
+        ownerId,
+        sinceIso,
+      ),
     ]);
-    if (decksRes.error) throw decksRes.error;
-    if (cardsRes.error) throw cardsRes.error;
-    if (sessionsRes.error) throw sessionsRes.error;
     return {
-      decks: (decksRes.data as Row<Deck>[]).map(toRemoteRow),
-      cards: (cardsRes.data as Row<Flashcard>[]).map(toRemoteRow),
-      sessions: (sessionsRes.data as Omit<Row<SessionSummary>, 'deleted_at'>[]).map(toSessionRow),
+      decks: decks.map(toRemoteRow),
+      cards: cards.map(toRemoteRow),
+      sessions: sessions.map(toSessionRow),
     };
+  }
+
+  /**
+   * Every row in one table since the cursor, however many pages that takes.
+   *
+   * Ordered by `updated_at` — with `id` breaking ties so paging is stable
+   * across requests — because the engine derives its next cursor from the
+   * newest row it saw. Ascending order is what makes that safe: whatever a
+   * page did not reach has a later timestamp, so the cursor never advances
+   * past a row that was not returned.
+   *
+   * The window is inclusive (`gte`). A row committed in the last moments of
+   * the previous pull may not have been visible then, and every merge is
+   * idempotent, so re-reading the boundary costs a few rows and closes the gap.
+   */
+  private async fetchPaged<T>(
+    table: string,
+    columns: string,
+    ownerId: Id,
+    sinceIso: IsoDate,
+  ): Promise<T[]> {
+    const rows: T[] = [];
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const from = page * PAGE_SIZE;
+      const { data, error } = await this.client
+        .from(table)
+        .select(columns)
+        .eq('owner_id', ownerId)
+        .gte('updated_at', sinceIso)
+        .order('updated_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+
+      const batch = (data ?? []) as T[];
+      rows.push(...batch);
+      if (batch.length < PAGE_SIZE) return rows;
+    }
+    throw new Error(
+      `Reading ${table} needed more than ${MAX_PAGES * PAGE_SIZE} rows, which should not happen.`,
+    );
   }
 
   async pushDecks(ownerId: Id, decks: Deck[]): Promise<void> {

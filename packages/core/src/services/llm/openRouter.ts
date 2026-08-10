@@ -560,7 +560,7 @@ function describeMultipleDocuments(count: number): string {
  * eight images each would be forty pictures and several dollars. The run-level
  * cap is what the user is actually billed against, so it is enforced here.
  */
-const MAX_IMAGES_PER_RUN = 12;
+export const MAX_IMAGES_PER_RUN = 12;
 
 interface LabelledImage {
   image: DocumentImage;
