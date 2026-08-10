@@ -14,3 +14,6 @@ web-build/
 android/
 ios/
 .playwright-mcp/
+
+.vercel
+.env*
