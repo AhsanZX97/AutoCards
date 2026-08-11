@@ -71,7 +71,11 @@ if (!title) {
   process.exit(1);
 }
 
-const message = [title, "", body].join("\n").trim();
+const AGENT_INSTRUCTIONS = `---
+
+You are running unattended in CI with no shell access to external services — you can only read and edit files in this repo. If finishing this task requires something you can't do by editing files (running a CLI like \`supabase db push\` or \`stripe\` commands, changing a dashboard setting, adding an environment variable or secret, deploying an Edge Function), do not attempt it and do not pretend it's done. Instead write exact, copy-pasteable step-by-step instructions for a human into a new file at .notion-agent/MANUAL_STEPS.md, including the precise commands to run. Only create this file if manual steps are actually needed.`;
+
+const message = [title, "", body, AGENT_INSTRUCTIONS].join("\n").trim();
 const fs = await import("node:fs/promises");
 await fs.writeFile(outputPath, message, "utf8");
 console.log(`Wrote task "${title}" (${message.length} chars) to ${outputPath}`);

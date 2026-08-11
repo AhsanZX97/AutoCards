@@ -65,16 +65,46 @@ jobs:
             exit 0
           fi
 
+          MANUAL_STEPS=""
+          if [ -f .notion-agent/MANUAL_STEPS.md ]; then
+            MANUAL_STEPS=$(cat .notion-agent/MANUAL_STEPS.md)
+            git rm -q .notion-agent/MANUAL_STEPS.md
+            git commit --amend --no-edit --allow-empty -q
+          fi
+
           git push origin "${{ steps.branch.outputs.name }}"
 
           TITLE=$(head -1 /tmp/task.md)
+          BODY=$(cat <<EOF
+          Notion card: https://notion.so/${{ github.event.client_payload.notion_page_id }}
+
+          Automated by DeepSeek V4 Flash via Aider.
+
+          ## Test locally
+
+          \`\`\`bash
+          git fetch origin ${{ steps.branch.outputs.name }}
+          git checkout ${{ steps.branch.outputs.name }}
+          npm install
+          npm run dev:web
+          npm run typecheck
+          npm test
+          \`\`\`
+          EOF
+          )
+          if [ -n "$MANUAL_STEPS" ]; then
+            BODY="$BODY
+
+          ## Manual steps needed
+
+          $MANUAL_STEPS"
+          fi
+
           PR_URL=$(gh pr create \
             --base main \
             --head "${{ steps.branch.outputs.name }}" \
             --title "$TITLE" \
-            --body "Notion card: https://notion.so/${{ github.event.client_payload.notion_page_id }}
-
-          Automated by DeepSeek V4 Flash via Aider.")
+            --body "$BODY")
           echo "opened=true" >> "$GITHUB_OUTPUT"
           echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
 
