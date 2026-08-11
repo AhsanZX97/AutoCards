@@ -1,0 +1,85 @@
+name: Notion Task Agent
+
+# Fired by Zapier via repository_dispatch when a Jira Board card in Notion
+# moves to "Todo". Reads the card, lets Aider (backed by DeepSeek V4 Flash
+# via OpenRouter) implement it on a new branch, opens a PR, and moves the
+# card to "Review".
+on:
+  repository_dispatch:
+    types: [notion-task]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Aider
+        run: pipx install aider-chat
+
+      - name: Fetch Notion task
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        run: node scripts/notion-agent/fetch-task.mjs "${{ github.event.client_payload.notion_page_id }}" /tmp/task.md
+
+      - name: Create task branch
+        id: branch
+        run: |
+          SLUG=$(head -1 /tmp/task.md | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/-\+/-/g; s/^-//; s/-$//' | cut -c1-40)
+          BRANCH="agent/${SLUG}-${{ github.run_id }}"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -b "$BRANCH"
+          git config user.name "notion-agent[bot]"
+          git config user.email "notion-agent@users.noreply.github.com"
+
+      - name: Run Aider against the task
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          aider \
+            --openai-api-base https://openrouter.ai/api/v1 \
+            --openai-api-key "$OPENROUTER_API_KEY" \
+            --model openrouter/deepseek/deepseek-v4-flash-latest \
+            --yes-always \
+            --message-file /tmp/task.md
+
+      - name: Push branch and open PR
+        id: pr
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(git log main..HEAD --oneline)" ]; then
+            echo "Aider made no commits — leaving the card in Doing for a human to look at."
+            echo "opened=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git push origin "${{ steps.branch.outputs.name }}"
+
+          TITLE=$(head -1 /tmp/task.md)
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "${{ steps.branch.outputs.name }}" \
+            --title "$TITLE" \
+            --body "Notion card: https://notion.so/${{ github.event.client_payload.notion_page_id }}
+
+          Automated by DeepSeek V4 Flash via Aider.")
+          echo "opened=true" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Move Notion card to Review
+        if: steps.pr.outputs.opened == 'true'
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        run: node scripts/notion-agent/set-status.mjs "${{ github.event.client_payload.notion_page_id }}" Review
