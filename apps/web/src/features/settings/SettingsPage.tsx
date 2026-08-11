@@ -9,7 +9,7 @@ import {
   type Plan,
   type PurchasablePlan,
 } from '@autocards/core';
-import { useApp } from '../../lib/appContext';
+import { useApp, getSupabaseClient } from '../../lib/appContext';
 import { Avatar, Badge, Button, Card, CardBody, Field, Input, Progress, Select, Switch, Tabs } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useUploadQuota } from '../../lib/useUploadQuota';
@@ -22,9 +22,6 @@ const TABS = [
 ];
 
 export function SettingsPage() {
-  // Stripe returns people to /app/settings?checkout=…, and every plan-limit
-  // notice links to ?tab=billing — both should land on the billing tab rather
-  // than on the profile.
   const [params] = useSearchParams();
   const [tab, setTab] = useState(() => {
     if (params.get('checkout')) return 'billing';
@@ -52,6 +49,27 @@ export function SettingsPage() {
 function ProfileTab() {
   const app = useApp();
   const user = app.authStore((s) => s.session?.user);
+  const signOut = app.authStore((s) => s.signOut);
+
+  async function handleDeleteAccount() {
+    if (!user) return;
+    const confirmed = window.confirm(
+      'This action is permanent and cannot be undone. All your data will be deleted. Are you sure?',
+    );
+    if (!confirmed) return;
+    const client = getSupabaseClient();
+    if (!client) return;
+    try {
+      const { error } = await client.functions.invoke('delete-account', {
+        body: { user_id: user.id },
+      });
+      if (error) throw error;
+      await signOut();
+      window.location.href = '/';
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete account');
+    }
+  }
 
   if (!user) return null;
 
@@ -71,6 +89,11 @@ function ProfileTab() {
         <Field label="Email">
           <Input value={user.email} disabled />
         </Field>
+        <div className="pt-2">
+          <Button variant="danger" onClick={handleDeleteAccount}>
+            Delete account
+          </Button>
+        </div>
       </CardBody>
     </Card>
   );
@@ -169,36 +192,15 @@ function GenerationTab() {
   );
 }
 
-/** Plans with a Stripe price behind them. Everything else is what you get for free. */
 const PURCHASABLE_PLANS: Plan[] = ['pro', 'lifetime'];
-
-/**
- * Plans owned outright rather than rented.
- *
- * Kept as a list rather than a `plan === 'lifetime'` test scattered through
- * the panel: it decides the wording, the price line, and whether there is
- * anything left to sell someone.
- */
 const ONE_TIME_PLANS: Plan[] = ['lifetime'];
-
-/** What each plan costs, for the button and the card. Display only — Stripe holds the real prices. */
 const PLAN_PRICES: Record<Plan, string> = {
   free: 'Free',
   pro: '$4 / month',
   lifetime: '$39 once',
 };
 
-/**
- * What the subscription means, in the terms someone would ask about it: when
- * am I next charged, when does this stop, and is anything wrong.
- *
- * `past_due` is the one worth being clear about — the plan still works, and
- * saying so avoids a support message from someone who thinks they have lost
- * access when they have not.
- */
 function describeSubscription(subscription: AccountSubscription): string {
-  // A plan bought outright has no renewal, no end date and nothing to cancel,
-  // so none of the questions below apply to it.
   if (ONE_TIME_PLANS.includes(subscription.plan)) {
     return 'Bought outright. There is nothing to renew and nothing to cancel.';
   }
@@ -228,16 +230,6 @@ function describeSubscription(subscription: AccountSubscription): string {
   return `Status: ${subscription.status}.`;
 }
 
-/**
- * Stripe sends people back the instant they pay, which is usually before its
- * webhook has reached us — so the plan on screen would still say free. Rather
- * than show that and be wrong, the session is re-read a few times until the
- * upgrade lands.
- *
- * Waits for the plan they actually bought, not merely for something other than
- * free. Watching for "not free" meant a Pro subscriber buying Lifetime matched
- * on the very first read and was congratulated on the plan they already had.
- */
 async function waitForUpgrade(app: App, purchased: Plan): Promise<Plan | null> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await app.authStore.getState().restore();
@@ -261,8 +253,6 @@ function BillingTab() {
   const [subscription, setSubscription] = useState<AccountSubscription | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
-  // Re-read after an upgrade lands so the panel is not describing the old
-  // subscription — `activating` flipping back to false is the signal.
   const userId = user?.id;
   useEffect(() => {
     const account = app.services.account;
@@ -280,15 +270,11 @@ function BillingTab() {
     const outcome = params.get('checkout');
     if (!outcome) return;
 
-    // What checkout says was bought — see the success URL in
-    // `create-checkout-session`.
     const purchasedParam = params.get('plan');
     const purchased: Plan = PURCHASABLE_PLANS.includes(purchasedParam as Plan)
       ? (purchasedParam as Plan)
       : 'pro';
 
-    // Cleared straight away so a refresh does not replay the message, and so a
-    // bookmarked settings URL is not permanently mid-checkout.
     const next = new URLSearchParams(params);
     next.delete('checkout');
     next.delete('plan');
@@ -332,8 +318,6 @@ function BillingTab() {
     if (!billing) return;
     setStarting(plan);
     try {
-      // Leaves the app entirely — Stripe hosts the payment page, so no card
-      // details ever touch this origin.
       window.location.href = await billing.startCheckout(plan as PurchasablePlan);
     } catch (error) {
       toast({
@@ -344,11 +328,6 @@ function BillingTab() {
     }
   }
 
-  /**
-   * The admin comp path. `admin_set_plan` refuses a non-admin server-side, and
-   * this used to be called without awaiting or catching — so the refusal
-   * rejected into nothing and the button looked like it had worked.
-   */
   async function comp(plan: Plan) {
     try {
       await changePlan(plan);
@@ -365,8 +344,6 @@ function BillingTab() {
     if (!billing) return;
     setOpeningPortal(true);
     try {
-      // Cancelling, resuming and card changes all happen on Stripe's own
-      // pages — see `create-portal-session` for why they are not rebuilt here.
       window.location.href = await billing.openPortal();
     } catch (error) {
       toast({
@@ -403,8 +380,6 @@ function BillingTab() {
               </p>
             </div>
             <Button variant="outline" onClick={() => void manageBilling()} disabled={openingPortal}>
-              {/* Nothing to manage on a plan owned outright — the portal is
-                  only where the receipt lives. */}
               {openingPortal ? 'Opening…' : ownsOutright ? 'Receipts' : 'Manage billing'}
             </Button>
           </CardBody>
@@ -432,8 +407,6 @@ function BillingTab() {
         {PLANS.map((plan) => {
           const limits = PLAN_LIMITS[plan];
           const isCurrent = user.plan === plan;
-          // Nothing is worth selling to someone who already owns the product:
-          // a lifetime holder buying Pro would be paying monthly for less.
           const forSale = billing && PURCHASABLE_PLANS.includes(plan) && !ownsOutright;
           return (
             <Card key={plan} className={isCurrent ? 'border-2 border-brand-600 dark:border-brand-500' : undefined}>
