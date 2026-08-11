@@ -7,7 +7,9 @@ import {
   PRIORITIES,
   cardTypeLabel,
   computeDeckStats,
+  describeCadence,
   hasCloze,
+  isReminderActive,
   parseCloze,
   type CardDraft,
   type Difficulty,
@@ -25,6 +27,7 @@ import { CardEditorModal } from './CardEditorModal';
 import { DeckEditorModal, type DeckEdits } from './DeckEditorModal';
 import { DeckFlashcardView } from './DeckFlashcardView';
 import { DeckGenerateCardsModal } from './DeckGenerateCardsModal';
+import { DeckRemindersModal } from './DeckRemindersModal';
 import { DeckShareModal } from './DeckShareModal';
 import { toast } from '../../components/ui/toastStore';
 import { EMPTY_ARRAY } from '../../lib/empty';
@@ -53,6 +56,8 @@ export function DeckDetailPage() {
   const deleteCategory = app.deckStore((s) => s.deleteCategory);
   const archiveDeck = app.deckStore((s) => s.archiveDeck);
   const deleteDeck = app.deckStore((s) => s.deleteDeck);
+  const reminders = app.reminderStore((s) => (deckId ? s.remindersByDeck[deckId] : undefined));
+  const clearReminders = app.reminderStore((s) => s.clearDeck);
 
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -63,6 +68,7 @@ export function DeckDetailPage() {
   const [deckEditorOpen, setDeckEditorOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [remindersOpen, setRemindersOpen] = useState(false);
   const [statsHelpOpen, setStatsHelpOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -70,6 +76,17 @@ export function DeckDetailPage() {
   const [view, setView] = useState<'list' | 'flashcards'>('list');
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
+
+  /** What the bell says without being opened: how many reminders are still live. */
+  const reminderStatus = useMemo(() => {
+    const now = new Date();
+    const live = (reminders ?? []).filter((reminder) => isReminderActive(reminder, now));
+    if (live.length === 0) return { label: 'Study reminders', dot: false };
+    // One reminder can be named outright; past that a count is all that fits.
+    const label =
+      live.length === 1 ? `Reminder — ${describeCadence(live[0]!)}` : `${live.length} reminders set`;
+    return { label, dot: true };
+  }, [reminders]);
   const quota = useUploadQuota();
   // Runs once, the first time anyone opens a deck. Held off until the deck has
   // loaded so the first step never lands on the "Deck not found" card.
@@ -203,6 +220,8 @@ export function DeckDetailPage() {
   function handleDeleteDeck() {
     if (!confirm(`Delete "${deck!.title}" and all ${cards.length} of its cards? This cannot be undone.`)) return;
     deleteDeck(deckId!);
+    // Otherwise the schedule outlives the deck and mails about cards that are gone.
+    clearReminders(deckId!);
     setDeckEditorOpen(false);
     toast({ variant: 'success', title: 'Deck deleted' });
     navigate('/app/decks');
@@ -300,6 +319,21 @@ export function DeckDetailPage() {
             title="Share deck"
           >
             <ShareIcon />
+          </Button>
+          {/* The dot is the whole status readout: whether this deck will email
+              you is a yes/no, and it is answered without opening anything. */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative"
+            onClick={() => setRemindersOpen(true)}
+            aria-label={reminderStatus.label}
+            title={reminderStatus.label}
+          >
+            <BellIcon />
+            {reminderStatus.dot && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
+            )}
           </Button>
           <Button data-tour="deck-study" onClick={() => navigate(`/app/study/${deckId}`)} disabled={stats.total === 0}>
             Study now
@@ -491,6 +525,12 @@ export function DeckDetailPage() {
         cards={cards}
       />
       {deckId && <DeckShareModal open={shareOpen} onClose={() => setShareOpen(false)} deckId={deckId} />}
+      <DeckRemindersModal
+        open={remindersOpen}
+        onClose={() => setRemindersOpen(false)}
+        deckId={deckId}
+        deckTitle={deck.title}
+      />
 
       <Modal
         open={statsHelpOpen}
@@ -543,6 +583,20 @@ function ShareIcon() {
       <circle cx="4" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
       <circle cx="12" cy="12.5" r="2" stroke="currentColor" strokeWidth="1.4" />
       <path d="m5.8 7.1 4.4-2.2M5.8 8.9l4.4 2.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M4 6.5a4 4 0 0 1 8 0c0 2.2.5 3.3 1.1 4a.5.5 0 0 1-.4.8H3.3a.5.5 0 0 1-.4-.8c.6-.7 1.1-1.8 1.1-4Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M6.5 13.2a1.7 1.7 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }

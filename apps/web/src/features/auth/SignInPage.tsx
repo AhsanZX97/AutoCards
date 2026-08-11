@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
 import { Button, Field, Input } from '../../components/ui';
+import { GoogleButton } from './GoogleButton';
+import { OrDivider } from './OrDivider';
 
 /**
  * Where to land after signing in, rebuilt from the location `RequireAuth`
@@ -39,6 +41,16 @@ export function SignInPage() {
 
   return (
     <div className="space-y-5">
+      {/* Above the form, not inside it: with Google at the top, an error about
+          Google shown down by the submit button reads as a form error. Field
+          errors still render against their own input. */}
+      {error && !errorField && (
+        <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
+      )}
+
+      <GoogleButton next={returnTo(location.state)} label="Sign in with Google" />
+      <OrDivider />
+
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="Email">
           <Input
@@ -70,7 +82,6 @@ export function SignInPage() {
             Forgot your password?
           </Link>
         </div>
-        {error && !errorField && <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>}
         <Button type="submit" className="w-full" loading={status === 'loading'}>
           Sign in
         </Button>

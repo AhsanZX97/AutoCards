@@ -3,6 +3,8 @@ export * from './auth/supabaseAuth';
 export * from './edgeConfig';
 export * from './llm';
 export * from './billing';
+export * from './feedback';
 export * from './account';
 export * from './documents';
+export * from './reminders';
 export * from './sync';

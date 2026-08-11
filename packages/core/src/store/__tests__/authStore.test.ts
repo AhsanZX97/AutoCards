@@ -24,6 +24,7 @@ function makeAuth(): AuthService {
   return {
     signIn: async () => makeSession('someone'),
     signUp: async () => ({ status: 'authenticated', session: makeSession('someone') }),
+    signInWithGoogle: async () => {},
     signOut: async () => {},
     restore: async (session) => session,
     updateProfile: async (user, patch) => ({ ...user, ...patch }),
@@ -144,6 +145,65 @@ describe('createAuthStore.restore', () => {
     await store.getState().restore({ fromProvider: true });
 
     expect(store.getState().status).toBe('signed-out');
+  });
+});
+
+describe('createAuthStore.signInWithGoogle', () => {
+  it('hands the provider the address the browser should come back to', async () => {
+    let asked: string | undefined;
+    const auth: AuthService = {
+      ...makeAuth(),
+      signInWithGoogle: async (redirectTo) => {
+        asked = redirectTo;
+      },
+    };
+    const store = createAuthStore(auth, createMemoryStorage());
+
+    await store.getState().signInWithGoogle('https://autocards.study/auth/callback');
+
+    expect(asked).toBe('https://autocards.study/auth/callback');
+  });
+
+  /**
+   * There is no session to set here — the call ends with the browser leaving
+   * for Google, and the session arrives on the way back. Staying on 'loading'
+   * is what keeps the button spinning until the page is gone.
+   */
+  it('stays loading while the browser is on its way to the provider', async () => {
+    const store = createAuthStore(makeAuth(), createMemoryStorage());
+
+    await expect(store.getState().signInWithGoogle('https://x.test/auth/callback')).resolves.toBe(
+      true,
+    );
+
+    expect(store.getState().status).toBe('loading');
+  });
+
+  it('reports the failure and stops loading when the provider refuses', async () => {
+    const auth: AuthService = {
+      ...makeAuth(),
+      signInWithGoogle: async () => {
+        throw new Error('Provider is not enabled.');
+      },
+    };
+    const store = createAuthStore(auth, createMemoryStorage());
+
+    await expect(store.getState().signInWithGoogle('https://x.test/auth/callback')).resolves.toBe(
+      false,
+    );
+
+    expect(store.getState().status).toBe('signed-out');
+    expect(store.getState().error).toBe('Provider is not enabled.');
+  });
+
+  /** A half-finished password sign-up must not leave its notice on screen. */
+  it('clears a pending confirmation notice', async () => {
+    const store = createAuthStore(makeAuth(), createMemoryStorage());
+    store.setState({ pendingConfirmationEmail: 'someone@example.com' });
+
+    await store.getState().signInWithGoogle('https://x.test/auth/callback');
+
+    expect(store.getState().pendingConfirmationEmail).toBeNull();
   });
 });
 

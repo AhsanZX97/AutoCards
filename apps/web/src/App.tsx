@@ -13,6 +13,7 @@ import { SignInPage } from './features/auth/SignInPage';
 import { SignUpPage } from './features/auth/SignUpPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
+import { AuthCallbackPage } from './features/auth/AuthCallbackPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { DeckLibraryPage } from './features/decks/DeckLibraryPage';
 import { CreateDeckPage } from './features/decks/CreateDeckPage';
@@ -56,6 +57,17 @@ export default function App() {
               subtitle="We'll email you a link to set a new one."
             >
               <ForgotPasswordPage />
+            </AuthLayout>
+          }
+        />
+        {/* Also outside RequireAuth: the session is still being exchanged out of
+            the URL when this mounts, so the guard would bounce it to sign-in a
+            moment before it arrives. */}
+        <Route
+          path="/auth/callback"
+          element={
+            <AuthLayout title="Almost there" subtitle="Finishing your sign-in.">
+              <AuthCallbackPage />
             </AuthLayout>
           }
         />

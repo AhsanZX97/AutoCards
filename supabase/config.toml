@@ -170,13 +170,20 @@ site_url = "https://autocards.study"
 #
 # Production origin alongside the localhost entries, not instead of them, so local development
 # keeps working.
+#
+# `/auth/callback` is the same story for Google: it is where the provider sends
+# the browser back to, and an origin that is not listed here has its return trip
+# refused. Listed exactly, for the reason above.
 additional_redirect_urls = [
   "https://autocards.study/**",
   "https://autocards.study/reset-password",
+  "https://autocards.study/auth/callback",
   "http://localhost:5173/**",
   "http://localhost:5173/reset-password",
+  "http://localhost:5173/auth/callback",
   "http://127.0.0.1:5173/**",
   "http://127.0.0.1:5173/reset-password",
+  "http://127.0.0.1:5173/auth/callback",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -363,6 +370,41 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+
+# Sign in with Google.
+#
+# The credentials are not in this file and must not be: `client_id` is public,
+# but `secret` is not, and both are read from the environment.
+#
+# `supabase config push` resolves both `env(...)` references from *this
+# machine's shell* at push time and sends the resolved values to the hosted
+# project — it is not a local-only setting. Confirmed the hard way: running
+# `config push` in a shell where these two vars are unset pushes the literal
+# text "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)" as the client_id and an
+# empty secret, silently breaking Google sign-in on the live project even
+# though `enabled` stays `true`. Always export both first:
+#
+#   SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=... SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET=... \
+#     npx supabase config push
+#
+# Creating the credential pair is a manual step in the Google Cloud console.
+# There is no CLI for it: `gcloud iam oauth-clients` is workforce-identity
+# federation and `gcloud iap oauth-clients` is Identity-Aware Proxy — neither
+# mints the "Web application" client that consumer sign-in needs. See the
+# README in this directory for the click-through.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# Overrides the default auth callback URL derived from auth.external_url.
+redirect_uri = ""
+url = ""
+# Only relevant to the ID-token flow (`signInWithIdToken`). This app uses the
+# redirect flow, where the nonce is handled for us.
+skip_nonce_check = false
+email_optional = false
+
 [auth.external.apple]
 enabled = false
 client_id = ""
@@ -461,4 +503,11 @@ enabled = true
 # without one. The signature check inside `stripe-webhook` is what stands in
 # for auth — see the note at the top of that file.
 [functions.stripe-webhook]
+verify_jwt = false
+
+# The cron job that sends reminder emails holds no user session, and a user
+# session would be no use if it did: every signed-in learner has a valid JWT,
+# so `verify_jwt` would let any of them fire the whole userbase's reminders.
+# The `x-cron-secret` check inside the function is the real door.
+[functions.send-reminders]
 verify_jwt = false

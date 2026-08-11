@@ -4,8 +4,12 @@ import { RoutingLlmService } from './services/llm';
 import type { EdgeLlmConfig, LlmService, OpenRouterConfig } from './services/llm';
 import { EdgeBillingService } from './services/billing';
 import type { BillingService } from './services/billing';
+import { EdgeFeedbackService } from './services/feedback';
+import type { FeedbackService } from './services/feedback';
 import { SupabaseAccountBackend } from './services/account';
 import type { AccountBackend } from './services/account';
+import { SupabaseReminderBackend } from './services/reminders';
+import type { ReminderBackend } from './services/reminders';
 import type { DocumentExtractor } from './services/documents';
 import { SupabaseAuthService } from './services/auth/supabaseAuth';
 import { SupabaseSyncBackend } from './services/sync/supabaseSyncBackend';
@@ -13,6 +17,7 @@ import { SyncEngine } from './services/sync/syncEngine';
 import {
   createAuthStore,
   createDeckStore,
+  createReminderStore,
   createSettingsStore,
   createStudyStore,
   createSyncStore,
@@ -82,6 +87,10 @@ export function createApp(options: CreateAppOptions) {
   // server, since that is where the prices and the Stripe key live.
   const billing: BillingService | null = options.edge ? new EdgeBillingService(options.edge) : null;
 
+  // Same reasoning as billing: sending mail needs a credential only the
+  // server holds, so this only exists where the functions are deployed.
+  const feedback: FeedbackService | null = options.edge ? new EdgeFeedbackService(options.edge) : null;
+
   // Plan and allowance as the server holds them. Read straight from Postgres:
   // both tables are owner-readable under RLS and neither needs a secret.
   const account: AccountBackend | null = options.supabase
@@ -105,6 +114,31 @@ export function createApp(options: CreateAppOptions) {
   const usageStore = createUsageStore(options.storage);
   const tourStore = createTourStore(options.storage);
 
+  // Reminders go straight to their own table rather than through the sync
+  // outbox. They are not offline-first the way decks are — a schedule that
+  // never reaches the server is a schedule nothing can mail from — and they
+  // carry no merge problem worth an outbox: one row, last write wins.
+  const reminders: ReminderBackend | null = options.supabase
+    ? new SupabaseReminderBackend(options.supabase)
+    : null;
+
+  const reminderStore = createReminderStore(options.storage, (change) => {
+    if (!reminders) return;
+    // Fire and forget: the edit is already saved locally, and the backend
+    // logs its own failures. Nothing here is worth blocking the editor on.
+    switch (change.kind) {
+      case 'upsert':
+        void reminders.push(change.reminder);
+        break;
+      case 'remove':
+        void reminders.remove(change.reminderId);
+        break;
+      case 'clear-deck':
+        void reminders.removeForDeck(change.deckId);
+        break;
+    }
+  });
+
   if (options.supabase) {
     syncEngine = new SyncEngine({
       authStore,
@@ -115,6 +149,32 @@ export function createApp(options: CreateAppOptions) {
       flushIntervalMs: options.syncFlushIntervalMs,
     });
     syncEngine.start();
+
+    // Reminders are pulled once per signed-in account rather than kept on a
+    // timer: nothing but the reminder editor writes them, and the editor
+    // pushes as it goes. The pull is what lets a second device see a schedule
+    // set on the first — and what stops one account inheriting another's.
+    let remindersFor: string | null = null;
+    const followAccount = (userId: string | null) => {
+      if (userId === remindersFor) return;
+      const previous = remindersFor;
+      remindersFor = userId;
+      if (!userId) {
+        // Only on a real sign-out, never on a first load that was already
+        // signed out — otherwise a reload would clear the local copy before
+        // the session had finished restoring.
+        if (previous) reminderStore.getState().hydrate([]);
+        return;
+      }
+      void reminders!.pull().then((rows) => {
+        // A slow read must not land on an account that has since changed, and
+        // null means the server was unreachable rather than empty.
+        if (rows && remindersFor === userId) reminderStore.getState().hydrate(rows);
+      });
+    };
+    followAccount(authStore.getState().session?.user.id ?? null);
+    authStore.subscribe((state) => followAccount(state.session?.user.id ?? null));
+
     // Keep the store in step with Supabase's own session lifecycle (silent
     // token refresh, sign-in/out) rather than only when restore() runs.
     //
@@ -133,13 +193,14 @@ export function createApp(options: CreateAppOptions) {
   }
 
   return {
-    services: { auth, llm, billing, account, documents: options.documentExtractor },
+    services: { auth, llm, billing, feedback, account, documents: options.documentExtractor },
     authStore,
     deckStore,
     studyStore,
     settingsStore,
     usageStore,
     tourStore,
+    reminderStore,
     syncStore,
     syncEngine,
     dispose: () => syncEngine?.stop(),

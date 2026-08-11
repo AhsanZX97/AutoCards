@@ -95,6 +95,21 @@ export class SupabaseAuthService implements AuthService {
     return { status: 'authenticated', session: toSession(data.session, toUser(data.user, profile)) };
   }
 
+  /**
+   * Starts the Google redirect. The `profiles` row is still the trigger's job —
+   * see `supabase/migrations/0008_oauth_usernames.sql`, which derives a handle,
+   * since Google sends a name and an email but never a username.
+   */
+  async signInWithGoogle(redirectTo: string): Promise<void> {
+    const { error } = await this.client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    });
+    // Only reached when the hand-off itself was refused — on success the
+    // browser is already leaving for Google.
+    if (error) throw new AuthError(error.message);
+  }
+
   async signOut(): Promise<void> {
     const { error } = await this.client.auth.signOut();
     if (error) throw error;

@@ -15,6 +15,7 @@ export function DeckLibraryPage() {
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
   const archiveDeck = app.deckStore((s) => s.archiveDeck);
   const deleteDeck = app.deckStore((s) => s.deleteDeck);
+  const clearReminders = app.reminderStore((s) => s.clearDeck);
   const importDeck = app.deckStore((s) => s.importDeck);
   const userId = app.authStore((s) => s.session?.user.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,7 +142,11 @@ export function DeckLibraryPage() {
                       archived={deck.archived}
                       onArchive={() => archiveDeck(deck.id, !deck.archived)}
                       onDelete={() => {
-                        if (confirm(`Delete "${deck.title}"? This cannot be undone.`)) deleteDeck(deck.id);
+                        if (confirm(`Delete "${deck.title}"? This cannot be undone.`)) {
+                          deleteDeck(deck.id);
+                          // Otherwise the schedule outlives the deck.
+                          clearReminders(deck.id);
+                        }
                       }}
                     />
                   </div>

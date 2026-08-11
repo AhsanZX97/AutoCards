@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
+import { FeedbackModal } from '../../features/feedback/FeedbackModal';
 import { Avatar, Button, Modal, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
 
@@ -20,6 +21,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [unsyncedWarning, setUnsyncedWarning] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   /**
    * Signing out clears this device's decks and history, so anything that has
@@ -51,7 +53,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
-        <SidebarContent onNavigate={() => {}} />
+        <SidebarContent onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
       </aside>
 
       {/* Mobile sidebar */}
@@ -59,7 +61,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
-            <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+            <SidebarContent
+              onNavigate={() => setMobileNavOpen(false)}
+              onFeedback={() => {
+                setMobileNavOpen(false);
+                setFeedbackOpen(true);
+              }}
+            />
           </aside>
         </div>
       )}
@@ -117,6 +125,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
 
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
       <Modal
         open={unsyncedWarning}
         onClose={() => setUnsyncedWarning(false)}
@@ -144,7 +154,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
+function SidebarContent({ onNavigate, onFeedback }: { onNavigate: () => void; onFeedback: () => void }) {
   return (
     <>
       <div className="flex h-16 items-center border-b border-slate-200 px-6 dark:border-slate-800">
@@ -171,7 +181,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
           </NavLink>
         ))}
       </nav>
-      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="space-y-2 border-t border-slate-100 p-4 dark:border-slate-800">
         <NavLink
           to="/app/decks/new"
           onClick={onNavigate}
@@ -179,6 +189,12 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
         >
           <span>+</span> New deck
         </NavLink>
+        <button
+          onClick={onFeedback}
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        >
+          <span aria-hidden>💬</span> Feedback
+        </button>
       </div>
     </>
   );

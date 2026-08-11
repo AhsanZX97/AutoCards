@@ -34,4 +34,5 @@ export const STORAGE_KEYS = {
   sync: 'autocards.sync',
   usage: 'autocards.usage',
   tours: 'autocards.tours',
+  reminders: 'autocards.reminders',
 } as const;

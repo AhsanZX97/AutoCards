@@ -14,3 +14,4 @@ export * from './retiredCards';
 export * from './uploadQuota';
 export * from './planLimits';
 export * from './tourPlacement';
+export * from './reminders';

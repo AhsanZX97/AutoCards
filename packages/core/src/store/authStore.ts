@@ -30,6 +30,16 @@ export interface AuthState {
   signIn: (credentials: Credentials) => Promise<boolean>;
   signUp: (input: SignUpInput) => Promise<boolean>;
   /**
+   * Sends the browser to Google. `true` means the hand-off was accepted and
+   * the page is on its way out — not that anyone is signed in yet.
+   *
+   * The status is deliberately left on 'loading' in that case: the button
+   * should keep spinning until the navigation actually happens, and there is
+   * no session to move to 'authenticated' with. The one that comes back lands
+   * through `restore({ fromProvider: true })` on the return page.
+   */
+  signInWithGoogle: (redirectTo: string) => Promise<boolean>;
+  /**
    * Signs out, after giving anything unsynced a chance to reach the server.
    *
    * Returns false without signing out when local changes could not be pushed —
@@ -133,6 +143,23 @@ export function createAuthStore(
               status: 'signed-out',
               error: err instanceof Error ? err.message : 'Sign up failed.',
               errorField: err instanceof AuthError ? (err.field ?? null) : null,
+            });
+            return false;
+          }
+        },
+
+        signInWithGoogle: async (redirectTo) => {
+          set({ status: 'loading', error: null, errorField: null, pendingConfirmationEmail: null });
+          try {
+            await auth.signInWithGoogle(redirectTo);
+            return true;
+          } catch (err) {
+            // No field to hang this on — there is no form. It renders as the
+            // notice above the buttons.
+            set({
+              status: 'signed-out',
+              error: err instanceof Error ? err.message : 'Could not continue with Google.',
+              errorField: null,
             });
             return false;
           }

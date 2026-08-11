@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MIN_PASSWORD_LENGTH } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Field, Input } from '../../components/ui';
+import { GoogleButton } from './GoogleButton';
+import { OrDivider } from './OrDivider';
 
 export function SignUpPage() {
   const app = useApp();
@@ -49,6 +51,16 @@ export function SignUpPage() {
 
   return (
     <div className="space-y-5">
+      {error && !errorField && (
+        <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
+      )}
+
+      {/* The fast way in, and the only one that skips the confirmation email —
+          Google has already proved the address belongs to them. Whoever picks
+          the form below still gets the email, because we have no such proof. */}
+      <GoogleButton label="Sign up with Google" />
+      <OrDivider />
+
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="Username" hint="3–20 chars, lowercase, a–z, 0–9, _">
           <Input
@@ -84,7 +96,6 @@ export function SignUpPage() {
             error={errorField === 'password' ? error ?? undefined : undefined}
           />
         </Field>
-        {error && !errorField && <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>}
         <Button type="submit" className="w-full" loading={status === 'loading'}>
           Create account
         </Button>

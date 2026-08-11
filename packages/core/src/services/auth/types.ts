@@ -3,6 +3,24 @@ import type { Credentials, Plan, Session, SignUpInput, SignUpResult, User } from
 export interface AuthService {
   signIn(credentials: Credentials): Promise<Session>;
   signUp(input: SignUpInput): Promise<SignUpResult>;
+  /**
+   * Hands off to Google, which sends the browser back to `redirectTo` with the
+   * session attached.
+   *
+   * Resolving means the hand-off was accepted, not that anyone signed in — the
+   * page is on its way out by then, and the session arrives on the return trip
+   * through `restore({ fromProvider: true })`. Only a refusal (the provider is
+   * switched off, the origin is not allow-listed) comes back as a throw.
+   *
+   * `redirectTo` comes from the caller for the same reason it does on
+   * `requestPasswordReset`: core does not know its own origin, and the value
+   * has to be on the provider's allow-list.
+   *
+   * No email confirmation follows, and none is skipped: Google has already
+   * verified the address it hands over, which is the thing our own confirmation
+   * email exists to establish.
+   */
+  signInWithGoogle(redirectTo: string): Promise<void>;
   signOut(): Promise<void>;
   /**
    * Re-validates a session against the provider. Returns null once it has
