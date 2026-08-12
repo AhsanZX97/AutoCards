@@ -30,7 +30,7 @@ export default function DashboardScreen() {
         {activeDecks.length > 0 ? `${activeDecks.length} deck${activeDecks.length === 1 ? '' : 's'} ready to study.` : 'Create your first deck to get started.'}
       </Text>
 
-      <Button title="Create deck from PDF — coming soon" onPress={() => {}} disabled />
+      <Button title="Create deck" onPress={() => router.push('/(app)/decks/new')} />
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
         <StatTile icon="🔥" label="Streak" value={String(stats.streak.current)} />

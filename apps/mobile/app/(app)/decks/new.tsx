@@ -25,6 +25,12 @@ export default function CreateDeckScreen() {
   const userId = app.authStore((s) => s.session?.user.id);
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
+  const createBlankDeck = app.deckStore((s) => s.createBlankDeck);
+  const updateDeck = app.deckStore((s) => s.updateDeck);
+
+  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
 
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<{ uri: string; name: string; size: number } | null>(null);
@@ -87,7 +93,7 @@ export default function CreateDeckScreen() {
         },
         onProgress: setProgress,
       });
-      const deck = createDeckFromGeneration(result, userId);
+      const deck = createDeckFromGeneration(result, userId, { title, description });
       router.replace(`/(app)/decks/${deck.id}`);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your deck.');
@@ -95,21 +101,61 @@ export default function CreateDeckScreen() {
     }
   }
 
+  function createManualDeck() {
+    const name = title.trim();
+    if (!name || !userId) return;
+    // No upload, no model call — so this never touches the upload quota.
+    const deck = createBlankDeck(userId, name);
+    if (description.trim()) updateDeck(deck.id, { description: description.trim() });
+    router.replace(`/(app)/decks/${deck.id}`);
+  }
+
   return (
     <Screen>
       <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Create a deck</Text>
       <Text style={{ fontSize: 14, color: theme.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-        Upload a PDF and Auto Cards will write the flashcards for you.
+        {mode === 'ai'
+          ? 'Upload a PDF and Auto Cards will write the flashcards for you.'
+          : 'Start with an empty deck and write the cards yourself.'}
       </Text>
 
       {step === 'upload' && (
-        <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
-          <Text style={{ fontSize: 40 }}>📄</Text>
-          <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
-            Choose a PDF to build flashcards from
-          </Text>
-          <Button title="Browse files" onPress={pickFile} style={{ marginTop: spacing.lg }} />
-        </Card>
+        <View>
+          <View style={{ flexDirection: 'row', marginBottom: spacing.lg }}>
+            <Chip label="Generate with AI" active={mode === 'ai'} onPress={() => setMode('ai')} />
+            <Chip label="Start from scratch" active={mode === 'manual'} onPress={() => setMode('manual')} />
+          </View>
+
+          <Card style={{ marginBottom: spacing.lg }}>
+            <Field
+              label="Deck name"
+              placeholder="e.g. Financial Accounting, Chapter 4"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <Field
+              label="Description"
+              hint="optional"
+              placeholder="What this deck covers…"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={2}
+            />
+          </Card>
+
+          {mode === 'manual' ? (
+            <Button title="Create empty deck" onPress={createManualDeck} size="lg" disabled={!title.trim()} />
+          ) : (
+            <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
+              <Text style={{ fontSize: 40 }}>📄</Text>
+              <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
+                Choose a PDF to build flashcards from
+              </Text>
+              <Button title="Browse files" onPress={pickFile} style={{ marginTop: spacing.lg }} />
+            </Card>
+          )}
+        </View>
       )}
 
       {step === 'configure' && file && (
