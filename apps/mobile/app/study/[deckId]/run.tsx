@@ -10,7 +10,7 @@ import {
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
-import { useTheme, DIFFICULTY_COLOR, radius, spacing } from '../../../src/lib/theme';
+import { useTheme, useDifficultyColors, radius, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
 import { EMPTY_ARRAY } from '../../../src/lib/empty';
 
@@ -26,6 +26,7 @@ export default function StudyRunnerScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const app = useApp();
   const theme = useTheme();
+  const difficultyColors = useDifficultyColors();
 
   const session = app.studyStore((s) => s.activeSession);
   const answer = app.studyStore((s) => s.answer);
@@ -127,8 +128,8 @@ export default function StudyRunnerScreen() {
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
           <Badge
             label={currentCard.difficulty}
-            color={DIFFICULTY_COLOR[currentCard.difficulty]}
-            softColor={`${DIFFICULTY_COLOR[currentCard.difficulty]}22`}
+            color={difficultyColors[currentCard.difficulty]}
+            softColor={`${difficultyColors[currentCard.difficulty]}22`}
           />
           <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, textAlign: 'center', marginTop: spacing.lg }}>
             {flipped ? answerText : promptText}

@@ -59,7 +59,7 @@ export default function StatsScreen() {
                   {deck.sessions} sessions · {Math.round(deck.accuracy * 100)}%
                 </Text>
               </View>
-              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{deck.xp} XP</Text>
+              <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 13 }}>{deck.xp} XP</Text>
             </View>
           ))
         )}

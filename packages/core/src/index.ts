@@ -3,6 +3,7 @@ export * from './lib/id';
 export * from './lib/random';
 export * from './lib/date';
 export * from './lib/text';
+export * from './lib/theme';
 export * from './lib/deckTransfer';
 export * from './lib/storage';
 export * from './domain';

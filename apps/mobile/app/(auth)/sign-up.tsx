@@ -37,7 +37,7 @@ export default function SignUpScreen() {
             Click it to confirm your account, then sign in.
           </Text>
           <Link href="/(auth)/sign-in" style={{ marginTop: spacing.xl }}>
-            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 16 }}>Go to sign in</Text>
+            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>Go to sign in</Text>
           </Link>
         </View>
       </Screen>
@@ -91,7 +91,7 @@ export default function SignUpScreen() {
       <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl }}>
         <Text style={{ color: theme.textMuted }}>Already have an account? </Text>
         <Link href="/(auth)/sign-in">
-          <Text style={{ color: theme.primary, fontWeight: '700' }}>Sign in</Text>
+          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>Sign in</Text>
         </Link>
       </View>
     </Screen>

@@ -55,7 +55,7 @@ export default function SignInScreen() {
       <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl }}>
         <Text style={{ color: theme.textMuted }}>Don&apos;t have an account? </Text>
         <Link href="/(auth)/sign-up">
-          <Text style={{ color: theme.primary, fontWeight: '700' }}>Sign up</Text>
+          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>Sign up</Text>
         </Link>
       </View>
     </Screen>

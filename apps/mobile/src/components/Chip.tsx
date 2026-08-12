@@ -17,7 +17,7 @@ export function Chip({ label, active, onPress }: ChipProps) {
         paddingVertical: 8,
         borderRadius: radius.full,
         borderWidth: 1,
-        borderColor: active ? theme.primary : theme.border,
+        borderColor: active ? theme.primary : theme.borderStrong,
         backgroundColor: active ? theme.primary : theme.surface,
         marginRight: spacing.sm,
         marginBottom: spacing.sm,

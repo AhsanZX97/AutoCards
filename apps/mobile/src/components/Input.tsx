@@ -20,7 +20,7 @@ export function Field({ label, error, hint, style, ...rest }: FieldProps) {
         style={[
           {
             borderWidth: 1,
-            borderColor: error ? theme.danger : theme.border,
+            borderColor: error ? theme.danger : theme.borderStrong,
             borderRadius: radius.md,
             paddingHorizontal: spacing.md,
             paddingVertical: 10,

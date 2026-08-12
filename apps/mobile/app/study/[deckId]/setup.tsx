@@ -42,7 +42,7 @@ export default function StudySetupScreen() {
   return (
     <Screen>
       <Pressable onPress={() => router.back()} style={{ marginBottom: spacing.md }}>
-        <Text style={{ color: theme.primary, fontWeight: '600' }}>← Back</Text>
+        <Text style={{ color: theme.primaryText, fontWeight: '600' }}>← Back</Text>
       </Pressable>
       <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text }}>Study &quot;{deck.title}&quot;</Text>
       <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: spacing.lg }}>

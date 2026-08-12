@@ -12,13 +12,15 @@ import {
   type Flashcard,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
-import { useTheme, DIFFICULTY_COLOR, PRIORITY_COLOR, spacing } from '../../../src/lib/theme';
+import { useTheme, useDifficultyColors, usePriorityColors, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
 
 export default function DeckDetailScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const app = useApp();
   const theme = useTheme();
+  const difficultyColors = useDifficultyColors();
+  const priorityColors = usePriorityColors();
 
   const deck = app.deckStore((s) => (deckId ? s.getDeck(deckId) : undefined));
   const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? [] : []));
@@ -134,13 +136,13 @@ export default function DeckDetailScreen() {
                     <Badge label={cardTypeLabel(card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
                     <Badge
                       label={card.difficulty}
-                      color={DIFFICULTY_COLOR[card.difficulty]}
-                      softColor={`${DIFFICULTY_COLOR[card.difficulty]}22`}
+                      color={difficultyColors[card.difficulty]}
+                      softColor={`${difficultyColors[card.difficulty]}22`}
                     />
                     <Badge
                       label={card.priority}
-                      color={PRIORITY_COLOR[card.priority]}
-                      softColor={`${PRIORITY_COLOR[card.priority]}22`}
+                      color={priorityColors[card.priority]}
+                      softColor={`${priorityColors[card.priority]}22`}
                     />
                   </View>
                   <View style={{ marginTop: spacing.sm }}>

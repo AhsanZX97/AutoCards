@@ -1,7 +1,8 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createApp, type App, type EdgeLlmConfig } from '@autocards/core';
-import { BrowserPdfExtractor, RoutingDocumentExtractor } from '@autocards/core';
+import { RoutingDocumentExtractor } from '@autocards/core';
+import { BrowserPdfExtractor } from '@autocards/core/browser';
 import { createWebStorage } from './webStorage';
 
 const AppContext = createContext<App | null>(null);

@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
-import { useTheme, radius, spacing } from '../lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme, radius, spacing, BRAND_GRADIENT } from '../lib/theme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
@@ -18,13 +19,14 @@ export function Button({ title, onPress, variant = 'primary', size = 'md', loadi
   const theme = useTheme();
   const isDisabled = disabled || loading;
 
+  // Primary paints its own brand gradient underneath, so it stays transparent.
   const backgroundColor =
-    variant === 'primary'
-      ? theme.primary
-      : variant === 'danger'
-        ? theme.danger
-        : variant === 'secondary'
-          ? theme.text
+    variant === 'danger'
+      ? theme.dangerSolid
+      : variant === 'secondary'
+        ? theme.text
+        : variant === 'outline'
+          ? theme.surface
           : 'transparent';
 
   const textColor =
@@ -46,12 +48,20 @@ export function Button({ title, onPress, variant = 'primary', size = 'md', loadi
           backgroundColor,
           paddingVertical,
           borderWidth: variant === 'outline' ? 1 : 0,
-          borderColor: theme.border,
+          borderColor: theme.borderStrong,
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
         },
         style,
       ]}
     >
+      {variant === 'primary' && (
+        <LinearGradient
+          colors={[...BRAND_GRADIENT]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
       {loading && <ActivityIndicator color={textColor} style={{ marginRight: spacing.sm }} />}
       <Text style={[styles.text, { color: textColor, fontSize: size === 'lg' ? 16 : 14 }]}>{title}</Text>
     </Pressable>
@@ -65,6 +75,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
+    // Keeps the primary gradient inside the rounded corners.
+    overflow: 'hidden',
   },
   text: {
     fontWeight: '600',

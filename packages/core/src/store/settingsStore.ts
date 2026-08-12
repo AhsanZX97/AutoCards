@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { STORAGE_KEYS, type StorageAdapter } from '../lib/storage';
+import type { ThemePreference } from '../lib/theme';
 import { toZustandStorage } from './persistBridge';
 import { DEFAULT_MODEL_ID } from '../services/llm/models';
 import type { CardType, Difficulty, GenerationOptions } from '../types';
 import { CARD_TYPES, DEFAULT_GENERATION_PRESET } from '../types';
 
-export type ThemePreference = 'light' | 'dark' | 'system';
+export type { ThemePreference };
 
 export interface SettingsState {
   theme: ThemePreference;
