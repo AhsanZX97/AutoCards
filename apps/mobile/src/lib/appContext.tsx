@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Text, useColorScheme, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
@@ -61,8 +61,47 @@ export function getSupabaseClient(): SupabaseClient | undefined {
   return supabaseClient;
 }
 
+function ConfigurationNeeded() {
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+  const bg = dark ? '#020617' : '#f8fafc';
+  const text = dark ? '#f1f5f9' : '#0f172a';
+  const textMuted = dark ? '#94a3b8' : '#64748b';
+  const surface = dark ? '#0f172a' : '#ffffff';
+  const border = dark ? '#334155' : '#cbd5e1';
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, padding: 24 }}>
+      <Text style={{ fontSize: 36 }}>🔌</Text>
+      <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '800', color: text, textAlign: 'center' }}>
+        Auto Cards isn&apos;t connected to its database
+      </Text>
+      <Text style={{ marginTop: 8, fontSize: 14, color: textMuted, textAlign: 'center' }}>
+        This build is missing{' '}
+        <Text
+          style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: surface, borderColor: border }}
+        >
+          EXPO_PUBLIC_SUPABASE_URL
+        </Text>{' '}
+        and{' '}
+        <Text style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: surface, borderColor: border }}>
+          EXPO_PUBLIC_SUPABASE_ANON_KEY
+        </Text>
+        . Set both and build again.
+      </Text>
+    </View>
+  );
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const app = useMemo(getApp, []);
+  const app = useMemo<App | null>(() => {
+    try {
+      return getApp();
+    } catch (error) {
+      console.error('[autocards] the app could not start', error);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!supabaseClient) return;
@@ -76,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, []);
 
+  if (!app) return <ConfigurationNeeded />;
   return <AppContext.Provider value={app}>{children}</AppContext.Provider>;
 }
 

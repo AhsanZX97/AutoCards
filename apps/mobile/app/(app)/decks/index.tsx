@@ -5,6 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, spacing } from '../../../src/lib/theme';
+import { toast } from '../../../src/lib/toastStore';
 import { Button, Card, Field, Screen } from '../../../src/components';
 import { DeckRow } from '../../../src/features/decks/DeckRow';
 
@@ -24,7 +25,7 @@ export default function DeckLibraryScreen() {
 
   async function handleImport() {
     if (!userId) {
-      Alert.alert('Sign in required', 'Import a deck after signing in.');
+      toast({ variant: 'info', title: 'Sign in required', description: 'Import a deck after signing in.' });
       return;
     }
     let result;
@@ -34,18 +35,18 @@ export default function DeckLibraryScreen() {
         copyToCacheDirectory: true,
       });
     } catch {
-      Alert.alert('Import failed', 'The document picker is unavailable.');
+      toast({ variant: 'error', title: 'Import failed', description: 'The document picker is unavailable.' });
       return;
     }
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
     const payload = parseDeckExport(await readAssetText(asset));
     if (!payload) {
-      Alert.alert('Import failed', 'That file is not a valid deck.');
+      toast({ variant: 'error', title: 'Import failed', description: 'That file is not a valid deck.' });
       return;
     }
     if (payload.cards.length === 0 && payload.categories.length === 0) {
-      Alert.alert('Import failed', 'That deck file is empty.');
+      toast({ variant: 'error', title: 'Import failed', description: 'That deck file is empty.' });
       return;
     }
     Alert.alert('Import deck', `${payload.title}\n${payload.cards.length} cards`, [
@@ -54,7 +55,7 @@ export default function DeckLibraryScreen() {
         text: 'Import',
         onPress: () => {
           const deck = importDeck(payload, userId);
-          Alert.alert('Imported', `${deck.title} added to your decks.`);
+          toast({ variant: 'success', title: 'Imported', description: `${deck.title} added to your decks.` });
           router.push(`/(app)/decks/${deck.id}`);
         },
       },

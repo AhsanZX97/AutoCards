@@ -37,7 +37,7 @@ export async function complete(request: ChatRequest, signal?: AbortSignal): Prom
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey()}`,
         // Attribution only; OpenRouter shows these on the activity page.
-        'HTTP-Referer': Deno.env.get('APP_URL') ?? 'https://autocards.app',
+        'HTTP-Referer': Deno.env.get('APP_URL') ?? 'https://autocards.study',
         'X-Title': 'Auto Cards',
       },
       body: JSON.stringify(request),

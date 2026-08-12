@@ -1,5 +1,89 @@
 # AutoCards
 
+Turn uploaded documents (PDF, Word, PowerPoint, text, Markdown) into gamified flashcards. Web +
+mobile, sharing one core package. Supabase for auth/data, Edge Functions for anything that spends
+money, Stripe for plans.
+
+## Layout
+
+```
+packages/core/      @autocards/core — types, domain logic, services, zustand stores
+apps/web/           Vite + React + Tailwind + react-router (the shipping app)
+apps/mobile/        Expo Router (React Native)
+supabase/           schema.sql, migrations, Edge Functions
+scripts/notion-agent/  scripts behind .github/workflows/notion-agent.yml
+```
+
+npm workspaces. Node >= 20.
+
+## Commands
+
+Run from the repo root:
+
+```bash
+npm run dev            # web app on http://localhost:5173
+npm run dev:mobile     # Expo
+npm test               # core's vitest suite (48 files, 741 tests) — the only tests in the repo
+npm run typecheck      # every workspace, including mobile
+npm run build          # core + web production build
+```
+
+`npm test` and `npm run typecheck` both pass on `main`. Keep it that way — run both before calling
+anything done.
+
+## Git
+
+**Never commit and never push.** Leave finished work in the working tree and tell me what changed;
+I'll review the diff and commit it myself. This holds even when a task looks obviously complete,
+and even if I said "make the change" — that is not permission to commit it. The same goes for
+anything that publishes work outward: no branches, no worktrees, no `gh pr create`, no force-push,
+no tags.
+
+Read-only git is fine and often useful — `git status`, `git diff`, `git log`, `git show`.
+
+If you think a commit is genuinely the right next step, say so and stop; don't do it and report it
+afterwards.
+
+## Architecture rules
+
+- **`@autocards/core` owns all business logic.** Types, SRS scheduler, scoring, study-queue
+  builder, document extraction, LLM services, sync engine and every zustand store live there.
+  Neither app may duplicate or reimplement that logic — if a screen needs a rule, the rule goes in
+  core and the screen calls it.
+- **Apps supply three things only:** a `StorageAdapter` (`localStorage` vs `AsyncStorage`), a
+  `DocumentExtractor`, and platform UI. Everything is wired in
+  [createApp.ts](packages/core/src/createApp.ts) and handed to screens through each app's
+  `src/lib/appContext.tsx`.
+- **Services sit behind interfaces** (`LlmService`, `AuthService`, `BillingService`,
+  `DocumentExtractor`, `SyncBackend`). Screens talk to the interface, never to a concrete class.
+- **Never trust model or file input.** `normalizeGeneratedCards` and the deck-transfer parser
+  repair what they can and demote or drop the rest; malformed input must degrade into a plainer
+  deck, never a crash or an unrenderable card.
+
+## Secrets
+
+The OpenRouter key and the Stripe secret key belong in Supabase project secrets, read only by Edge
+Functions. Vite and Expo inline every public env value into the bundle, so a key in `.env.local`
+is readable by anyone who loads the app — and would make the monthly upload allowance
+unenforceable. Generation goes through `generate-deck`; checkout through
+`create-checkout-session`; only `stripe-webhook` writes `profiles.plan`. See
+[supabase/functions/README.md](supabase/functions/README.md).
+
+## Testing
+
+- Vitest, in `packages/core` only. Tests live in `__tests__/` next to the file under test, named
+  after it (`scoring.ts` → `__tests__/scoring.test.ts`).
+- Mock only at boundaries — `fetch`, Supabase, storage. Don't mock code in this repo; test through
+  it.
+- Web app changes have no automated coverage, so verify them in the browser.
+
+## Known gaps
+
+- **Mobile deck generation is not real.** `apps/mobile` wires `StubDocumentExtractor`, which
+  synthesises page text and flags the document `synthetic`; a live model refuses it. A native
+  extractor behind the same `DocumentExtractor` interface is the swap-in point.
+- Scanned/image-only PDFs have no text layer and are rejected up front rather than sent to a model.
+
 ## Notion shorthand
 
 When working in this repo, these phrases refer to specific Notion pages. Go straight to the URL —

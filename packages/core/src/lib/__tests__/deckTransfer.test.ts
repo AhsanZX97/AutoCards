@@ -279,16 +279,16 @@ describe('share codes', () => {
 
   it('builds and parses share URLs', () => {
     const payload = buildDeckExport(makeDeck(), [makeCard()]);
-    const url = shareUrlForDeck(payload, 'https://autocards.app/app/decks');
-    expect(url.startsWith('https://autocards.app/app/decks?deck=')).toBe(true);
+    const url = shareUrlForDeck(payload, 'https://autocards.study/app/decks');
+    expect(url.startsWith('https://autocards.study/app/decks?deck=')).toBe(true);
     const restored = deckExportFromShareUrl(url);
     expect(restored?.title).toBe('Biology 101');
     expect(restored?.cards).toHaveLength(1);
   });
 
   it('returns null for non-share URLs and garbage codes', () => {
-    expect(deckExportFromShareUrl('https://autocards.app/app/decks')).toBeNull();
-    expect(deckExportFromShareUrl('https://autocards.app/app/decks?deck=%%%not-base64%%%')).toBeNull();
+    expect(deckExportFromShareUrl('https://autocards.study/app/decks')).toBeNull();
+    expect(deckExportFromShareUrl('https://autocards.study/app/decks?deck=%%%not-base64%%%')).toBeNull();
     expect(decodeShareCode('not-a-deck')).toBeNull();
   });
 

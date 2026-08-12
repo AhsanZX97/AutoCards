@@ -4,13 +4,19 @@ import { router } from 'expo-router';
 import { describeSubscription, type AccountSubscription } from '@autocards/core';
 import { useApp, getSupabaseClient } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
+import { toast } from '../../src/lib/toastStore';
 import { useUploadQuota, formatQuota } from '../../src/lib/useUploadQuota';
 import { Badge, Button, Card, Field, ProgressBar, Screen, SwitchRow } from '../../src/components';
+import { FeedbackModal } from '../../src/features/feedback/FeedbackModal';
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const;
 
-/** Where "Manage your plan on the web" sends people — Apple requires IAP for purchases made inside the app. */
-const WEB_BILLING_URL = 'https://autocards.app/app/settings?tab=billing';
+/**
+ * Where someone with no subscription to manage goes to see plans and upgrade —
+ * Apple requires IAP for any purchase made inside the app, so this is web's own
+ * billing tab, opened in the browser rather than checkout run in-app.
+ */
+const WEB_BILLING_URL = 'https://autocards.study/app/settings?tab=billing';
 
 export default function SettingsScreen() {
   const app = useApp();
@@ -23,25 +29,61 @@ export default function SettingsScreen() {
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const quota = useUploadQuota();
   const [subscription, setSubscription] = useState<AccountSubscription | null>(null);
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const userId = user?.id;
   useEffect(() => {
     const account = app.services.account;
-    if (!userId || !account) return;
+    if (!userId || !account) {
+      setSubscriptionLoaded(true);
+      return;
+    }
     let live = true;
+    setSubscriptionLoaded(false);
     void account.fetchSubscription(userId).then((found) => {
-      if (live) setSubscription(found);
+      if (!live) return;
+      setSubscription(found);
+      setSubscriptionLoaded(true);
     });
     return () => {
       live = false;
     };
   }, [app, userId]);
 
+  const ownsOutright = subscription?.plan === 'lifetime';
+
+  /**
+   * Same call the web app's own "Manage billing" button makes — the Stripe
+   * Customer Portal, opened in the browser rather than a static settings URL.
+   * A free account has no subscription for the portal to open, so that case
+   * falls back to the web app's billing tab instead, same as `PlanLimitNotice`.
+   */
   async function handleManagePlan() {
+    if (!subscriptionLoaded) return;
+    const billing = app.services.billing;
+    if (!subscription || !billing) {
+      try {
+        await Linking.openURL(WEB_BILLING_URL);
+      } catch {
+        toast({ variant: 'error', title: 'Could not open browser', description: `Visit ${WEB_BILLING_URL} to see plans.` });
+      }
+      return;
+    }
+
+    setOpeningPortal(true);
     try {
-      await Linking.openURL(WEB_BILLING_URL);
-    } catch {
-      Alert.alert('Could not open browser', `Visit ${WEB_BILLING_URL} to manage your plan.`);
+      const url = await billing.openPortal();
+      await Linking.openURL(url);
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: 'Could not open billing',
+        description: error instanceof Error ? error.message : 'Try again in a moment.',
+      });
+    } finally {
+      setOpeningPortal(false);
     }
   }
 
@@ -72,7 +114,11 @@ export default function SettingsScreen() {
               await signOut();
               router.replace('/(auth)/sign-in');
             } catch (err) {
-              Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete account');
+              toast({
+                variant: 'error',
+                title: 'Could not delete account',
+                description: err instanceof Error ? err.message : undefined,
+              });
             }
           },
         },
@@ -166,7 +212,22 @@ export default function SettingsScreen() {
           {formatQuota(quota)}
         </Text>
 
-        <Button title="Manage your plan on the web" variant="outline" size="sm" onPress={handleManagePlan} />
+        <Button
+          title={
+            !subscriptionLoaded
+              ? 'Loading…'
+              : subscription
+                ? ownsOutright
+                  ? 'Receipts'
+                  : 'Manage billing'
+                : 'See plans on the web'
+          }
+          variant="outline"
+          size="sm"
+          disabled={!subscriptionLoaded}
+          loading={openingPortal}
+          onPress={handleManagePlan}
+        />
       </Card>
 
       <Card style={{ marginBottom: spacing.md }}>
@@ -177,6 +238,13 @@ export default function SettingsScreen() {
       </Card>
 
       <Button
+        title="Send feedback"
+        variant="outline"
+        onPress={() => setFeedbackOpen(true)}
+        style={{ marginBottom: spacing.md }}
+      />
+
+      <Button
         title="Delete account"
         variant="danger"
         onPress={handleDeleteAccount}
@@ -184,6 +252,8 @@ export default function SettingsScreen() {
       />
 
       <Button title="Sign out" variant="danger" onPress={handleSignOut} />
+
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </Screen>
   );
 }

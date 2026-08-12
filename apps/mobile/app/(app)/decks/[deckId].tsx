@@ -54,7 +54,7 @@ export default function DeckDetailScreen() {
         title: `${payload.title} — Auto Cards`,
         message: `Study "${payload.title}" (${payload.cards.length} cards) on Auto Cards: ${shareUrlForDeck(
           payload,
-          'https://autocards.app/app/decks',
+          'https://autocards.study/app/decks',
         )}`,
       });
     } catch {
