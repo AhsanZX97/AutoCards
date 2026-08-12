@@ -245,7 +245,7 @@ export function CreateDeckPage() {
         <Card>
           <CardBody className="flex flex-col items-center py-14 text-center">
             <div className="relative flex h-20 w-20 items-center justify-center">
-              <span className="animate-pulse text-4xl">🧠</span>
+              <img src="/favicon.svg" alt="" className="h-12 w-12 animate-pulse rounded-lg" />
             </div>
             <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
               {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}

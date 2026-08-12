@@ -246,7 +246,7 @@ export function DeckGenerateCardsModal({ open, onClose, deck, cards }: DeckGener
     >
       {step === 'generating' && (
         <div className="flex flex-col items-center py-10 text-center">
-          <span className="animate-pulse text-4xl">🧠</span>
+          <img src="/favicon.svg" alt="" className="mx-auto h-12 w-12 animate-pulse rounded-lg" />
           <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
             {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}
           </p>

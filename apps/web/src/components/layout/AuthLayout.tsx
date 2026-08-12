@@ -17,13 +17,13 @@ export function AuthLayout({ children, title, subtitle }: { children: ReactNode;
         <div className="absolute inset-0 bg-gradient-to-br from-brand-950 via-slate-950 to-blue-950" />
         <div className="relative flex h-full flex-col items-center justify-center px-16 text-center">
           <div className="mb-8 flex -space-x-4">
-            {['📄', '➡️', '🧠', '➡️', '🃏'].map((emoji, i) => (
+            {['📄', '➡️', 'logo', '➡️', '🃏'].map((emoji, i) => (
               <div
                 key={i}
                 className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl backdrop-blur"
                 style={{ zIndex: 5 - i }}
               >
-                {emoji}
+                {emoji === 'logo' ? <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-md" /> : emoji}
               </div>
             ))}
           </div>

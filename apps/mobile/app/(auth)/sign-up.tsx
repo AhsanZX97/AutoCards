@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
@@ -47,7 +47,7 @@ export default function SignUpScreen() {
   return (
     <Screen>
       <View style={{ marginBottom: spacing.xl, marginTop: spacing.xl }}>
-        <Text style={{ fontSize: 32 }}>🧠</Text>
+        <Image source={require('../../assets/icon.png')} style={{ width: 40, height: 40, borderRadius: 10 }} />
         <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: spacing.md }}>
           Create your account
         </Text>
