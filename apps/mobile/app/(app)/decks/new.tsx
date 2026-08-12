@@ -1,21 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import {
   CARD_TYPE_LABELS,
   CARD_TYPES,
+  DEFAULT_GENERATION_PRESET,
+  DEFAULT_MODEL_ID,
   DIFFICULTIES,
+  GENERATION_PRESETS,
+  GENERATION_PRESET_DESCRIPTIONS,
+  GENERATION_PRESET_LABELS,
   GENERATION_STAGE_LABELS,
+  resolvePreset,
   type CardType,
   type Difficulty,
+  type GenerationPresetId,
   type GenerationProgress,
-  type ModelInfo,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
 import { documentSourceFromUri } from '../../../src/lib/pdfSource';
 import { useTheme, spacing } from '../../../src/lib/theme';
-import { Button, Card, Chip, Field, ProgressBar, Screen, SwitchRow } from '../../../src/components';
+import { Button, Card, Chip, Field, ProgressBar, Screen, Stepper, SwitchRow } from '../../../src/components';
 
 type Step = 'upload' | 'configure' | 'generating' | 'error';
 
@@ -24,6 +30,7 @@ export default function CreateDeckScreen() {
   const theme = useTheme();
   const userId = app.authStore((s) => s.session?.user.id);
   const defaults = app.settingsStore((s) => s.generationDefaults);
+  const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const createDeckFromGeneration = app.deckStore((s) => s.createDeckFromGeneration);
   const createBlankDeck = app.deckStore((s) => s.createBlankDeck);
   const updateDeck = app.deckStore((s) => s.updateDeck);
@@ -34,24 +41,19 @@ export default function CreateDeckScreen() {
 
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<{ uri: string; name: string; size: number } | null>(null);
-  const [models, setModels] = useState<ModelInfo[]>([]);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [cardCount] = useState(defaults.cardCount);
+  const [preset, setPreset] = useState<GenerationPresetId>(defaults.preset ?? DEFAULT_GENERATION_PRESET);
+  const [cardCount, setCardCount] = useState(defaults.cardCount);
   const [cardTypes, setCardTypes] = useState<CardType[]>(defaults.cardTypes);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty);
-  const [model, setModel] = useState(defaults.model);
   const [autoCategories, setAutoCategories] = useState(defaults.autoCategories);
   const [includeHints, setIncludeHints] = useState(defaults.includeHints);
   const [includeExplanations, setIncludeExplanations] = useState(defaults.includeExplanations);
-
-  useEffect(() => {
-    app.services.llm.listModels().then((list) => {
-      setModels(list);
-      setModel((current) => current || list[0]?.id || current);
-    });
-  }, [app]);
+  const [includeSourceQuotes, setIncludeSourceQuotes] = useState(defaults.includeSourceQuotes);
+  const [readImages, setReadImages] = useState(defaults.readImages ?? false);
+  const [instructions, setInstructions] = useState('');
 
   async function pickFile() {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
@@ -71,24 +73,35 @@ export default function CreateDeckScreen() {
     });
   }
 
+  function choosePreset(next: GenerationPresetId) {
+    setPreset(next);
+    setCardTypes(resolvePreset(next).suggestedCardTypes);
+  }
+
   async function startGeneration() {
     if (!file || !userId) return;
     setStep('generating');
     setErrorMessage('');
+    updateDefaults({ preset, cardCount, cardTypes, difficulty, autoCategories, includeHints, includeExplanations, includeSourceQuotes, readImages });
     try {
       const source = documentSourceFromUri(file.uri, file.name, file.size);
       const document = await app.services.documents.extract(source);
       const result = await app.services.llm.generateDeck({
         documents: [document],
         options: {
-          model,
+          // Model choice is not a decision to put in front of a student, so
+          // generation always runs on the house default rather than exposing a picker.
+          model: DEFAULT_MODEL_ID,
+          preset,
           cardCount,
           cardTypes,
           difficulty,
           autoCategories,
+          instructions: instructions.trim() || undefined,
           includeHints,
           includeExplanations,
-          includeSourceQuotes: false,
+          includeSourceQuotes,
+          readImages,
           language: 'en',
         },
         onProgress: setProgress,
@@ -170,12 +183,27 @@ export default function CreateDeckScreen() {
           <Card style={{ marginBottom: spacing.lg }}>
             <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Generation options</Text>
 
-            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: spacing.sm }}>Model</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: spacing.sm }}>
+              What are these cards for?
+            </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {models.map((m) => (
-                <Chip key={m.id} label={m.name} active={model === m.id} onPress={() => setModel(m.id)} />
+              {GENERATION_PRESETS.map((id) => (
+                <Chip key={id} label={GENERATION_PRESET_LABELS[id]} active={preset === id} onPress={() => choosePreset(id)} />
               ))}
             </View>
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: -4, marginBottom: spacing.md }}>
+              {GENERATION_PRESET_DESCRIPTIONS[preset]}
+            </Text>
+
+            <Stepper
+              label="Number of cards"
+              value={cardCount}
+              min={5}
+              max={60}
+              step={5}
+              formatValue={(v) => `${v} cards`}
+              onChange={setCardCount}
+            />
 
             <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginTop: spacing.md, marginBottom: spacing.sm }}>
               Card types
@@ -201,6 +229,18 @@ export default function CreateDeckScreen() {
             </View>
 
             <View style={{ marginTop: spacing.md }}>
+              <Field
+                label="Custom instructions"
+                hint="optional"
+                placeholder="e.g. Focus on chapter 3, write cards for a final exam…"
+                value={instructions}
+                onChangeText={setInstructions}
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+
+            <View style={{ marginTop: spacing.md }}>
               <SwitchRow
                 label="Auto-categorize"
                 description="Group cards by topic"
@@ -209,6 +249,18 @@ export default function CreateDeckScreen() {
               />
               <SwitchRow label="Include hints" value={includeHints} onValueChange={setIncludeHints} />
               <SwitchRow label="Include explanations" value={includeExplanations} onValueChange={setIncludeExplanations} />
+              <SwitchRow
+                label="Quote source passages"
+                description="Show the original text each card was based on"
+                value={includeSourceQuotes}
+                onValueChange={setIncludeSourceQuotes}
+              />
+              <SwitchRow
+                label="Read the pictures too"
+                description="Reads diagrams and charts as well as the text. Slower and costs more."
+                value={readImages}
+                onValueChange={setReadImages}
+              />
             </View>
           </Card>
 
