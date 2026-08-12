@@ -49,3 +49,9 @@ export function remainingUploads(
 export function canUpload(plan: Plan, usage: UploadUsage | undefined, now: Date = new Date()): boolean {
   return remainingUploads(plan, usage, now) > 0;
 }
+
+/** "3 of 5 uploads left this month" / "12 used this month" once the plan is unlimited. */
+export function formatQuota(remaining: number, limit: number, used: number): string {
+  if (limit === Number.POSITIVE_INFINITY) return `${used} used this month`;
+  return `${remaining} of ${limit} uploads left this month`;
+}

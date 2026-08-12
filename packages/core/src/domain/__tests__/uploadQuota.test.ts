@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canUpload,
   countUpload,
+  formatQuota,
   remainingUploads,
   usageForPeriod,
   usagePeriod,
@@ -73,5 +74,15 @@ describe('canUpload', () => {
 
   it('allows an upload when there is no usage at all', () => {
     expect(canUpload('free', undefined, JAN)).toBe(true);
+  });
+});
+
+describe('formatQuota', () => {
+  it('counts down the remaining allowance', () => {
+    expect(formatQuota(3, 5, 2)).toBe('3 of 5 uploads left this month');
+  });
+
+  it('reports the count used instead, once the plan is unlimited', () => {
+    expect(formatQuota(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, 12)).toBe('12 used this month');
   });
 });
