@@ -234,44 +234,96 @@ create policy "usage is self-readable" on public.usage_counters
   for select using (user_id = auth.uid());
 -- No write policy: the Edge Function uses the service role, which bypasses RLS.
 
+-- usage_by_email: the same allowance, keyed so it outlives the account.
+--
+-- `usage_counters` cascades away the instant an account is deleted, which
+-- would make deleting an account and signing back up with the same email a
+-- free reset of the monthly allowance. This table is what actually decides
+-- the limit; `usage_counters` is kept equal to it purely so the per-account
+-- read in `SupabaseAccountBackend.fetchUploadUsage` keeps working. Keyed by
+-- `sha256(lower(email))` rather than the email itself, and with no foreign
+-- key to `auth.users`, so nothing about it is touched by that cascade — the
+-- plaintext address is not retained after an account is deleted.
+create table public.usage_by_email (
+  email_hash text not null,
+  period text not null,
+  uploads integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (email_hash, period)
+);
+
+alter table public.usage_by_email enable row level security;
+-- No policies at all: spent and refunded only by the Edge Function via the
+-- service role, which bypasses RLS. Nobody can read it directly.
+
 -- Spends one upload if the allowance has room, and reports the new count.
 -- Check and increment are one statement so two generations racing for the last
 -- upload cannot both win. `p_limit` null means unlimited — counted, not capped.
 -- Returns the new count, or null when the allowance is spent.
-create function public.spend_upload(p_user uuid, p_period text, p_limit integer)
+--
+-- An email is not guaranteed by anything upstream, so a missing one falls
+-- back to a per-user key rather than colliding every email-less caller into
+-- one shared bucket.
+create function public.spend_upload(p_user uuid, p_email text, p_period text, p_limit integer)
 returns integer
 language plpgsql
 security definer
 set search_path = public
 as $$
-declare spent integer;
+declare
+  v_hash text := encode(
+    sha256(convert_to(lower(coalesce(p_email, 'user:' || p_user::text)), 'UTF8')),
+    'hex'
+  );
+  spent integer;
 begin
   if p_limit is not null and p_limit <= 0 then
     return null;
   end if;
 
+  insert into public.usage_by_email as e (email_hash, period, uploads)
+  values (v_hash, p_period, 1)
+  on conflict (email_hash, period) do update
+    set uploads = e.uploads + 1, updated_at = now()
+    where p_limit is null or e.uploads < p_limit
+  returning e.uploads into spent;
+
+  if spent is null then
+    return null;
+  end if;
+
   insert into public.usage_counters as u (user_id, period, uploads)
-  values (p_user, p_period, 1)
+  values (p_user, p_period, spent)
   on conflict (user_id, period) do update
-    set uploads = u.uploads + 1, updated_at = now()
-    where p_limit is null or u.uploads < p_limit
-  returning u.uploads into spent;
+    set uploads = spent, updated_at = now();
 
   return spent;
 end;
 $$;
 
 -- Puts an upload back when the call it was reserved for never reached the
--- model. Floors at zero so a double refund cannot mint allowance.
-create function public.refund_upload(p_user uuid, p_period text)
+-- model. Floors at zero so a double refund cannot mint allowance. Refunds the
+-- email ledger first, then mirrors its result onto usage_counters.
+create function public.refund_upload(p_user uuid, p_email text, p_period text)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_hash text := encode(
+    sha256(convert_to(lower(coalesce(p_email, 'user:' || p_user::text)), 'UTF8')),
+    'hex'
+  );
+  new_count integer;
 begin
-  update public.usage_counters
+  update public.usage_by_email
     set uploads = greatest(0, uploads - 1), updated_at = now()
+  where email_hash = v_hash and period = p_period
+  returning uploads into new_count;
+
+  update public.usage_counters
+    set uploads = coalesce(new_count, greatest(0, uploads - 1)), updated_at = now()
   where user_id = p_user and period = p_period;
 end;
 $$;
@@ -279,10 +331,10 @@ $$;
 -- Both are security definer and take the user id as an argument, so the
 -- default grant would let any signed-in client spend or refund against any
 -- account. Only the Edge Function may call them.
-revoke execute on function public.spend_upload(uuid, text, integer) from public;
-revoke execute on function public.refund_upload(uuid, text) from public;
-grant execute on function public.spend_upload(uuid, text, integer) to service_role;
-grant execute on function public.refund_upload(uuid, text) to service_role;
+revoke execute on function public.spend_upload(uuid, text, text, integer) from public;
+revoke execute on function public.refund_upload(uuid, text, text) from public;
+grant execute on function public.spend_upload(uuid, text, text, integer) to service_role;
+grant execute on function public.refund_upload(uuid, text, text) to service_role;
 
 -- subscriptions: the paid plan behind `profiles.plan`.
 --

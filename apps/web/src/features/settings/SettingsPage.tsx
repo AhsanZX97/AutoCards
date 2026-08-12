@@ -9,8 +9,9 @@ import {
   type Plan,
   type PurchasablePlan,
 } from '@autocards/core';
+import { FunctionsFetchError } from '@supabase/supabase-js';
 import { useApp, getSupabaseClient } from '../../lib/appContext';
-import { Avatar, Badge, Button, Card, CardBody, Field, Input, Progress, Select, Switch, Tabs } from '../../components/ui';
+import { Avatar, Badge, Button, Card, CardBody, Field, Input, Modal, Progress, Select, Switch, Tabs } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useUploadQuota } from '../../lib/useUploadQuota';
 
@@ -50,24 +51,39 @@ function ProfileTab() {
   const app = useApp();
   const user = app.authStore((s) => s.session?.user);
   const signOut = app.authStore((s) => s.signOut);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  async function handleDeleteAccount() {
+  async function deleteAccount() {
     if (!user) return;
-    const confirmed = window.confirm(
-      'This action is permanent and cannot be undone. All your data will be deleted. Are you sure?',
-    );
-    if (!confirmed) return;
     const client = getSupabaseClient();
     if (!client) return;
+    setDeleting(true);
     try {
       const { error } = await client.functions.invoke('delete-account', {
         body: { user_id: user.id },
       });
       if (error) throw error;
-      await signOut();
+      await signOut({ force: true });
       window.location.href = '/';
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not delete account');
+      if (err instanceof FunctionsFetchError) {
+        // The browser failed to read the response rather than the request
+        // failing to send — seen in practice with browser tracking
+        // prevention blocking `/functions/` URLs. The delete call still
+        // reaches the server either way, so treat this as a done deal rather
+        // than leaving the account looking alive when it may already be gone.
+        await signOut({ force: true });
+        window.location.href = '/';
+        return;
+      }
+      setDeleting(false);
+      setConfirmOpen(false);
+      toast({
+        variant: 'error',
+        title: 'Could not delete account',
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   }
 
@@ -90,11 +106,33 @@ function ProfileTab() {
           <Input value={user.email} disabled />
         </Field>
         <div className="pt-2">
-          <Button variant="danger" onClick={handleDeleteAccount}>
+          <Button variant="danger" onClick={() => setConfirmOpen(true)}>
             Delete account
           </Button>
         </div>
       </CardBody>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => !deleting && setConfirmOpen(false)}
+        title="Delete your account?"
+        description="This action is permanent and cannot be undone."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={() => void deleteAccount()} loading={deleting}>
+              Delete account
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          All your decks, cards and study history will be deleted. You will be signed out immediately.
+        </p>
+      </Modal>
     </Card>
   );
 }

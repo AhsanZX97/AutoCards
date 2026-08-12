@@ -65,10 +65,20 @@ jobs:
             exit 0
           fi
 
+          SUMMARY=""
           MANUAL_STEPS=""
+          STRIPPED=0
+          if [ -f .notion-agent/SUMMARY.md ]; then
+            SUMMARY=$(cat .notion-agent/SUMMARY.md)
+            git rm -q .notion-agent/SUMMARY.md
+            STRIPPED=1
+          fi
           if [ -f .notion-agent/MANUAL_STEPS.md ]; then
             MANUAL_STEPS=$(cat .notion-agent/MANUAL_STEPS.md)
             git rm -q .notion-agent/MANUAL_STEPS.md
+            STRIPPED=1
+          fi
+          if [ "$STRIPPED" = "1" ]; then
             git commit --amend --no-edit --allow-empty -q
           fi
 
@@ -79,6 +89,23 @@ jobs:
           Notion card: https://notion.so/${{ github.event.client_payload.notion_page_id }}
 
           Automated by DeepSeek V4 Flash via Aider.
+          EOF
+          )
+          if [ -n "$SUMMARY" ]; then
+            BODY="$BODY
+
+          ## What changed
+
+          $SUMMARY"
+          fi
+          if [ -n "$MANUAL_STEPS" ]; then
+            BODY="$BODY
+
+          ## Manual steps needed
+
+          $MANUAL_STEPS"
+          fi
+          BODY="$BODY
 
           ## Test locally
 
@@ -89,16 +116,7 @@ jobs:
           npm run dev:web
           npm run typecheck
           npm test
-          \`\`\`
-          EOF
-          )
-          if [ -n "$MANUAL_STEPS" ]; then
-            BODY="$BODY
-
-          ## Manual steps needed
-
-          $MANUAL_STEPS"
-          fi
+          \`\`\`"
 
           PR_URL=$(gh pr create \
             --base main \

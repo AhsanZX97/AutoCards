@@ -58,7 +58,7 @@ Deno.serve(async (request) => {
   // spend money rather than after.
   let uploads: number | null;
   try {
-    uploads = await spendUpload(admin, caller.id, period, limits.monthlyUploads);
+    uploads = await spendUpload(admin, caller.id, caller.email, period, limits.monthlyUploads);
   } catch (error) {
     console.error('spend_upload failed', error);
     return failure('We could not check your upload allowance. Try again in a moment.', 500, 'upstream');
@@ -88,7 +88,7 @@ Deno.serve(async (request) => {
   if (!outcome.billed) {
     // Nothing was generated, so the upload goes back — the same rule the app
     // has always followed: a run that never reached the model is free to retry.
-    await refundUpload(admin, caller.id, period);
+    await refundUpload(admin, caller.id, caller.email, period);
     return failure(outcome.message ?? 'The model could not complete that.', outcome.status, 'upstream');
   }
 
