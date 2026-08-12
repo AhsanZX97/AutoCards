@@ -7,6 +7,7 @@ import { createWebStorage } from './webStorage';
 const AppContext = createContext<App | null>(null);
 
 let singleton: App | null = null;
+let supabaseClient: SupabaseClient | undefined;
 
 interface SupabaseSetup {
   client: SupabaseClient;
@@ -14,7 +15,6 @@ interface SupabaseSetup {
   anonKey: string;
 }
 
-/** Supabase for real accounts + cross-device sync. Required — see `.env.example`. */
 function buildSupabase(): SupabaseSetup | undefined {
   const url = import.meta.env.VITE_SUPABASE_URL?.trim();
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
@@ -22,23 +22,10 @@ function buildSupabase(): SupabaseSetup | undefined {
   return { client: createClient(url, anonKey), url, anonKey };
 }
 
-/**
- * Where card generation is actually run.
- *
- * There is no OpenRouter key in this bundle, deliberately: Vite inlines every
- * `VITE_` value into JavaScript anyone can read, so a key here would be a key
- * anyone could take — and an upload allowance nobody could enforce. The key
- * lives in the `generate-deck` function instead, which also counts the
- * allowance. See `supabase/functions/`.
- */
 function buildEdge(supabase: SupabaseSetup): EdgeLlmConfig {
   return {
-    // Points at the hosted project unless a local `supabase start` is being
-    // used for the functions — see `.env.example`.
     supabaseUrl: import.meta.env.VITE_SUPABASE_FUNCTIONS_URL?.trim() || supabase.url,
     anonKey: supabase.anonKey,
-    // Read per call: Supabase refreshes the token in the background, and a
-    // stale one is rejected at the gateway.
     getAccessToken: async () => {
       const { data } = await supabase.client.auth.getSession();
       return data.session?.access_token;
@@ -46,30 +33,24 @@ function buildEdge(supabase: SupabaseSetup): EdgeLlmConfig {
   };
 }
 
-/** One instance per page load — stores persist to localStorage across reloads. */
 function getApp(): App {
   if (!singleton) {
-    const supabase = buildSupabase();
+    const supabaseSetup = buildSupabase();
+    supabaseClient = supabaseSetup?.client;
     singleton = createApp({
       storage: createWebStorage(),
-      // pdf.js is the only reader that needs the browser; the router handles
-      // Word, PowerPoint and text itself.
       documentExtractor: new RoutingDocumentExtractor(new BrowserPdfExtractor()),
-      supabase: supabase?.client,
-      ...(supabase ? { edge: buildEdge(supabase) } : {}),
+      supabase: supabaseClient,
+      ...(supabaseSetup ? { edge: buildEdge(supabaseSetup) } : {}),
     });
   }
   return singleton;
 }
 
-/**
- * Says what is missing instead of rendering nothing.
- *
- * Without the Supabase pair, `createApp` throws inside the `useMemo` below and
- * takes the whole tree with it — a deploy that forgot an environment variable
- * looked exactly like a dead site. This is the one error worth naming
- * precisely, because the only person who can ever see it is whoever deployed.
- */
+export function getSupabaseClient(): SupabaseClient | undefined {
+  return supabaseClient;
+}
+
 function ConfigurationNeeded() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">

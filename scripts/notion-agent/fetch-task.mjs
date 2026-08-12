@@ -71,7 +71,17 @@ if (!title) {
   process.exit(1);
 }
 
-const message = [title, "", body].join("\n").trim();
+const AGENT_INSTRUCTIONS = `---
+
+You are running unattended in CI with no shell access to external services — you can only read and edit files in this repo. If finishing this task requires something you can't do by editing files (running a CLI like \`supabase db push\` or \`stripe\` commands, changing a dashboard setting, adding an environment variable or secret, deploying an Edge Function), do not attempt it and do not pretend it's done. Instead write exact, copy-pasteable step-by-step instructions for a human into a new file at .notion-agent/MANUAL_STEPS.md, including the precise commands to run. Only create this file if manual steps are actually needed.
+
+Also write a file at .notion-agent/SUMMARY.md explaining what you did, for a product owner with no coding background — plain language, no code terms, no file names, no jargon. Cover, only where relevant:
+- What changed, described as user- or business-facing behavior (e.g. "Users can now delete their own account from the app" rather than describing functions or files).
+- Any constraints or tradeoffs you hit (e.g. something the task asked for that you couldn't fully do, an assumption you had to make, a risk worth flagging).
+- Anything else worth knowing before this ships — skip this if there's genuinely nothing, don't pad it out.
+Keep it short — a few sentences per section, not an essay. Always create this file.`;
+
+const message = [title, "", body, AGENT_INSTRUCTIONS].join("\n").trim();
 const fs = await import("node:fs/promises");
 await fs.writeFile(outputPath, message, "utf8");
 console.log(`Wrote task "${title}" (${message.length} chars) to ${outputPath}`);

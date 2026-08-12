@@ -18,6 +18,7 @@ they could clear.
 | `create-portal-session` | Opens Stripe's Customer Portal for cancelling, card changes and invoices. | User JWT |
 | `stripe-webhook` | The only thing that can put an account on a paid plan. | Stripe signature |
 | `send-reminders` | Emails whoever is due a study reminder. Woken by cron every 5 minutes. | `x-cron-secret` |
+| `delete-account` | Deletes the caller's own auth user and everything cascading from it. | User JWT |
 
 ## What the server decides
 
@@ -29,7 +30,9 @@ it here. What this side re-decides is everything that determines the bill:
   read from `profiles`, never taken from the request.
 - **Whether they have an upload left.** `spend_upload` checks and increments in
   one statement, so two tabs cannot both spend the last one. It is given back if
-  the model never ran.
+  the model never ran. The count lives on a hash of the email
+  (`usage_by_email`), not the account id, so deleting an account and signing
+  back up with the same email does not reset it.
 - **What may be asked for.** `_shared/chatRequest.ts` rebuilds the request field
   by field: only catalogue models, a clamped output budget, a capped amount of
   text and inline-only images. Anything it does not recognise is dropped rather
@@ -184,6 +187,7 @@ npx supabase functions deploy create-checkout-session
 npx supabase functions deploy create-portal-session
 npx supabase functions deploy stripe-webhook
 npx supabase functions deploy send-reminders
+npx supabase functions deploy delete-account
 ```
 
 `stripe-webhook` must be reachable without a Supabase token, because Stripe has
@@ -199,6 +203,10 @@ fresh project:
 
 - `0002_usage_counters.sql` adds `usage_counters`, `spend_upload`, `refund_upload`.
   Without it every generation fails on the allowance check.
+- `0012_usage_by_email.sql` adds `usage_by_email`, the allowance keyed by a
+  hash of the email instead of the account id, and changes `spend_upload` /
+  `refund_upload` to take `p_email`. Without it, `delete-account` cascading
+  away `usage_counters` is a free reset of the monthly allowance.
 - `0003_subscriptions.sql` adds `subscriptions`, `stripe_events` and
   `claim_stripe_event`. Without it every webhook delivery fails and nobody's
   payment reaches their account.

@@ -1,6 +1,6 @@
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useApp } from '../../src/lib/appContext';
+import { useApp, getSupabaseClient } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Button, Card, Field, Screen, SwitchRow } from '../../src/components';
 
@@ -19,6 +19,36 @@ export default function SettingsScreen() {
   async function handleSignOut() {
     await signOut();
     router.replace('/(auth)/sign-in');
+  }
+
+  async function handleDeleteAccount() {
+    if (!user) return;
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    Alert.alert(
+      'Delete Account',
+      'This action is permanent and cannot be undone. All your data will be deleted. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await client.functions.invoke('delete-account', {
+                body: { user_id: user.id },
+              });
+              if (error) throw error;
+              await signOut();
+              router.replace('/(auth)/sign-in');
+            } catch (err) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete account');
+            }
+          },
+        },
+      ],
+    );
   }
 
   if (!user) return null;
@@ -75,6 +105,13 @@ export default function SettingsScreen() {
           files is web-only for now.
         </Text>
       </Card>
+
+      <Button
+        title="Delete account"
+        variant="danger"
+        onPress={handleDeleteAccount}
+        style={{ marginBottom: spacing.sm }}
+      />
 
       <Button title="Sign out" variant="danger" onPress={handleSignOut} />
     </Screen>

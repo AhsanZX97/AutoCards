@@ -55,15 +55,22 @@ export async function authenticate(
  * Reserved before the model call rather than counted after it, so two tabs
  * cannot both spend the last one. `refundUpload` puts it back if the call
  * never reached the model.
+ *
+ * Keyed by email as well as user id: the allowance this checks is
+ * `usage_by_email`, which has no foreign key to `auth.users` and so is the
+ * one thing `delete-account` cannot cascade away. Without it, deleting an
+ * account and signing back up with the same email would reset the count.
  */
 export async function spendUpload(
   admin: SupabaseClient,
   userId: string,
+  email: string | undefined,
   period: string,
   limit: number | null,
 ): Promise<number | null> {
   const { data, error } = await admin.rpc('spend_upload', {
     p_user: userId,
+    p_email: email ?? null,
     p_period: period,
     p_limit: limit,
   });
@@ -75,9 +82,14 @@ export async function spendUpload(
 export async function refundUpload(
   admin: SupabaseClient,
   userId: string,
+  email: string | undefined,
   period: string,
 ): Promise<void> {
-  const { error } = await admin.rpc('refund_upload', { p_user: userId, p_period: period });
+  const { error } = await admin.rpc('refund_upload', {
+    p_user: userId,
+    p_email: email ?? null,
+    p_period: period,
+  });
   if (error) console.error('refund_upload failed', { userId, period, error: error.message });
 }
 
