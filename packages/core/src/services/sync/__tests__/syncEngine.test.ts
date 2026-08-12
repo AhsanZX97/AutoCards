@@ -393,6 +393,56 @@ describe('SyncEngine', () => {
     engine.stop();
   });
 
+  /**
+   * A pull used to call one `set()` per row, so a first sync of a few hundred
+   * cards notified every subscriber that many times in a tight loop. Each
+   * notification forces `useSyncExternalStore` into a synchronous re-render,
+   * and past ~50 of them React aborts the tree with "Maximum update depth
+   * exceeded" — the whole pull has to land as one update.
+   */
+  it('applies a whole pull as a single store update rather than one per row', async () => {
+    const storage = createMemoryStorage();
+    const { authStore, deckStore, studyStore, syncStore } = makeDeckAndCard(storage);
+    const deck = deckStore.getState().createBlankDeck('user-1', 'Big');
+    const remoteCards = Array.from({ length: 100 }, (_, i) =>
+      makeCard({ id: `card_pulled_${i}`, deckId: deck.id }),
+    );
+    const backend = fakeBackend({
+      pull: vi.fn(async () => ({
+        decks: [],
+        cards: remoteCards.map((card) => ({
+          id: card.id,
+          deckId: deck.id,
+          updatedAt: nowIso(),
+          deletedAt: null,
+          data: card,
+        })),
+        sessions: [],
+      })),
+    });
+    const engine = new SyncEngine({
+      authStore,
+      deckStore,
+      studyStore,
+      syncStore,
+      backend,
+      flushIntervalMs: 10 ** 9,
+    });
+    engine.start();
+    await settle();
+
+    let notifications = 0;
+    const unsubscribe = deckStore.subscribe(() => {
+      notifications += 1;
+    });
+    await engine.syncNow();
+    unsubscribe();
+
+    expect(deckStore.getState().getCards(deck.id)).toHaveLength(100);
+    expect(notifications).toBe(1);
+    engine.stop();
+  });
+
   it('leaves the outbox intact when a push fails, then re-pushes on the next pass', async () => {
     const storage = createMemoryStorage();
     const { authStore, deckStore, studyStore, syncStore } = makeDeckAndCard(storage);

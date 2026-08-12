@@ -50,6 +50,14 @@ export interface DeckDetails {
   description: string;
 }
 
+/** One pull's worth of already-merge-resolved remote rows. */
+export interface RemoteChanges {
+  deckUpserts: Deck[];
+  deckDeletes: Id[];
+  cardUpserts: Flashcard[];
+  cardDeletes: Array<{ deckId: Id; cardId: Id }>;
+}
+
 export interface DeckState {
   decks: Deck[];
   cardsByDeck: Record<Id, Flashcard[]>;
@@ -87,13 +95,16 @@ export interface DeckState {
 
   reviewCard: (deckId: Id, cardId: Id, correct: boolean) => void;
 
-  /** Remote-merge entry points driven by the sync engine on pull. Unlike the
-   *  local mutators above, none of these fire `onChange`, because they reflect
-   *  remote truth rather than a local edit that needs pushing back up. */
-  applyRemoteDeck: (deck: Deck) => void;
-  applyRemoteDeleteDeck: (deckId: Id) => void;
-  applyRemoteCard: (card: Flashcard) => void;
-  applyRemoteDeleteCard: (deckId: Id, cardId: Id) => void;
+  /** Remote-merge entry point driven by the sync engine on pull. Unlike the
+   *  local mutators above it does not fire `onChange`, because it reflects
+   *  remote truth rather than a local edit that needs pushing back up.
+   *
+   *  A whole pull lands in one `set()` on purpose. Applying rows one at a time
+   *  notified subscribers once per row, and since `useSyncExternalStore` turns
+   *  every notification into a synchronous re-render, a first sync of a few
+   *  hundred cards tripped React's nested-update guard ("Maximum update depth
+   *  exceeded") and blanked the screen. */
+  applyRemoteChanges: (changes: RemoteChanges) => void;
   /** Empties local state without firing `onChange` — used on sign-out so a
    *  second account on the same device never starts from the first account's
    *  decks. */
@@ -483,42 +494,46 @@ export function createDeckStore(storage: StorageAdapter, onChange: (ops: SyncOp[
           onChange([cardOp(deckId, cardId)]);
         },
 
-        applyRemoteDeck: (deck) => {
-          set((state) => ({
-            decks: state.decks.some((d) => d.id === deck.id)
-              ? state.decks.map((d) => (d.id === deck.id ? deck : d))
-              : [deck, ...state.decks],
-          }));
-        },
-
-        applyRemoteDeleteDeck: (deckId) => {
+        applyRemoteChanges: ({ deckUpserts, deckDeletes, cardUpserts, cardDeletes }) => {
+          if (!deckUpserts.length && !deckDeletes.length && !cardUpserts.length && !cardDeletes.length) {
+            return;
+          }
           set((state) => {
-            const { [deckId]: _removed, ...cardsByDeck } = state.cardsByDeck;
-            return { decks: state.decks.filter((d) => d.id !== deckId), cardsByDeck };
-          });
-        },
+            const upsertById = new Map(deckUpserts.map((deck) => [deck.id, deck]));
+            const known = new Set(state.decks.map((deck) => deck.id));
+            // Newly-seen decks go on top, newest first, which is where a deck
+            // created on this device lands too.
+            const added = deckUpserts.filter((deck) => !known.has(deck.id)).reverse();
+            const deleted = new Set(deckDeletes);
+            const decks = [...added, ...state.decks.map((deck) => upsertById.get(deck.id) ?? deck)].filter(
+              (deck) => !deleted.has(deck.id),
+            );
 
-        applyRemoteCard: (card) => {
-          set((state) => {
-            const existing = state.cardsByDeck[card.deckId] ?? [];
-            const present = existing.some((c) => c.id === card.id);
-            const merged = present
-              ? existing.map((c) => (c.id === card.id ? card : c))
-              : [...existing, card];
-            // Every reader treats the stored array as display order, so a card
-            // arriving from another device has to land in its ordered slot
+            const cardsByDeck = { ...state.cardsByDeck };
+            for (const deckId of deleted) delete cardsByDeck[deckId];
+
+            // Touched decks are re-sorted once at the end rather than per card:
+            // every reader treats the stored array as display order, so cards
+            // arriving from another device have to land in their ordered slots
             // rather than at the end.
-            return { cardsByDeck: { ...state.cardsByDeck, [card.deckId]: sortCardsByPosition(merged) } };
-          });
-        },
+            const touched = new Set<Id>();
+            for (const card of cardUpserts) {
+              const existing = cardsByDeck[card.deckId] ?? [];
+              const present = existing.some((c) => c.id === card.id);
+              cardsByDeck[card.deckId] = present
+                ? existing.map((c) => (c.id === card.id ? card : c))
+                : [...existing, card];
+              touched.add(card.deckId);
+            }
+            for (const { deckId, cardId } of cardDeletes) {
+              cardsByDeck[deckId] = (cardsByDeck[deckId] ?? []).filter((c) => c.id !== cardId);
+            }
+            for (const deckId of touched) {
+              cardsByDeck[deckId] = sortCardsByPosition(cardsByDeck[deckId]!);
+            }
 
-        applyRemoteDeleteCard: (deckId, cardId) => {
-          set((state) => ({
-            cardsByDeck: {
-              ...state.cardsByDeck,
-              [deckId]: (state.cardsByDeck[deckId] ?? []).filter((c) => c.id !== cardId),
-            },
-          }));
+            return { decks, cardsByDeck };
+          });
         },
 
         clear: () => set({ decks: [], cardsByDeck: {} }),
