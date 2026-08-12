@@ -63,6 +63,11 @@ export default function CreateDeckScreen() {
     setStep('configure');
   }
 
+  function removeFile() {
+    setFile(null);
+    setStep('upload');
+  }
+
   function toggleCardType(type: CardType) {
     setCardTypes((prev) => {
       if (prev.includes(type)) {
@@ -174,10 +179,15 @@ export default function CreateDeckScreen() {
       {step === 'configure' && file && (
         <View>
           <Card style={{ marginBottom: spacing.lg }}>
-            <Text style={{ fontWeight: '700', color: theme.text }} numberOfLines={1}>
-              📄 {file.name}
-            </Text>
-            <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{Math.round(file.size / 1024)} KB</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1, marginRight: spacing.md }}>
+                <Text style={{ fontWeight: '700', color: theme.text }} numberOfLines={1}>
+                  📄 {file.name}
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{Math.round(file.size / 1024)} KB</Text>
+              </View>
+              <Button title="Remove" variant="ghost" size="sm" onPress={removeFile} />
+            </View>
           </Card>
 
           <Card style={{ marginBottom: spacing.lg }}>
