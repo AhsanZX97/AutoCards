@@ -72,7 +72,7 @@ export default function DeckLibraryScreen() {
           onPress={handleImport}
           style={{ flexGrow: 1 }}
         />
-        <Button title="Create deck from PDF — coming soon" onPress={() => {}} disabled style={{ flexGrow: 2 }} />
+        <Button title="Create deck" onPress={() => router.push('/(app)/decks/new')} style={{ flexGrow: 2 }} />
       </View>
 
       {filtered.length === 0 ? (
