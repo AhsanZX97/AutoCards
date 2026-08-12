@@ -45,13 +45,20 @@ export default function StudyRunnerScreen() {
   const startedAtRef = useRef(Date.now());
 
   useEffect(() => {
+    // Cram mode re-appends a missed card to the end of the queue, so the
+    // *same* card can become current again right after being answered wrong
+    // — keying this off `currentId` would then skip the reset entirely,
+    // since the id didn't change even though it's a fresh attempt. Keying
+    // off `position` (which always advances by one per answer) guarantees a
+    // reset every time, matching web's `[session?.position]`.
     startedAtRef.current = Date.now();
     setFlipped(false);
     setHintRevealed(false);
     setTypedResponse('');
     setSelectedChoiceId(null);
     setRevealed(null);
-  }, [currentId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.position]);
 
   useEffect(() => {
     if (session?.status === 'completed') {

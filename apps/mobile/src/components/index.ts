@@ -6,3 +6,5 @@ export * from './SwitchRow';
 export * from './ProgressBar';
 export * from './Chip';
 export * from './Screen';
+export * from './Stepper';
+export * from './Notice';

@@ -145,7 +145,7 @@ describe('study history as account state', () => {
   it('files a run from another device into history', async () => {
     const store = await hydrate(createMemoryStorage());
 
-    store.getState().applyRemoteSession(summary({ id: 'session_remote' }));
+    store.getState().applyRemoteSessions([summary({ id: 'session_remote' })]);
 
     expect(store.getState().history.map((s) => s.id)).toEqual(['session_remote']);
   });
@@ -153,8 +153,8 @@ describe('study history as account state', () => {
   it('keeps history newest-first when a remote run predates a local one', async () => {
     const store = await hydrate(createMemoryStorage());
 
-    store.getState().applyRemoteSession(summary({ id: 'older', endedAt: '2026-01-01T00:00:00.000Z' }));
-    store.getState().applyRemoteSession(summary({ id: 'newer', endedAt: '2026-03-01T00:00:00.000Z' }));
+    store.getState().applyRemoteSessions([summary({ id: 'older', endedAt: '2026-01-01T00:00:00.000Z' })]);
+    store.getState().applyRemoteSessions([summary({ id: 'newer', endedAt: '2026-03-01T00:00:00.000Z' })]);
 
     expect(store.getState().history.map((s) => s.id)).toEqual(['newer', 'older']);
   });
@@ -165,7 +165,7 @@ describe('study history as account state', () => {
     completeRun(store);
     const recorded = store.getState().history[0]!;
 
-    store.getState().applyRemoteSession(recorded);
+    store.getState().applyRemoteSessions([recorded]);
 
     expect(store.getState().history).toHaveLength(1);
   });
@@ -174,7 +174,7 @@ describe('study history as account state', () => {
     const onChange = vi.fn();
     const store = await hydrate(createMemoryStorage(), onChange);
 
-    store.getState().applyRemoteSession(summary());
+    store.getState().applyRemoteSessions([summary()]);
 
     expect(onChange).not.toHaveBeenCalled();
   });

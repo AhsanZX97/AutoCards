@@ -32,9 +32,11 @@ export interface StudyState {
   clearActiveSession: () => void;
   sessionsForDeck: (deckId: string) => SessionSummary[];
 
-  /** Files a run finished on another device. Does not fire `onChange` — it is
-   *  remote truth arriving, not a local run that needs pushing back up. */
-  applyRemoteSession: (summary: SessionSummary) => void;
+  /** Files runs finished on another device. Does not fire `onChange` — it is
+   *  remote truth arriving, not a local run that needs pushing back up. Takes
+   *  the whole pull at once so a large history lands in a single `set()`; see
+   *  `applyRemoteChanges` on the deck store for why that matters. */
+  applyRemoteSessions: (summaries: SessionSummary[]) => void;
   /** Empties history without firing `onChange` — used on sign-out so a second
    *  account on the same device doesn't inherit the first one's streak and XP. */
   clear: () => void;
@@ -130,8 +132,11 @@ export function createStudyStore(
 
         sessionsForDeck: (deckId) => get().history.filter((s) => s.deckId === deckId),
 
-        applyRemoteSession: (summary) => {
-          set((state) => ({ history: fileSummary(state.history, summary) }));
+        applyRemoteSessions: (summaries) => {
+          if (summaries.length === 0) return;
+          set((state) => ({
+            history: summaries.reduce(fileSummary, state.history),
+          }));
         },
 
         clear: () => set({ history: [], activeSession: null }),

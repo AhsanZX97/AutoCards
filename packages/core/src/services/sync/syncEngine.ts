@@ -1,5 +1,5 @@
 import type { AuthStore } from '../../store/authStore';
-import type { DeckStore } from '../../store/deckStore';
+import type { DeckStore, RemoteChanges } from '../../store/deckStore';
 import type { StudyStore } from '../../store/studyStore';
 import { syncOpKey, type SyncStore } from '../../store/syncStore';
 import type { Deck, Flashcard, Id, IsoDate, SessionSummary } from '../../types';
@@ -200,12 +200,17 @@ export class SyncEngine {
     try {
       const changes = await this.backend.pull(ownerId, since);
 
+      // Resolved first, applied second: the whole pull lands as one update per
+      // store, because applying row by row re-rendered every subscriber once
+      // per row and blew React's nested-update limit on a big first sync.
+      const resolved: RemoteChanges = { deckUpserts: [], deckDeletes: [], cardUpserts: [], cardDeletes: [] };
+
       const decks = new Map<string, IsoDate>(this.deckStore.getState().decks.map((d) => [d.id, d.updatedAt]));
       for (const row of changes.decks) {
         const localAt = decks.get(row.id);
         const action = resolveMerge(localAt ? { updatedAt: localAt } : undefined, row);
-        if (action.type === 'upsert') this.deckStore.getState().applyRemoteDeck(row.data);
-        else if (action.type === 'remove') this.deckStore.getState().applyRemoteDeleteDeck(row.id);
+        if (action.type === 'upsert') resolved.deckUpserts.push(row.data);
+        else if (action.type === 'remove') resolved.deckDeletes.push(row.id);
       }
 
       const cards = new Map<string, IsoDate>();
@@ -215,16 +220,16 @@ export class SyncEngine {
       for (const row of changes.cards) {
         const localAt = cards.get(row.id);
         const action = resolveMerge(localAt ? { updatedAt: localAt } : undefined, row);
-        if (action.type === 'upsert') this.deckStore.getState().applyRemoteCard(row.data);
-        else if (action.type === 'remove') this.deckStore.getState().applyRemoteDeleteCard(row.data.deckId, row.id);
+        if (action.type === 'upsert') resolved.cardUpserts.push(row.data);
+        else if (action.type === 'remove') resolved.cardDeletes.push({ deckId: row.data.deckId, cardId: row.id });
       }
 
+      this.deckStore.getState().applyRemoteChanges(resolved);
+
       // No merge policy for study history: a finished run is immutable, so
-      // there is nothing to resolve. `applyRemoteSession` ignores ids it
+      // there is nothing to resolve. `applyRemoteSessions` ignores ids it
       // already holds, which is what makes the echo of our own push harmless.
-      for (const row of changes.sessions) {
-        this.studyStore.getState().applyRemoteSession(row.data);
-      }
+      this.studyStore.getState().applyRemoteSessions(changes.sessions.map((row) => row.data));
 
       // Advanced to the newest row the *server* stamped, never to this
       // device's idea of now — see `nextCursor`. A pull that returned nothing

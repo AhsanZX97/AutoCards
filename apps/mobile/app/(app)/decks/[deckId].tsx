@@ -14,6 +14,7 @@ import {
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, useDifficultyColors, usePriorityColors, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
+import { EMPTY_ARRAY } from '../../../src/lib/empty';
 
 export default function DeckDetailScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
@@ -23,7 +24,7 @@ export default function DeckDetailScreen() {
   const priorityColors = usePriorityColors();
 
   const deck = app.deckStore((s) => (deckId ? s.getDeck(deckId) : undefined));
-  const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? [] : []));
+  const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? EMPTY_ARRAY : EMPTY_ARRAY));
   const toggleStar = app.deckStore((s) => s.toggleStar);
   const toggleSuspend = app.deckStore((s) => s.toggleSuspend);
   const deleteCard = app.deckStore((s) => s.deleteCard);
