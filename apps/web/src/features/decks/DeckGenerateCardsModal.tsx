@@ -13,6 +13,7 @@ import {
   PLAN_LIMITS,
   SUPPORTED_FORMATS_LABEL,
   UploadQuotaExceededError,
+  getPromptText,
   oversizedDocuments,
   resolvePreset,
   type CardType,
@@ -26,7 +27,6 @@ import {
 import { useApp } from '../../lib/appContext';
 import { Button, Chip, Field, Modal, Progress, Select, Slider, Switch, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
-import { getPromptText } from '../../lib/cardText';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
 import { PlanLimitNotice } from '../billing/PlanLimitNotice';
 import { UploadDropzone } from './UploadDropzone';

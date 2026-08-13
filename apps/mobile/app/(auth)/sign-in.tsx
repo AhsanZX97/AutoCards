@@ -50,6 +50,12 @@ export default function SignInScreen() {
       />
       {error && !errorField && <Text style={{ color: theme.danger, marginBottom: spacing.md }}>{error}</Text>}
 
+      <View style={{ alignItems: 'flex-end', marginBottom: spacing.md }}>
+        <Link href="/(auth)/forgot-password">
+          <Text style={{ color: theme.primaryText, fontWeight: '600', fontSize: 14 }}>Forgot your password?</Text>
+        </Link>
+      </View>
+
       <Button title="Sign in" onPress={onSubmit} loading={status === 'loading'} style={{ marginTop: spacing.sm }} />
 
       <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl }}>

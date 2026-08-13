@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { computeDeckStats, computeOverallStats } from '@autocards/core';
+import { computeDeckStats, computeOverallStats, formatRelative, type SessionSummary } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
-import { useTheme, spacing } from '../../src/lib/theme';
-import { Button, Card, Screen } from '../../src/components';
+import { useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
+import { Badge, Button, Card, Screen } from '../../src/components';
 import { DeckRow } from '../../src/features/decks/DeckRow';
 
 export default function DashboardScreen() {
@@ -21,6 +21,8 @@ export default function DashboardScreen() {
     () => activeDecks.slice(0, 5).map((deck) => ({ deck, stats: computeDeckStats(cardsByDeck[deck.id] ?? []) })),
     [activeDecks, cardsByDeck],
   );
+  /* History outlives the decks it came from, so rows for a deleted deck stay flat text. */
+  const existingDeckIds = useMemo(() => new Set(allDecks.map((d) => d.id)), [allDecks]);
   const firstName = user?.username ?? 'there';
 
   return (
@@ -53,7 +55,91 @@ export default function DashboardScreen() {
           ))}
         </View>
       )}
+
+      {history.length > 0 && (
+        <>
+          <Text
+            style={{ fontSize: 18, fontWeight: '700', color: theme.text, marginTop: spacing.xl, marginBottom: spacing.md }}
+          >
+            Recent sessions
+          </Text>
+          <Card>
+            {history.slice(0, 5).map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                theme={theme}
+                onPress={
+                  existingDeckIds.has(session.deckId)
+                    ? () => router.push(`/(app)/decks/${session.deckId}`)
+                    : undefined
+                }
+              />
+            ))}
+          </Card>
+        </>
+      )}
     </Screen>
+  );
+}
+
+function SessionRow({
+  session,
+  theme,
+  onPress,
+}: {
+  session: SessionSummary;
+  theme: Theme;
+  onPress?: () => void;
+}) {
+  const grade =
+    session.letter === 'F'
+      ? { color: theme.danger, soft: theme.dangerSoft }
+      : session.letter === 'S' || session.letter === 'A'
+        ? { color: theme.success, soft: theme.successSoft }
+        : { color: theme.primaryText, soft: theme.primarySoft };
+
+  const content = (
+    <>
+      <View style={{ flex: 1, marginRight: spacing.sm }}>
+        <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>
+          {session.deckTitle}
+        </Text>
+        <Text style={{ fontSize: 11, color: theme.textFaint }}>{formatRelative(session.endedAt)}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Text style={{ fontSize: 12, color: theme.textMuted }}>
+          {session.correct}/{session.answered} correct
+        </Text>
+        <Badge label={session.letter} color={grade.color} softColor={grade.soft} />
+      </View>
+    </>
+  );
+
+  const layout = {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  } as const;
+
+  if (!onPress) return <View style={layout}>{content}</View>;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${session.deckTitle}`}
+      style={({ pressed }) => ({
+        ...layout,
+        marginHorizontal: -spacing.sm,
+        paddingHorizontal: spacing.sm,
+        borderRadius: radius.md,
+        backgroundColor: pressed ? theme.surfaceAlt : 'transparent',
+      })}
+    >
+      {content}
+    </Pressable>
   );
 }
 

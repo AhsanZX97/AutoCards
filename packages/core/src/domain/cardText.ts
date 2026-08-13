@@ -1,4 +1,5 @@
-import { hasCloze, parseCloze, type Flashcard } from '@autocards/core';
+import { hasCloze, parseCloze } from '../lib/text';
+import type { Flashcard } from '../types';
 
 /** The text shown on a card's question side.
  *

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { cardTypeLabel, type Flashcard } from '@autocards/core';
+import { cardTypeLabel, getAnswerText, getPromptText, type Flashcard } from '@autocards/core';
 import { Badge, Button, Card, CardBody, Progress } from '../../components/ui';
 import { DIFFICULTY_BADGE } from '../../lib/badges';
-import { getAnswerText, getPromptText } from '../../lib/cardText';
 import { cn } from '../../lib/cn';
 
 /** Fisher-Yates on a copy, so the caller's array is left alone. */

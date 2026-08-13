@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
+  GRADES,
+  SURVIVAL_LIVES,
   autoGrade,
   currentCardId as getCurrentCardId,
-  hasCloze,
-  parseCloze,
-  type Flashcard,
+  getAnswerText,
+  getPromptText,
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
@@ -21,6 +22,24 @@ const GRADE_COLOR: Record<Grade, string> = {
   easy: '#0ea5e9',
 };
 const GRADE_LABEL: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' };
+
+interface GradeButton {
+  grade: Grade;
+  label: string;
+}
+
+const FOUR_POINT_BUTTONS: GradeButton[] = GRADES.map((grade) => ({ grade, label: GRADE_LABEL[grade] }));
+
+/** Exam forces the binary scale: the learner marks themselves right or wrong,
+ *  with no shades in between. `again` and `good` are the two grades the
+ *  scheduler already treats as fail and pass. */
+const BINARY_BUTTONS: GradeButton[] = [
+  { grade: 'again', label: 'Incorrect' },
+  { grade: 'good', label: 'Correct' },
+];
+
+/** Seconds left at which the countdown bar turns red, matching web. */
+const TIMER_WARNING_SECONDS = 5;
 
 export default function StudyRunnerScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
@@ -42,7 +61,14 @@ export default function StudyRunnerScreen() {
   const [typedResponse, setTypedResponse] = useState('');
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<{ correct: boolean; grade: Grade } | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+
   const startedAtRef = useRef(Date.now());
+  // How long the card actually took to answer, frozen the moment the answer is
+  // locked in. Without this the clock would keep running while the learner
+  // reads the explanation, and that reading time would be scored as thinking
+  // time — enough on its own to wipe out the speed bonus on every card.
+  const answerTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Cram mode re-appends a missed card to the end of the queue, so the
@@ -52,11 +78,13 @@ export default function StudyRunnerScreen() {
     // off `position` (which always advances by one per answer) guarantees a
     // reset every time, matching web's `[session?.position]`.
     startedAtRef.current = Date.now();
+    answerTimeRef.current = null;
     setFlipped(false);
     setHintRevealed(false);
     setTypedResponse('');
     setSelectedChoiceId(null);
     setRevealed(null);
+    setRemaining(session?.settings.timer.enabled ? session.settings.timer.perCardSeconds : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.position]);
 
@@ -66,6 +94,43 @@ export default function StudyRunnerScreen() {
     }
   }, [session?.status, session?.id, deckId]);
 
+  // The countdown is for producing an answer, so it stops as soon as one
+  // exists: `revealed` for auto-graded cards, `flipped` for self-graded ones.
+  // Self-graded cards never set `revealed`, so without the `flipped` check the
+  // clock would run on while the learner picks a grade and then auto-submit
+  // "again" over the top of them.
+  const answerGiven = revealed !== null || flipped;
+
+  // Freeze the elapsed time at the same instant the countdown stops. Anything
+  // after this point is reading the explanation or choosing a self-grade, which
+  // is not time spent answering.
+  useEffect(() => {
+    if (answerGiven && answerTimeRef.current === null) {
+      answerTimeRef.current = Date.now() - startedAtRef.current;
+    }
+  }, [answerGiven]);
+
+  useEffect(() => {
+    // No card means the queue points at something the deck no longer has; there
+    // is nothing to time and nothing to submit an answer against.
+    //
+    // `currentCard` is deliberately *not* a dependency. Answering rewrites the
+    // card to bump its mastery, so it comes back a new object — and in the
+    // commit right after a timeout submit, `remaining` is still 0 because the
+    // reset above is only queued. Depending on the card identity would re-enter
+    // this effect on that commit and fire a second "again", skipping a card.
+    // Re-running each tick keeps the closure at most one tick stale, and at the
+    // instant `remaining` reaches 0 it is the current render's.
+    if (remaining === null || answerGiven || !currentCard) return undefined;
+    if (remaining <= 0) {
+      if (session?.settings.timer.autoAdvance) submitAnswer('again', false, true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setRemaining((r) => (r !== null ? r - 1 : r)), 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, answerGiven]);
+
   if (!session || session.deckId !== deckId) {
     return (
       <Screen scroll={false}>
@@ -73,17 +138,30 @@ export default function StudyRunnerScreen() {
       </Screen>
     );
   }
+  // The card in the queue is no longer in the deck — deleted on another device
+  // mid-run, or the deck itself was. This used to sit on a bare "Loading…"
+  // spinner forever, which looked like the app had frozen.
   if (!currentCard) {
     return (
-      <Screen scroll={false}>
-        <ActivityHint theme={theme} />
-      </Screen>
+      <MissingCard
+        onEnd={() => {
+          pauseAndAbandon();
+          router.replace(`/(app)/decks/${deckId}`);
+        }}
+        onRestart={() => router.replace(`/study/${deckId}/setup`)}
+      />
     );
   }
 
-  function submitAnswer(grade: Grade, correct: boolean, response?: string) {
-    const timeMs = Date.now() - startedAtRef.current;
-    answer({ cardId: currentCard!.id, grade, correct, timeMs, usedHint: hintRevealed, timedOut: false, response });
+  function submitAnswer(grade: Grade, correct: boolean, timedOut: boolean, response?: string) {
+    // Null only when the card was never answered — a timeout — where the full
+    // elapsed time is the honest figure.
+    const timeMs = answerTimeRef.current ?? Date.now() - startedAtRef.current;
+    answer({ cardId: currentCard!.id, grade, correct, timeMs, usedHint: hintRevealed, timedOut, response });
+  }
+
+  function handleSelfGrade(grade: Grade) {
+    submitAnswer(grade, grade !== 'again', false);
   }
 
   function handleChoiceSelect(choiceId: string) {
@@ -114,12 +192,14 @@ export default function StudyRunnerScreen() {
   }
 
   const isAutoGraded = currentCard.type === 'multiple-choice' || currentCard.type === 'true-false' || currentCard.type === 'type-in';
-  const promptText = getPromptText(currentCard);
-  const answerText = getAnswerText(currentCard);
+  const promptText = getPromptText(currentCard, session.settings.reversed);
+  const answerText = getAnswerText(currentCard, session.settings.reversed);
+  const hint = currentCard.hint;
+  const gradeButtons = session.settings.gradingScale === 'binary' ? BINARY_BUTTONS : FOUR_POINT_BUTTONS;
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
         <Pressable onPress={handleExit}>
           <Text style={{ color: theme.textMuted, fontSize: 18 }}>✕</Text>
         </Pressable>
@@ -129,7 +209,24 @@ export default function StudyRunnerScreen() {
         <Text style={{ color: theme.textFaint, fontSize: 12 }}>
           {session.position + 1}/{session.queue.length}
         </Text>
+        {session.settings.mode === 'survival' && (
+          <Text style={{ fontSize: 12 }}>
+            {'❤️'.repeat(session.livesRemaining)}
+            {'🖤'.repeat(SURVIVAL_LIVES - session.livesRemaining)}
+          </Text>
+        )}
       </View>
+
+      {remaining !== null && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <ProgressBar
+            value={remaining}
+            max={session.settings.timer.perCardSeconds}
+            height={4}
+            color={remaining <= TIMER_WARNING_SECONDS ? theme.dangerSolid : theme.primary}
+          />
+        </View>
+      )}
 
       {!isAutoGraded ? (
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
@@ -144,14 +241,14 @@ export default function StudyRunnerScreen() {
 
           {!flipped ? (
             <View style={{ alignItems: 'center', marginTop: spacing.xl, width: '100%' }}>
-              {currentCard.hint && !hintRevealed && (
+              {hint && !hintRevealed && (
                 <Pressable onPress={() => setHintRevealed(true)} style={{ marginBottom: spacing.md }}>
                   <Text style={{ color: theme.textMuted, fontSize: 13 }}>💡 Show hint</Text>
                 </Pressable>
               )}
-              {hintRevealed && currentCard.hint && (
+              {hintRevealed && hint && (
                 <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: spacing.md, textAlign: 'center' }}>
-                  {currentCard.hint}
+                  {hint}
                 </Text>
               )}
               <Button title="Show answer" onPress={() => setFlipped(true)} style={{ width: '100%' }} />
@@ -164,10 +261,10 @@ export default function StudyRunnerScreen() {
                 </Text>
               )}
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                {(['again', 'hard', 'good', 'easy'] as Grade[]).map((grade) => (
+                {gradeButtons.map(({ grade, label }) => (
                   <Pressable
                     key={grade}
-                    onPress={() => submitAnswer(grade, grade !== 'again')}
+                    onPress={() => handleSelfGrade(grade)}
                     style={{
                       flex: 1,
                       paddingVertical: spacing.md,
@@ -176,7 +273,7 @@ export default function StudyRunnerScreen() {
                       backgroundColor: GRADE_COLOR[grade],
                     }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{GRADE_LABEL[grade]}</Text>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{label}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -188,6 +285,17 @@ export default function StudyRunnerScreen() {
           <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, textAlign: 'center' }}>
             {currentCard.front}
           </Text>
+
+          {hint && !hintRevealed && !revealed && (
+            <Pressable onPress={() => setHintRevealed(true)} style={{ marginTop: spacing.md }}>
+              <Text style={{ color: theme.textMuted, fontSize: 13 }}>💡 Show hint</Text>
+            </Pressable>
+          )}
+          {hintRevealed && hint && (
+            <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: spacing.md, textAlign: 'center' }}>
+              {hint}
+            </Text>
+          )}
 
           {(currentCard.type === 'multiple-choice' || currentCard.type === 'true-false') && (
             <View style={{ width: '100%', gap: spacing.sm, marginTop: spacing.lg }}>
@@ -240,6 +348,13 @@ export default function StudyRunnerScreen() {
                   color: theme.text,
                 }}
               />
+              {/* A wrong answer is only useful if it says what would have been
+                  right — otherwise the learner retypes the same near-miss. */}
+              {revealed && !revealed.correct && (
+                <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' }}>
+                  Accepted: {(currentCard.acceptedAnswers ?? [currentCard.back]).join(', ')}
+                </Text>
+              )}
               {revealed === null && (
                 <Button title="Submit" onPress={handleTypeInSubmit} disabled={!typedResponse.trim()} style={{ marginTop: spacing.md }} />
               )}
@@ -260,7 +375,12 @@ export default function StudyRunnerScreen() {
                 title="Next card"
                 style={{ width: '100%' }}
                 onPress={() =>
-                  submitAnswer(revealed.grade, revealed.correct, currentCard.type === 'type-in' ? typedResponse : selectedChoiceId ?? undefined)
+                  submitAnswer(
+                    revealed.grade,
+                    revealed.correct,
+                    false,
+                    currentCard.type === 'type-in' ? typedResponse : selectedChoiceId ?? undefined,
+                  )
                 }
               />
             </View>
@@ -271,16 +391,29 @@ export default function StudyRunnerScreen() {
   );
 }
 
-function ActivityHint({ theme }: { theme: ReturnType<typeof useTheme> }) {
-  return <Text style={{ color: theme.textMuted, padding: spacing.lg }}>Loading…</Text>;
-}
-
-function getPromptText(card: Flashcard): string {
-  if (card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText)) return parseCloze(card.clozeText).prompt;
-  return card.front;
-}
-
-function getAnswerText(card: Flashcard): string {
-  if (card.type === 'cloze' && card.clozeText && hasCloze(card.clozeText)) return parseCloze(card.clozeText).answer;
-  return card.back;
+/**
+ * Shown when the queue points at a card the deck no longer has.
+ *
+ * Whatever has been answered so far is real and worth keeping, so ending the
+ * run here files it rather than discarding it — `pauseAndAbandon` writes the
+ * summary as long as at least one answer was given.
+ */
+function MissingCard({ onEnd, onRestart }: { onEnd: () => void; onRestart: () => void }) {
+  const theme = useTheme();
+  return (
+    <Screen scroll={false} style={{ justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
+      <Text style={{ fontSize: 34 }}>🃏</Text>
+      <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
+        This card isn&apos;t here any more
+      </Text>
+      <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' }}>
+        It was deleted somewhere else while you were studying. Everything you answered up to now has
+        been counted.
+      </Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl }}>
+        <Button title="End session" onPress={onEnd} />
+        <Button title="Start a new one" variant="outline" onPress={onRestart} />
+      </View>
+    </Screen>
+  );
 }

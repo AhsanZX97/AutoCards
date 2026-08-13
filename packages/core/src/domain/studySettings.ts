@@ -43,13 +43,18 @@ export function createDefaultStudySettings(): StudySettings {
 }
 
 /**
- * Repairs settings whose mode no longer exists — decks saved or shared before a
- * mode was retired still carry it. Everything the retired mode did not control
- * is kept; only the mode itself and whatever the new mode forces change.
+ * Brings stored settings back in line with the modes as they exist today.
+ *
+ * Two kinds of drift: a mode that no longer exists — decks saved or shared
+ * before a mode was retired still carry it — and a mode whose preset has since
+ * changed. A deck's settings are written once when it is created and never
+ * rewritten, so a preset edit would otherwise never reach the decks already out
+ * there. Re-applying the preset is safe because the keys it covers are the ones
+ * modes force anyway; everything else the learner set is kept.
  */
 export function normalizeStudySettings(settings: StudySettings): StudySettings {
-  if (STUDY_MODES.includes(settings.mode)) return settings;
-  return applyModePreset({ ...settings, mode: DEFAULT_STUDY_MODE }, DEFAULT_STUDY_MODE);
+  const mode = STUDY_MODES.includes(settings.mode) ? settings.mode : DEFAULT_STUDY_MODE;
+  return applyModePreset(settings, mode);
 }
 
 /** The settings a mode forces. Anything not listed here stays under the learner's control. */
@@ -62,7 +67,7 @@ export interface ModePreset {
 export const MODE_PRESETS: Record<StudyMode, ModePreset> = {
   timed: { timer: { enabled: true } },
   exam: { timer: { enabled: true, perCardSeconds: 45 }, gradingScale: 'binary' },
-  cram: { shuffle: 'weakest-first' },
+  cram: { shuffle: 'random' },
   survival: { timer: { enabled: true, perCardSeconds: 15 } },
 };
 

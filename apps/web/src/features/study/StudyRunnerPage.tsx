@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
+  SURVIVAL_LIVES,
   autoGrade,
   currentCardId as getCurrentCardId,
+  getAnswerText,
+  getPromptText,
   type Flashcard,
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { Button, Progress } from '../../components/ui';
-import { getAnswerText, getPromptText } from '../../lib/cardText';
 import { cn } from '../../lib/cn';
 import { EMPTY_ARRAY } from '../../lib/empty';
 import { CardFace } from './CardFace';
@@ -180,7 +182,7 @@ export function StudyRunnerPage() {
         {session.settings.mode === 'survival' && (
           <span className="text-sm">
             {'❤️'.repeat(session.livesRemaining)}
-            {'🖤'.repeat(3 - session.livesRemaining)}
+            {'🖤'.repeat(SURVIVAL_LIVES - session.livesRemaining)}
           </span>
         )}
       </div>

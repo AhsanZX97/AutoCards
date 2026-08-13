@@ -8,6 +8,7 @@ export * from './grading';
 export * from './deckStats';
 export * from './statsAggregation';
 export * from './flashcardFactory';
+export * from './cardText';
 export * from './cardOrder';
 export * from './cardDedupe';
 export * from './retiredCards';

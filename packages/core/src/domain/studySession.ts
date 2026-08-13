@@ -5,7 +5,9 @@ import { computeScore, emptyScore } from './scoring';
 import { buildQueue } from './studyQueue';
 import type { CardAnswer, Deck, Flashcard, Grade, StudySession, StudySettings } from '../types';
 
-const SURVIVAL_LIVES = 3;
+/** Lives a survival run starts with. Exported so the runners can draw the same
+ *  number of hearts the scorer takes away. */
+export const SURVIVAL_LIVES = 3;
 
 export function createSession(
   deck: Deck,

@@ -39,13 +39,13 @@ describe('applyModePreset', () => {
     expect(cram.timer.perCardSeconds).toBe(createDefaultStudySettings().timer.perCardSeconds);
   });
 
-  it('forces weakest-first ordering in cram mode', () => {
+  it('forces random ordering in cram mode', () => {
     const cram = applyModePreset({ ...createDefaultStudySettings(), shuffle: 'none' }, 'cram');
-    expect(cram.shuffle).toBe('weakest-first');
+    expect(cram.shuffle).toBe('random');
   });
 
   it('restores the neutral shuffle when leaving cram mode', () => {
-    const cram = applyModePreset(createDefaultStudySettings(), 'cram');
+    const cram = applyModePreset({ ...createDefaultStudySettings(), shuffle: 'none' }, 'cram');
     expect(applyModePreset(cram, 'timed').shuffle).toBe('random');
   });
 
@@ -109,5 +109,25 @@ describe('normalizeStudySettings', () => {
   it('leaves a still-valid mode alone', () => {
     const exam = applyModePreset(createDefaultStudySettings(), 'exam');
     expect(normalizeStudySettings(exam)).toEqual(exam);
+  });
+
+  // Decks created while Cram forced weakest-first carry that ordering in storage
+  // forever — nothing rewrites a deck's saved settings after it is created.
+  it('re-applies the mode preset to settings saved under an older one', () => {
+    const stale = { ...createDefaultStudySettings(), mode: 'cram', shuffle: 'weakest-first' } as StudySettings;
+    expect(normalizeStudySettings(stale).shuffle).toBe('random');
+  });
+
+  it('keeps the settings the current mode does not force', () => {
+    const stale = {
+      ...createDefaultStudySettings(),
+      mode: 'cram',
+      shuffle: 'weakest-first',
+      reversed: true,
+      sound: false,
+    } as StudySettings;
+    const normalized = normalizeStudySettings(stale);
+    expect(normalized.reversed).toBe(true);
+    expect(normalized.sound).toBe(false);
   });
 });

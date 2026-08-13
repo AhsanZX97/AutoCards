@@ -3,7 +3,8 @@ import { Text, View } from 'react-native';
 import { computeAchievements, computeOverallStats } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
-import { Card, ProgressBar, Screen } from '../../src/components';
+import { Badge, Card, ProgressBar, Screen } from '../../src/components';
+import { ActivityHeatmap } from '../../src/features/stats/ActivityHeatmap';
 
 export default function StatsScreen() {
   const app = useApp();
@@ -35,6 +36,16 @@ export default function StatsScreen() {
         <Text style={{ fontSize: 32 }}>🔥</Text>
         <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 4 }}>{stats.streak.current}</Text>
         <Text style={{ color: theme.textMuted, fontSize: 13 }}>day streak · best {stats.streak.longest}</Text>
+        {stats.streak.atRisk && (
+          <View style={{ marginTop: spacing.sm }}>
+            <Badge label="Study today to keep it!" color={theme.warning} softColor={theme.warningSoft} />
+          </View>
+        )}
+      </Card>
+
+      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>Activity</Text>
+      <Card style={{ marginBottom: spacing.md }}>
+        <ActivityHeatmap activity={stats.activity} />
       </Card>
 
       <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>
@@ -82,6 +93,11 @@ export default function StatsScreen() {
             <Text style={{ fontSize: 10, fontWeight: '700', color: theme.text, marginTop: 4, textAlign: 'center' }}>
               {a.name}
             </Text>
+            {!a.unlocked && (
+              <View style={{ alignSelf: 'stretch', marginTop: spacing.sm }}>
+                <ProgressBar value={a.progress * 100} max={100} height={4} />
+              </View>
+            )}
           </Card>
         ))}
       </View>
