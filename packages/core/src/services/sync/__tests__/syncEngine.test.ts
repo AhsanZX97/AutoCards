@@ -31,6 +31,8 @@ function fakeAuth(): AuthService {
     signIn: async () => SESSION,
     signUp: async () => ({ status: 'authenticated' as const, session: SESSION }),
     signInWithGoogle: async () => {},
+    startGoogleSignIn: async () => 'https://accounts.google.com/o/oauth2/auth',
+    restoreFromUrl: async () => null,
     signOut: async () => {},
     restore: async () => SESSION,
     updateProfile: async (user) => user,

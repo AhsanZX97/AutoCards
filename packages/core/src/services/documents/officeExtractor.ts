@@ -1,3 +1,4 @@
+import { unzipSync } from 'fflate';
 import type { DocumentImage, ExtractedDocument } from '../../types';
 import { downscaleImages } from './downscaleImage';
 import { selectImages, type CandidateImage } from './selectImages';
@@ -12,8 +13,13 @@ import { DocumentExtractionError, documentKindOf, type DocumentExtractor, type D
  * environment with no `DOMParser`, and the only thing wanted out of them is the
  * text between known tags.
  *
- * `fflate` is imported on demand so a bundle only pays for the unzip when
- * someone actually uploads one of these.
+ * `fflate` is a static import rather than a dynamic one: `OfficeExtractor` is
+ * already constructed unconditionally by `RoutingDocumentExtractor` at app
+ * startup on both platforms, so a dynamic import here saved nothing but
+ * fflate's own 8kB — and on Metro, a `import()` inside a workspace package
+ * (`@autocards/core`, resolved from outside the app's own directory) turns
+ * into a lazy split-bundle request that fails to resolve across the
+ * monorepo boundary in dev mode.
  */
 export class OfficeExtractor implements DocumentExtractor {
   readonly id = 'office';
@@ -48,11 +54,13 @@ type ZipEntries = Record<string, Uint8Array>;
 async function unzip(source: DocumentSource): Promise<ZipEntries> {
   const buffer = await source.arrayBuffer();
   try {
-    const { unzipSync } = await import('fflate');
     return unzipSync(new Uint8Array(buffer));
-  } catch {
+  } catch (error) {
     // Either it is not a zip at all — a renamed .doc is the usual culprit — or
-    // the file truncated on the way in. Neither is worth distinguishing here.
+    // the file truncated on the way in. Neither is worth distinguishing in the
+    // message shown to whoever uploaded it, but the real cause is worth
+    // keeping in the console for whoever has to debug a report of this.
+    console.warn(`[office extractor] could not unzip ${source.name} (${buffer.byteLength} bytes)`, error);
     throw new DocumentExtractionError(
       `Could not open ${source.name}. It may be damaged, or saved in an older format that only looks like a .docx or .pptx.`,
     );

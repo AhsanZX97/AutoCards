@@ -49,6 +49,16 @@ describe('reminderStore', () => {
     });
   });
 
+  it('round-trips emailEnabled through add and update', () => {
+    const draft = createReminder('deck-1');
+    store.getState().addReminder({ ...draft, emailEnabled: false });
+    expect(store.getState().remindersFor('deck-1')[0]?.emailEnabled).toBe(false);
+
+    const saved = store.getState().remindersFor('deck-1')[0]!;
+    store.getState().updateReminder({ ...saved, emailEnabled: true });
+    expect(store.getState().remindersFor('deck-1')[0]?.emailEnabled).toBe(true);
+  });
+
   it('updates a reminder in place, leaving its neighbours alone', () => {
     const first = createReminder('deck-1');
     const second = createReminder('deck-1');

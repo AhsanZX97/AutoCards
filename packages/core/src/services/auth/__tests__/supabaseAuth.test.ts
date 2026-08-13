@@ -37,6 +37,9 @@ interface FakeClientOptions {
   signUp?: () => Promise<unknown>;
   signOut?: () => Promise<unknown>;
   getSession?: () => Promise<unknown>;
+  signInWithOAuth?: () => Promise<unknown>;
+  setSession?: () => Promise<unknown>;
+  exchangeCodeForSession?: () => Promise<unknown>;
   profile?: { data: unknown; error: unknown };
   rpc?: (name: string, args: unknown) => Promise<unknown>;
 }
@@ -48,6 +51,10 @@ function fakeClient(options: FakeClientOptions = {}): SupabaseClient {
       signUp: options.signUp ?? (async () => ({ data: {}, error: null })),
       signOut: options.signOut ?? (async () => ({ error: null })),
       getSession: options.getSession ?? (async () => ({ data: { session: null }, error: null })),
+      signInWithOAuth: options.signInWithOAuth ?? (async () => ({ data: { url: null }, error: null })),
+      setSession: options.setSession ?? (async () => ({ data: { session: null }, error: null })),
+      exchangeCodeForSession:
+        options.exchangeCodeForSession ?? (async () => ({ data: { session: null }, error: null })),
     },
     from: () => queryResult(options.profile ?? { data: PROFILE, error: null }),
     rpc: options.rpc ?? (async () => ({ data: null, error: null })),
@@ -118,6 +125,21 @@ describe('SupabaseAuthService.signUp', () => {
     ).rejects.toMatchObject({ field: 'name' });
     expect(signUp).not.toHaveBeenCalled();
   });
+
+  /** Where a confirmation email's link lands — mobile has to say, since core doesn't know its own scheme. */
+  it('forwards redirectTo as the confirmation email’s landing page', async () => {
+    const signUp = vi.fn(async () => ({ data: { session: null, user: { id: 'user-1' } }, error: null }));
+    const service = new SupabaseAuthService(fakeClient({ signUp }));
+
+    await service.signUp(
+      { email: 'ada@example.com', password: 'hunter22', username: 'ada_lovelace' },
+      'autocards://callback',
+    );
+
+    expect(signUp).toHaveBeenCalledWith(
+      expect.objectContaining({ options: expect.objectContaining({ emailRedirectTo: 'autocards://callback' }) }),
+    );
+  });
 });
 
 describe('SupabaseAuthService.restore', () => {
@@ -132,6 +154,89 @@ describe('SupabaseAuthService.restore', () => {
     );
     const session = await service.restore();
     expect(session?.user.id).toBe('user-1');
+  });
+});
+
+describe('SupabaseAuthService.startGoogleSignIn', () => {
+  it('asks for the authorize URL without letting the client navigate', async () => {
+    const calls: unknown[] = [];
+    const service = new SupabaseAuthService(
+      fakeClient({
+        signInWithOAuth: async (...args: unknown[]) => {
+          calls.push(args);
+          return { data: { url: 'https://accounts.google.com/o/oauth2/auth?client_id=1' }, error: null };
+        },
+      }),
+    );
+
+    const url = await service.startGoogleSignIn('autocards://callback');
+
+    expect(url).toBe('https://accounts.google.com/o/oauth2/auth?client_id=1');
+    expect(calls).toEqual([
+      [{ provider: 'google', options: { redirectTo: 'autocards://callback', skipBrowserRedirect: true } }],
+    ]);
+  });
+
+  it('throws when the provider refuses the hand-off', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        signInWithOAuth: async () => ({ data: { url: null }, error: { message: 'Provider is not enabled.' } }),
+      }),
+    );
+
+    await expect(service.startGoogleSignIn('autocards://callback')).rejects.toThrow(AuthError);
+  });
+});
+
+describe('SupabaseAuthService.restoreFromUrl', () => {
+  it('resolves to null for a URL carrying nothing usable', async () => {
+    const service = new SupabaseAuthService(fakeClient());
+    await expect(service.restoreFromUrl('autocards://reset-password')).resolves.toBeNull();
+  });
+
+  it('throws the provider’s own denial rather than treating it as empty', async () => {
+    const service = new SupabaseAuthService(fakeClient());
+    await expect(
+      service.restoreFromUrl('autocards://callback?error=access_denied&error_description=Denied'),
+    ).rejects.toThrow(AuthError);
+  });
+
+  it('exchanges a token pair in the fragment for a session', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        setSession: async () => ({ data: { session: SUPABASE_SESSION }, error: null }),
+      }),
+    );
+
+    const session = await service.restoreFromUrl(
+      'autocards://reset-password#access_token=a1&refresh_token=r1&type=recovery',
+    );
+
+    expect(session?.user.id).toBe('user-1');
+  });
+
+  it('exchanges a PKCE code in the query string for a session', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        exchangeCodeForSession: async () => ({ data: { session: SUPABASE_SESSION }, error: null }),
+      }),
+    );
+
+    const session = await service.restoreFromUrl('https://autocards.study/auth/callback?code=abc123');
+
+    expect(session?.user.id).toBe('user-1');
+  });
+
+  it('resolves to null when the exchange itself fails', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        setSession: async () => ({ data: { session: null }, error: { message: 'invalid token' } }),
+      }),
+    );
+
+    await expect(
+      service.restoreFromUrl('autocards://reset-password#access_token=a1&refresh_token=r1'),
+    ).resolves.toBeNull();
   });
 });
 

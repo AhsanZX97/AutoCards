@@ -7,6 +7,7 @@ import { initialsOf, isValidUsername, normalizeUsername } from '../../lib/text';
 import type { Credentials, Plan, Session, SignUpInput, SignUpResult, User } from '../../types';
 import { AuthError, MIN_PASSWORD_LENGTH } from './types';
 import type { AuthService } from './types';
+import { parseCallbackUrl } from './parseCallbackUrl';
 
 interface ProfileRow {
   id: string;
@@ -68,7 +69,7 @@ export class SupabaseAuthService implements AuthService {
     return toSession(data.session, toUser(data.user, profile));
   }
 
-  async signUp({ email, password, username }: SignUpInput): Promise<SignUpResult> {
+  async signUp({ email, password, username }: SignUpInput, redirectTo?: string): Promise<SignUpResult> {
     const normalizedEmail = email.trim().toLowerCase();
     const handle = normalizeUsername(username);
     if (!isValidUsername(handle)) {
@@ -77,7 +78,7 @@ export class SupabaseAuthService implements AuthService {
     const { data, error } = await this.client.auth.signUp({
       email: normalizedEmail,
       password,
-      options: { data: { username: handle } },
+      options: { data: { username: handle }, emailRedirectTo: redirectTo },
     });
     if (error) {
       if (isUniqueViolation(error.message)) {
@@ -108,6 +109,50 @@ export class SupabaseAuthService implements AuthService {
     // Only reached when the hand-off itself was refused — on success the
     // browser is already leaving for Google.
     if (error) throw new AuthError(error.message);
+  }
+
+  /**
+   * Same hand-off as `signInWithGoogle`, `skipBrowserRedirect`-ed so nothing
+   * navigates — the caller opens the returned URL itself (an in-app browser
+   * session) and feeds the URL it comes back with to `restoreFromUrl`.
+   */
+  async startGoogleSignIn(redirectTo: string): Promise<string> {
+    const { data, error } = await this.client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error || !data.url) throw new AuthError(error?.message ?? 'Could not start Google sign-in.');
+    return data.url;
+  }
+
+  /**
+   * Hands the tokens or code a deep link carries to the client directly,
+   * rather than going through `restore()` — there is no locally-persisted
+   * session for this to reconcile against, only whatever the URL brought.
+   */
+  async restoreFromUrl(url: string): Promise<Session | null> {
+    const parsed = parseCallbackUrl(url);
+    switch (parsed.kind) {
+      case 'error':
+        throw new AuthError(parsed.message);
+      case 'empty':
+        return null;
+      case 'code': {
+        const { data, error } = await this.client.auth.exchangeCodeForSession(parsed.code);
+        if (error || !data.session) return null;
+        const profile = await this.fetchProfile(data.session.user.id);
+        return toSession(data.session, toUser(data.session.user, profile));
+      }
+      case 'tokens': {
+        const { data, error } = await this.client.auth.setSession({
+          access_token: parsed.accessToken,
+          refresh_token: parsed.refreshToken,
+        });
+        if (error || !data.session) return null;
+        const profile = await this.fetchProfile(data.session.user.id);
+        return toSession(data.session, toUser(data.session.user, profile));
+      }
+    }
   }
 
   async signOut(): Promise<void> {

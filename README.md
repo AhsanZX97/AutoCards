@@ -84,7 +84,7 @@ share modal and the library's import button; mobile uses the native share sheet 
 | Flashcard generation | **Real**, via OpenRouter behind the `generate-deck` Edge Function | n/a |
 | Payments | **Real**, via Stripe Checkout; `stripe-webhook` is the only thing that moves an account onto a paid plan | n/a |
 | Auth | **Real**, via Supabase | n/a |
-| PDF text extraction | `pdf.js` on web, which handles compressed content streams; a stub on mobile, so deck creation is disabled there for now | Native parser (mobile) behind the same `PdfExtractor` interface |
+| PDF text extraction | **Real** on both: `pdf.js` in the browser on web, and the same `pdf.js` in the `extract-document` Edge Function for mobile | n/a |
 
 ### The PDF extractor
 
@@ -103,6 +103,14 @@ the bundle everyone downloads.
 Uploads are capped at 25MB per file (`MAX_UPLOAD_BYTES`), checked when the file is picked. Reading
 one means holding it in memory and parsing it on the main thread, so a larger file does not fail so
 much as freeze the tab.
+
+Mobile cannot do any of the above in-process: Hermes has neither `structuredClone` nor
+`Promise.withResolvers` nor `DOMMatrix`, and pdf.js uses all three throughout. `EdgePdfExtractor`
+posts the file to the `extract-document` Edge Function instead, which runs the very same pdf.js and
+sends back the raw page text. The verdict on what that text *means* — a document with no text layer
+at all — is `buildPdfDocument`, which both extractors call, so a scanned PDF is judged identically
+whichever platform picked it up. The trade is that a PDF on mobile needs a signed-in session and a
+connection; the other four formats are plain JavaScript over bytes and still read on the device.
 
 ## Testing
 

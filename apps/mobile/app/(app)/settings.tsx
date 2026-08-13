@@ -6,7 +6,7 @@ import { useApp, getSupabaseClient } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { toast } from '../../src/lib/toastStore';
 import { useUploadQuota, formatQuota } from '../../src/lib/useUploadQuota';
-import { Badge, Button, Card, Field, ProgressBar, Screen, SwitchRow } from '../../src/components';
+import { Badge, Button, Card, Field, Modal, ProgressBar, Screen, SwitchRow } from '../../src/components';
 import { FeedbackModal } from '../../src/features/feedback/FeedbackModal';
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const;
@@ -32,6 +32,8 @@ export default function SettingsScreen() {
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [unsyncedWarning, setUnsyncedWarning] = useState(false);
 
   const userId = user?.id;
   useEffect(() => {
@@ -87,8 +89,29 @@ export default function SettingsScreen() {
     }
   }
 
+  /**
+   * Signing out clears this device's decks and history, so anything that has
+   * not reached the server is gone with it. `signOut` pushes first and
+   * returns false when it could not — being offline, usually — and that is a
+   * decision for the person holding the unsaved work, not for us. Mirrors
+   * web's `AppLayout.handleSignOut`.
+   */
   async function handleSignOut() {
-    await signOut();
+    setSigningOut(true);
+    const done = await signOut();
+    setSigningOut(false);
+    if (done) {
+      router.replace('/(auth)/sign-in');
+      return;
+    }
+    setUnsyncedWarning(true);
+  }
+
+  async function signOutAnyway() {
+    setSigningOut(true);
+    await signOut({ force: true });
+    setSigningOut(false);
+    setUnsyncedWarning(false);
     router.replace('/(auth)/sign-in');
   }
 
@@ -111,7 +134,10 @@ export default function SettingsScreen() {
                 body: { user_id: user.id },
               });
               if (error) throw error;
-              await signOut();
+              // The account is already gone server-side by this point, so
+              // there is nothing left to flush unsynced changes to — forcing
+              // skips a flush that could only ever fail.
+              await signOut({ force: true });
               router.replace('/(auth)/sign-in');
             } catch (err) {
               toast({
@@ -251,9 +277,39 @@ export default function SettingsScreen() {
         style={{ marginBottom: spacing.sm }}
       />
 
-      <Button title="Sign out" variant="danger" onPress={handleSignOut} />
+      <Button title="Sign out" variant="danger" onPress={handleSignOut} loading={signingOut} />
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
+      <Modal
+        open={unsyncedWarning}
+        onClose={() => setUnsyncedWarning(false)}
+        title="Some changes haven’t saved yet"
+        description="We couldn’t reach the server to save your most recent work."
+        footer={
+          <>
+            <Button
+              title="Stay signed in"
+              variant="ghost"
+              onPress={() => setUnsyncedWarning(false)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title="Sign out and lose them"
+              variant="danger"
+              onPress={() => void signOutAnyway()}
+              disabled={signingOut}
+              style={{ flex: 1 }}
+            />
+          </>
+        }
+      >
+        <Text style={{ color: theme.textMuted, fontSize: 13 }}>
+          Signing out clears this device, so anything not yet saved to your account would be lost.
+          Staying signed in until you&apos;re back online is usually what you want — it saves on its
+          own once the connection returns.
+        </Text>
+      </Modal>
     </Screen>
   );
 }

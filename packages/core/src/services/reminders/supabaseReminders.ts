@@ -9,6 +9,7 @@ interface ReminderRow {
   time_of_day: string;
   time_zone: string;
   last_sent_at: string | null;
+  email_enabled: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,7 +34,7 @@ export class SupabaseReminderBackend implements ReminderBackend {
   async pull(): Promise<DeckReminder[] | null> {
     const { data, error } = await this.client
       .from('deck_reminders')
-      .select('id,deck_id,cadence,time_of_day,time_zone,last_sent_at,created_at,updated_at');
+      .select('id,deck_id,cadence,time_of_day,time_zone,last_sent_at,email_enabled,created_at,updated_at');
 
     // Null, not an empty list: the caller replaces local state with whatever
     // comes back, and a failed read must not read as "you have none".
@@ -52,6 +53,7 @@ export class SupabaseReminderBackend implements ReminderBackend {
         cadence: reminder.cadence,
         time_of_day: reminder.timeOfDay,
         time_zone: reminder.timeZone,
+        email_enabled: reminder.emailEnabled,
         created_at: reminder.createdAt,
         updated_at: reminder.updatedAt,
       },
@@ -82,6 +84,7 @@ function toReminder(row: ReminderRow): DeckReminder {
     timeOfDay: row.time_of_day,
     timeZone: row.time_zone,
     ...(row.last_sent_at ? { lastSentAt: row.last_sent_at } : {}),
+    emailEnabled: row.email_enabled ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

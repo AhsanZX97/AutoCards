@@ -21,6 +21,7 @@ function reminder(cadence: ReminderCadence, patch: Partial<DeckReminder> = {}): 
     cadence,
     timeOfDay: '18:00',
     timeZone: 'Europe/London',
+    emailEnabled: true,
     createdAt: new Date(2026, 7, 1, 12, 0).toISOString(),
     updatedAt: new Date(2026, 7, 1, 12, 0).toISOString(),
     ...patch,
@@ -39,6 +40,10 @@ describe('createReminder', () => {
     expect(created.cadence).toEqual({ kind: 'daily' });
     expect(created.timeOfDay).toBe(DEFAULT_REMINDER_TIME);
     expect(created.deckId).toBe('deck-1');
+  });
+
+  it('opens with email on, matching today’s always-on behaviour', () => {
+    expect(createReminder('deck-1', { now: NOW }).emailEnabled).toBe(true);
   });
 });
 
@@ -163,6 +168,17 @@ describe('normalizeReminder', () => {
   it('clamps an inactivity gap into range', () => {
     const fixed = normalizeReminder(reminder({ kind: 'inactivity', afterDays: 0 }));
     expect(fixed.cadence).toEqual({ kind: 'inactivity', afterDays: 1 });
+  });
+
+  it('turns email on for a reminder written before the field existed', () => {
+    const stale = reminder({ kind: 'daily' });
+    const { emailEnabled: _drop, ...withoutField } = stale;
+    expect(normalizeReminder(withoutField as DeckReminder).emailEnabled).toBe(true);
+  });
+
+  it('leaves email off once someone has switched it off', () => {
+    const fixed = normalizeReminder(reminder({ kind: 'daily' }, { emailEnabled: false }));
+    expect(fixed.emailEnabled).toBe(false);
   });
 });
 

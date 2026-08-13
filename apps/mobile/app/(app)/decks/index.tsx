@@ -6,8 +6,10 @@ import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
-import { Button, Card, Field, Screen } from '../../../src/components';
+import { Button, Card, Chip, Field, Screen } from '../../../src/components';
 import { DeckRow } from '../../../src/features/decks/DeckRow';
+
+type FilterMode = 'active' | 'archived';
 
 export default function DeckLibraryScreen() {
   const app = useApp();
@@ -15,13 +17,51 @@ export default function DeckLibraryScreen() {
   const decks = app.deckStore((s) => s.decks);
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
   const importDeck = app.deckStore((s) => s.importDeck);
+  const archiveDeck = app.deckStore((s) => s.archiveDeck);
+  const deleteDeck = app.deckStore((s) => s.deleteDeck);
+  const clearReminders = app.reminderStore((s) => s.clearDeck);
   const userId = app.authStore((s) => s.session?.user.id);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<FilterMode>('active');
 
   const filtered = useMemo(
-    () => decks.filter((d) => !d.archived && d.title.toLowerCase().includes(query.toLowerCase())),
-    [decks, query],
+    () =>
+      decks
+        .filter((d) => (filter === 'active' ? !d.archived : d.archived))
+        .filter((d) => d.title.toLowerCase().includes(query.toLowerCase())),
+    [decks, filter, query],
   );
+
+  function handleDeckMenu(deck: (typeof decks)[number]) {
+    Alert.alert(deck.title, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: deck.archived ? 'Unarchive' : 'Archive',
+        onPress: () => {
+          archiveDeck(deck.id, !deck.archived);
+          toast({ variant: 'success', title: deck.archived ? 'Deck restored' : 'Deck archived' });
+        },
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert('Delete deck', `Delete "${deck.title}"? This cannot be undone.`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                deleteDeck(deck.id);
+                clearReminders(deck.id);
+                toast({ variant: 'success', title: 'Deck deleted' });
+              },
+            },
+          ]);
+        },
+      },
+    ]);
+  }
 
   async function handleImport() {
     if (!userId) {
@@ -76,9 +116,16 @@ export default function DeckLibraryScreen() {
         <Button title="Create deck" onPress={() => router.push('/(app)/decks/new')} style={{ flexGrow: 2 }} />
       </View>
 
+      <View style={{ flexDirection: 'row', marginBottom: spacing.md }}>
+        <Chip label="Active" active={filter === 'active'} onPress={() => setFilter('active')} />
+        <Chip label="Archived" active={filter === 'archived'} onPress={() => setFilter('archived')} />
+      </View>
+
       {filtered.length === 0 ? (
         <Card>
-          <Text style={{ textAlign: 'center', color: theme.textMuted }}>No decks found.</Text>
+          <Text style={{ textAlign: 'center', color: theme.textMuted }}>
+            {filter === 'archived' ? 'Nothing archived yet.' : 'No decks found.'}
+          </Text>
         </Card>
       ) : (
         <View style={{ gap: spacing.sm }}>
@@ -88,6 +135,7 @@ export default function DeckLibraryScreen() {
               deck={deck}
               stats={computeDeckStats(cardsByDeck[deck.id] ?? [])}
               onPress={() => router.push(`/(app)/decks/${deck.id}`)}
+              onMenu={() => handleDeckMenu(deck)}
             />
           ))}
         </View>

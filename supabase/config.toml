@@ -174,6 +174,12 @@ site_url = "https://autocards.study"
 # `/auth/callback` is the same story for Google: it is where the provider sends
 # the browser back to, and an origin that is not listed here has its return trip
 # refused. Listed exactly, for the reason above.
+#
+# `autocards://` is mobile's counterpart to the web origins above — the scheme
+# registered in apps/mobile/app.json, and where Google's return trip, a
+# sign-up confirmation email, and a password-reset email all land on that
+# platform (MOB-10). Wildcarded the same way, plus the two paths listed
+# exactly for the same reason `/reset-password` and `/auth/callback` are above.
 additional_redirect_urls = [
   "https://autocards.study/**",
   "https://autocards.study/reset-password",
@@ -184,6 +190,9 @@ additional_redirect_urls = [
   "http://127.0.0.1:5173/**",
   "http://127.0.0.1:5173/reset-password",
   "http://127.0.0.1:5173/auth/callback",
+  "autocards://**",
+  "autocards://reset-password",
+  "autocards://callback",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

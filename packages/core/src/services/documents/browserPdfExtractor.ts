@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { ExtractedDocument } from '../../types';
+import { buildPdfDocument } from './pdfDocument';
 import { DocumentExtractionError, type DocumentExtractor, type DocumentSource } from './types';
 
 /**
@@ -62,25 +63,14 @@ export class BrowserPdfExtractor implements DocumentExtractor {
     }
 
     try {
-      const extracted = await extractPages(pdfDocument);
       const title = await readTitle(pdfDocument);
-      const hasText = extracted.some((page) => page.trim().length > 0);
-      const pages = hasText
-        ? extracted
-        : [`[No extractable text found in ${source.name}. It may be a scanned/image-only PDF.]`];
-
-      return {
+      return buildPdfDocument({
         filename: source.name,
         size: source.size,
-        kind: 'pdf',
         pageCount: pdfDocument.numPages,
-        pages,
-        text: pages.join('\n\n'),
+        pages: await extractPages(pdfDocument),
         ...(title ? { title } : {}),
-        // Nothing came out of any page's text content: the PDF is image-only
-        // (no text layer), which pdf.js cannot read without OCR.
-        ...(hasText ? {} : { synthetic: true }),
-      };
+      });
     } finally {
       await pdfDocument.cleanup();
     }

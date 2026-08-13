@@ -13,6 +13,7 @@ they could clear.
 | Function | What it does | Auth |
 | --- | --- | --- |
 | `generate-deck` | Writes a deck from an uploaded document. Costs one upload. | User JWT |
+| `extract-document` | Reads the text out of a PDF for mobile, which cannot run pdf.js. Costs nothing. | User JWT |
 | `suggest-choice` | One wrong answer for a multiple-choice card. Costs nothing. | User JWT |
 | `create-checkout-session` | Starts a Stripe Checkout for a plan. Grants nothing. | User JWT |
 | `create-portal-session` | Opens Stripe's Customer Portal for cancelling, card changes and invoices. | User JWT |
@@ -38,9 +39,52 @@ it here. What this side re-decides is everything that determines the bill:
   text and inline-only images. Anything it does not recognise is dropped rather
   than forwarded.
 
-What it does *not* see is the uploaded document itself, only the prompt built
-from it, so per-plan page and deck limits stay client-side checks. The upload
-count and the payload ceilings are what bound the spend.
+What `generate-deck` does *not* see is the uploaded document itself, only the
+prompt built from it, so per-plan page and deck limits stay client-side checks.
+The upload count and the payload ceilings are what bound the spend.
+
+`extract-document` is the one exception, and only to the first half of that: it
+receives a PDF's bytes. It still spends nothing, writes nothing and reads no
+plan, so it moves none of the limits above — it parses what it is given, returns
+the text, and forgets it. Nothing is stored.
+
+## Reading a PDF for mobile
+
+```
+phone ──▶ extract-document ──▶ pdf.js ──▶ page text ──▶ buildPdfDocument (core)
+ bytes      (JWT, 25MB cap)                              │
+                                                         ▼
+                                              the same document web builds
+```
+
+React Native cannot run pdf.js. Hermes has no `structuredClone`, no
+`Promise.withResolvers` and no `DOMMatrix`, and pdf.js uses all three
+throughout — this is not a gap that polyfills close cheaply. The alternative was
+a native parser per platform, which would have meant three PDF implementations
+(iOS PDFKit, Android PdfBox, pdf.js) producing three subtly different decks from
+one file, plus a custom dev client for an app with no native modules at all.
+
+So the bytes come here instead, and the same pdf.js version the web app pins
+reads them. Two things keep the two platforms honest:
+
+- **The pin.** `npm:pdfjs-dist@<version>` in this function tracks `pdfjs-dist`
+  in `packages/core/package.json`. Two versions is the obvious way for "both
+  platforms read a PDF the same way" to quietly stop being true.
+- **The verdict lives in core.** This function returns raw page text and nothing
+  else. Whether a PDF has no text layer — a scan, which must be flagged
+  `synthetic` so a model refuses it rather than billing for cards about a
+  placeholder — is `buildPdfDocument`'s call, and both extractors go through it.
+
+pdf.js is pointed at itself rather than at a worker: assigning
+`globalThis.pdfjsWorker` makes it parse in-process, which is checked before it
+tries `new Worker(...)` (that path reads `window.location`, which Deno does not
+have) and before its fallback dynamically imports a URL computed at runtime
+(which a deployed bundle would not contain).
+
+The cap is 25MB, matching `MAX_UPLOAD_BYTES` in core, and is checked against
+what actually arrived rather than only against `content-length`. A session is
+the only other gate — parsing large PDFs costs real CPU, and an open endpoint
+that did it would be a way to spend this project's compute for free.
 
 ## How a reminder is sent
 
@@ -182,6 +226,7 @@ npx supabase secrets set OPENROUTER_API_KEY=sk-or-...
 npx supabase secrets set APP_URL=https://your-app-url   # optional, attribution only
 
 npx supabase functions deploy generate-deck
+npx supabase functions deploy extract-document
 npx supabase functions deploy suggest-choice
 npx supabase functions deploy create-checkout-session
 npx supabase functions deploy create-portal-session

@@ -79,10 +79,14 @@ unenforceable. Generation goes through `generate-deck`; checkout through
 
 ## Known gaps
 
-- **Mobile deck generation is not real.** `apps/mobile` wires `StubDocumentExtractor`, which
-  synthesises page text and flags the document `synthetic`; a live model refuses it. A native
-  extractor behind the same `DocumentExtractor` interface is the swap-in point.
 - Scanned/image-only PDFs have no text layer and are rejected up front rather than sent to a model.
+- **Mobile reads PDFs over the network, not on the device.** Hermes has no `structuredClone`,
+  `Promise.withResolvers` or `DOMMatrix`, so pdf.js cannot run there at all. `EdgePdfExtractor`
+  posts the file to the `extract-document` Edge Function, which runs the same pdf.js the web app
+  does and returns the page text; `buildPdfDocument` then turns that into a document on both
+  platforms. So a PDF needs a signed-in session and a connection on mobile, where web reads it
+  locally. Word, PowerPoint, text and Markdown are plain JS over bytes and still read on-device.
+  `StubDocumentExtractor` remains only for a build with no Supabase project configured.
 
 ## Notion shorthand
 

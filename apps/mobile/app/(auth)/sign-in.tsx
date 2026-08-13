@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useApp } from '../../src/lib/appContext';
+import { useGoogleSignIn } from '../../src/lib/useGoogleSignIn';
 import { useTheme, spacing } from '../../src/lib/theme';
-import { Button, Field, Screen } from '../../src/components';
+import { Button, Field, GoogleButton, OrDivider, Screen } from '../../src/components';
 
 export default function SignInScreen() {
   const app = useApp();
@@ -12,6 +13,7 @@ export default function SignInScreen() {
   const status = app.authStore((s) => s.status);
   const error = app.authStore((s) => s.error);
   const errorField = app.authStore((s) => s.errorField);
+  const google = useGoogleSignIn();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +32,9 @@ export default function SignInScreen() {
           Sign in to keep studying where you left off.
         </Text>
       </View>
+
+      <GoogleButton title="Sign in with Google" onPress={() => void google.start()} loading={google.loading} />
+      <OrDivider />
 
       <Field
         label="Email"

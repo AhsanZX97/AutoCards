@@ -3,8 +3,30 @@ import { AppState, Text, useColorScheme, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
-import { createApp, StubDocumentExtractor, type App, type EdgeLlmConfig } from '@autocards/core';
+// Hermes on Expo SDK 51 has TextEncoder but not TextDecoder, which core's
+// office and text extractors call directly — without this, generating a
+// deck from a .docx/.pptx/.txt/.md file throws before it reads a byte.
+import 'fast-text-encoding';
+import {
+  createApp,
+  EdgePdfExtractor,
+  RoutingDocumentExtractor,
+  StubDocumentExtractor,
+  type App,
+  type EdgeLlmConfig,
+} from '@autocards/core';
+import { toByteArray } from 'base64-js';
 import { createMobileStorage } from './storage';
+import { configureNotificationHandler, syncScheduledNotifications } from './reminderNotifications';
+
+/** Decodes a JWT's payload for diagnostics — no signature check, just a look. */
+function decodeJwtPayload(token: string): unknown {
+  const segment = token.split('.')[1];
+  if (!segment) return undefined;
+  const padded = segment.replace(/-/g, '+').replace(/_/g, '/').padEnd(segment.length + ((4 - (segment.length % 4)) % 4), '=');
+  const json = new TextDecoder('utf-8').decode(toByteArray(padded));
+  return JSON.parse(json);
+}
 
 const AppContext = createContext<App | null>(null);
 
@@ -37,7 +59,16 @@ function buildEdge(setup: SupabaseSetup): EdgeLlmConfig {
     supabaseUrl: setup.url,
     anonKey: setup.anonKey,
     getAccessToken: async () => {
-      const { data } = await setup.client.auth.getSession();
+      const { data, error } = await setup.client.auth.getSession();
+      if (!data.session) {
+        console.warn('[auth] getSession returned no session', error);
+      } else {
+        try {
+          console.warn('[auth] access token claims', decodeJwtPayload(data.session.access_token));
+        } catch (decodeError) {
+          console.warn('[auth] could not decode access token', decodeError);
+        }
+      }
       return data.session?.access_token;
     },
   };
@@ -47,11 +78,22 @@ function getApp(): App {
   if (!singleton) {
     const setup = buildSupabase();
     supabaseClient = setup?.client;
+    // One config for both callers: generation and PDF reading go to the same
+    // project with the same token.
+    const edge = setup ? buildEdge(setup) : undefined;
     singleton = createApp({
       storage: createMobileStorage(),
-      documentExtractor: new StubDocumentExtractor(),
+      // Word, PowerPoint, text and Markdown are plain JS over bytes and read
+      // for real right here. PDFs cannot be: pdf.js needs `structuredClone`,
+      // `Promise.withResolvers` and `DOMMatrix`, none of which Hermes has — so
+      // they go to the `extract-document` function, which runs the very same
+      // pdf.js the web app does. Without a Supabase project there is nothing to
+      // send them to, and the stub is all that is left.
+      documentExtractor: new RoutingDocumentExtractor(
+        edge ? new EdgePdfExtractor(edge) : new StubDocumentExtractor(),
+      ),
       supabase: supabaseClient,
-      ...(setup ? { edge: buildEdge(setup) } : {}),
+      ...(edge ? { edge } : {}),
     });
   }
   return singleton;
@@ -114,6 +156,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.remove();
   }, []);
+
+  // Local push for the study reminders. Every scheduled notification is only
+  // the next occurrence of its reminder, so the whole set is rebuilt whenever
+  // something it was worked out from moves: the reminders themselves, a
+  // session that resets an "if I fall behind" gap, or a spell in the
+  // background long enough for the ones already queued to have fired.
+  useEffect(() => {
+    if (!app) return;
+    configureNotificationHandler();
+    void syncScheduledNotifications(app);
+
+    // Both stores are watched on one slice each rather than wholesale: the
+    // study store fires on every card graded, and rebuilding the whole
+    // notification set mid-session for an answer that changes nothing about
+    // the schedule is work nobody asked for.
+    const resync = () => void syncScheduledNotifications(app);
+    const unsubReminders = app.reminderStore.subscribe((state, prev) => {
+      if (state.remindersByDeck !== prev.remindersByDeck) resync();
+    });
+    const unsubStudy = app.studyStore.subscribe((state, prev) => {
+      if (state.history !== prev.history) resync();
+    });
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resync();
+    });
+
+    return () => {
+      unsubReminders();
+      unsubStudy();
+      sub.remove();
+    };
+  }, [app]);
 
   if (!app) return <ConfigurationNeeded />;
   return <AppContext.Provider value={app}>{children}</AppContext.Provider>;

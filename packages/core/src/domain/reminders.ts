@@ -43,6 +43,7 @@ export function createReminder(
     cadence: { kind: 'daily' },
     timeOfDay: DEFAULT_REMINDER_TIME,
     timeZone: options.timeZone ?? localTimeZone(),
+    emailEnabled: true,
     createdAt: stamp,
     updatedAt: stamp,
   };
@@ -104,6 +105,9 @@ export function normalizeReminder(reminder: DeckReminder): DeckReminder {
     ...reminder,
     timeOfDay: parseTimeOfDay(reminder.timeOfDay) ? reminder.timeOfDay : DEFAULT_REMINDER_TIME,
     cadence: normalizeCadence(reminder.cadence),
+    // Missing on anything written before this field existed — read back as
+    // still on, matching the behaviour that was true before it was optional.
+    emailEnabled: reminder.emailEnabled ?? true,
   };
 }
 

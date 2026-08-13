@@ -1,18 +1,10 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Link } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Button, Field, Screen } from '../../src/components';
-
-/**
- * Where the emailed link lands.
- *
- * Web reads its own origin; there is no origin to read here, and the reset form
- * only exists on web anyway, so this points at the deployed site. The path has
- * to stay on the Supabase redirect allow-list (see supabase/config.toml).
- */
-const WEB_RESET_URL = 'https://autocards.study/reset-password';
 
 /**
  * Asks for the reset email.
@@ -32,7 +24,7 @@ export default function ForgotPasswordScreen() {
   async function onSubmit() {
     if (!email.trim()) return;
     setSending(true);
-    await app.services.auth.requestPasswordReset(email, WEB_RESET_URL);
+    await app.services.auth.requestPasswordReset(email, Linking.createURL('reset-password'));
     setSending(false);
     setSent(true);
   }

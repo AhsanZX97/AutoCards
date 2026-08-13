@@ -28,7 +28,8 @@ export interface AuthState {
    */
   restore: (options?: { fromProvider?: boolean }) => Promise<void>;
   signIn: (credentials: Credentials) => Promise<boolean>;
-  signUp: (input: SignUpInput) => Promise<boolean>;
+  /** `redirectTo` — see the same argument on `AuthService.signUp`. */
+  signUp: (input: SignUpInput, redirectTo?: string) => Promise<boolean>;
   /**
    * Sends the browser to Google. `true` means the hand-off was accepted and
    * the page is on its way out — not that anyone is signed in yet.
@@ -39,6 +40,15 @@ export interface AuthState {
    * through `restore({ fromProvider: true })` on the return page.
    */
   signInWithGoogle: (redirectTo: string) => Promise<boolean>;
+  /**
+   * The same hand-off, for a platform that has to open the authorize URL
+   * itself instead of letting the browser navigate — see
+   * `AuthService.startGoogleSignIn`. Resolves to the URL to open, or null on
+   * refusal (the error is already in `error` by then). The caller is
+   * responsible for feeding the URL the browser session comes back with to
+   * `restoreFromUrl` and applying the result with `syncFromProvider`.
+   */
+  startGoogleSignIn: (redirectTo: string) => Promise<string | null>;
   /**
    * Signs out, after giving anything unsynced a chance to reach the server.
    *
@@ -127,10 +137,10 @@ export function createAuthStore(
           }
         },
 
-        signUp: async (input) => {
+        signUp: async (input, redirectTo) => {
           set({ status: 'loading', error: null, errorField: null, pendingConfirmationEmail: null });
           try {
-            const result = await auth.signUp(input);
+            const result = await auth.signUp(input, redirectTo);
             if (result.status === 'authenticated') {
               set({ session: result.session, status: 'authenticated' });
               return true;
@@ -162,6 +172,20 @@ export function createAuthStore(
               errorField: null,
             });
             return false;
+          }
+        },
+
+        startGoogleSignIn: async (redirectTo) => {
+          set({ status: 'loading', error: null, errorField: null, pendingConfirmationEmail: null });
+          try {
+            return await auth.startGoogleSignIn(redirectTo);
+          } catch (err) {
+            set({
+              status: 'signed-out',
+              error: err instanceof Error ? err.message : 'Could not continue with Google.',
+              errorField: null,
+            });
+            return null;
           }
         },
 

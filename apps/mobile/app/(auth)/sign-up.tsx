@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useApp } from '../../src/lib/appContext';
+import { useGoogleSignIn } from '../../src/lib/useGoogleSignIn';
 import { useTheme, spacing } from '../../src/lib/theme';
-import { Button, Field, Screen } from '../../src/components';
+import { Button, Field, GoogleButton, OrDivider, Screen } from '../../src/components';
 
 export default function SignUpScreen() {
   const app = useApp();
@@ -13,13 +15,18 @@ export default function SignUpScreen() {
   const error = app.authStore((s) => s.error);
   const errorField = app.authStore((s) => s.errorField);
   const pendingEmail = app.authStore((s) => s.pendingConfirmationEmail);
+  const google = useGoogleSignIn();
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   async function onSubmit() {
-    const ok = await signUp({ username, email, password });
+    // Confirmation is required for a password sign-up (Google skips it — see
+    // `AuthService.signInWithGoogle`), and the link has to land back in the
+    // app rather than on the website's root, which is what an omitted
+    // `redirectTo` would fall back to.
+    const ok = await signUp({ username, email, password }, Linking.createURL('callback'));
     if (ok) router.replace('/(app)');
   }
 
@@ -55,6 +62,9 @@ export default function SignUpScreen() {
           Free to start. No credit card required.
         </Text>
       </View>
+
+      <GoogleButton title="Sign up with Google" onPress={() => void google.start()} loading={google.loading} />
+      <OrDivider />
 
       <Field
         label="Username"

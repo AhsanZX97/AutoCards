@@ -8,10 +8,17 @@ import {
   DEFAULT_GENERATION_PRESET,
   DEFAULT_MODEL_ID,
   DIFFICULTIES,
+  DOCUMENT_KIND_ICONS,
   GENERATION_PRESETS,
   GENERATION_PRESET_DESCRIPTIONS,
   GENERATION_PRESET_LABELS,
   GENERATION_STAGE_LABELS,
+  SUPPORTED_FORMATS_LABEL,
+  describeOversized,
+  describeUnsupported,
+  documentKindOf,
+  isOversizedUpload,
+  isSupportedDocument,
   resolvePreset,
   type CardType,
   type Difficulty,
@@ -20,6 +27,7 @@ import {
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
 import { documentSourceFromUri } from '../../../src/lib/pdfSource';
+import { toast } from '../../../src/lib/toastStore';
 import { useTheme, spacing } from '../../../src/lib/theme';
 import { Button, Card, Chip, Field, ProgressBar, Screen, Stepper, SwitchRow } from '../../../src/components';
 
@@ -56,10 +64,24 @@ export default function CreateDeckScreen() {
   const [instructions, setInstructions] = useState('');
 
   async function pickFile() {
-    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
+    // '*/*' rather than a MIME allowlist: platforms disagree about what MIME
+    // type a .docx or .md carries, same reasoning as the web picker's accept
+    // list. Real filtering happens below, by extension.
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    setFile({ uri: asset.uri, name: asset.name, size: asset.size ?? 0 });
+    const size = asset.size ?? 0;
+
+    if (!isSupportedDocument(asset.name)) {
+      toast({ variant: 'error', title: 'Cannot read that file', description: describeUnsupported(asset.name) });
+      return;
+    }
+    if (isOversizedUpload(size)) {
+      toast({ variant: 'error', title: 'That file is too big', description: describeOversized(asset.name, size) });
+      return;
+    }
+
+    setFile({ uri: asset.uri, name: asset.name, size });
     setStep('configure');
   }
 
@@ -133,7 +155,7 @@ export default function CreateDeckScreen() {
       <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Create a deck</Text>
       <Text style={{ fontSize: 14, color: theme.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
         {mode === 'ai'
-          ? 'Upload a PDF and Auto Cards will write the flashcards for you.'
+          ? 'Upload your material and Auto Cards will write the flashcards for you.'
           : 'Start with an empty deck and write the cards yourself.'}
       </Text>
 
@@ -168,7 +190,10 @@ export default function CreateDeckScreen() {
             <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
               <Text style={{ fontSize: 40 }}>📄</Text>
               <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
-                Choose a PDF to build flashcards from
+                Choose a file to build flashcards from
+              </Text>
+              <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4, textAlign: 'center' }}>
+                Takes {SUPPORTED_FORMATS_LABEL}.
               </Text>
               <Button title="Browse files" onPress={pickFile} style={{ marginTop: spacing.lg }} />
             </Card>
@@ -182,7 +207,7 @@ export default function CreateDeckScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: spacing.md }}>
                 <Text style={{ fontWeight: '700', color: theme.text }} numberOfLines={1}>
-                  📄 {file.name}
+                  {DOCUMENT_KIND_ICONS[documentKindOf(file.name) ?? 'pdf']} {file.name}
                 </Text>
                 <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{Math.round(file.size / 1024)} KB</Text>
               </View>

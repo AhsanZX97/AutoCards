@@ -72,9 +72,16 @@ export interface DeckReminder {
    * rather than every day once the gap has passed.
    */
   lastSentAt?: IsoDate;
+  /**
+   * Whether this reminder should also go out by email. Local push is not
+   * modeled here — on a device that supports it, it always fires — so this
+   * is the only channel that is ever actually optional, and only mobile's
+   * editor exposes it; web leaves it on.
+   */
+  emailEnabled: boolean;
   createdAt: IsoDate;
   updatedAt: IsoDate;
 }
 
 /** The parts of a reminder the editor lets someone change. */
-export type ReminderDraft = Pick<DeckReminder, 'cadence' | 'timeOfDay' | 'timeZone'>;
+export type ReminderDraft = Pick<DeckReminder, 'cadence' | 'timeOfDay' | 'timeZone' | 'emailEnabled'>;

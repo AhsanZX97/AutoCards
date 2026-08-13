@@ -1,6 +1,7 @@
 import { failure, json, preflight } from '../_shared/http.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { nextSendAt, type ReminderCadence } from '../_shared/reminderSchedule.ts';
+import { planSweep } from '../_shared/sweepPlan.ts';
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
 /**
@@ -43,6 +44,8 @@ interface ReminderRow {
   time_zone: string;
   last_sent_at: string | null;
   next_send_at: string | null;
+  /** False on a reminder that lives only as a local push on someone's phone. */
+  email_enabled: boolean | null;
   created_at: string;
   decks: { data: { title?: string } | null; deleted_at: string | null } | null;
 }
@@ -88,7 +91,7 @@ Deno.serve(async (request) => {
   const now = new Date();
   const { data, error } = await admin
     .from('deck_reminders')
-    .select('id,deck_id,owner_id,cadence,time_of_day,time_zone,last_sent_at,next_send_at,created_at,decks(data,deleted_at)')
+    .select('id,deck_id,owner_id,cadence,time_of_day,time_zone,last_sent_at,next_send_at,email_enabled,created_at,decks(data,deleted_at)')
     .or(`next_send_at.is.null,next_send_at.lte.${now.toISOString()}`)
     .order('next_send_at', { ascending: true, nullsFirst: true })
     .limit(BATCH_LIMIT);
@@ -104,6 +107,7 @@ Deno.serve(async (request) => {
   let scheduled = 0;
   let dropped = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const row of rows) {
     try {
@@ -121,68 +125,78 @@ Deno.serve(async (request) => {
       const lastStudiedAt =
         row.cadence.kind === 'inactivity' ? await lastStudied(admin, row.owner_id, row.deck_id) : null;
 
-      // A row that has never been scheduled is being seen for the first time.
-      // It is given its slot and nothing more: a reminder created at 3pm for
-      // 6pm must not fire the moment the next sweep notices it.
-      if (!row.next_send_at) {
-        const first = nextSendAt(
-          {
-            cadence: row.cadence,
-            timeOfDay: row.time_of_day,
-            timeZone: row.time_zone,
-            createdAt: row.created_at,
-            lastSentAt: row.last_sent_at,
-            lastStudiedAt,
-          },
-          now,
-        );
-        if (!first) {
-          await admin.from('deck_reminders').delete().eq('id', row.id);
-          dropped += 1;
-          continue;
-        }
-        await admin
-          .from('deck_reminders')
-          .update({ next_send_at: first.toISOString() })
-          .eq('id', row.id);
-        scheduled += 1;
+      // Everything the schedule is read from, gathered once: the decision here
+      // and the reschedule further down ask the same questions of it.
+      const schedule = {
+        cadence: row.cadence,
+        timeOfDay: row.time_of_day,
+        timeZone: row.time_zone,
+        createdAt: row.created_at,
+        lastSentAt: row.last_sent_at,
+        lastStudiedAt,
+      };
+
+      // Due, not yet, or never again. A row seen for the first time has its
+      // slot worked out from when it was written rather than from this sweep's
+      // clock — see `planSweep`, which is where a reminder used to lose a day.
+      const action = planSweep(schedule, row.next_send_at, now);
+
+      if (action.kind === 'drop') {
+        await admin.from('deck_reminders').delete().eq('id', row.id);
+        dropped += 1;
         continue;
       }
 
-      if (!emails.has(row.owner_id)) {
-        const { data: user } = await admin.auth.admin.getUserById(row.owner_id);
-        emails.set(row.owner_id, user?.user?.email ?? null);
+      if (action.kind === 'wait') {
+        // A slot worked out for the first time, or rolled past one missed by
+        // too much to be worth mailing. Null when the row already holds it.
+        if (action.record) {
+          await admin
+            .from('deck_reminders')
+            .update({ next_send_at: action.record.toISOString() })
+            .eq('id', row.id);
+          scheduled += 1;
+        }
+        continue;
       }
-      const to = emails.get(row.owner_id);
 
-      const title = row.decks.data?.title?.trim() || 'your deck';
-      const cardCount = await countCards(admin, row.deck_id);
+      // A reminder the mobile app fires as a local push and nothing more. The
+      // row still has to be walked forward — its cadence is what the phone
+      // reads to place the *next* push — so everything below happens exactly
+      // as it would for a mailed one, minus the mail.
+      const wantsEmail = row.email_enabled !== false;
 
-      let delivered = false;
-      if (to) {
-        delivered = await sendEmail(resendKey, to, title, row.deck_id, cardCount);
-        if (delivered) sent += 1;
-        else failed += 1;
+      // Counts as serviced either way: `last_sent_at` is what stops an
+      // inactivity cadence coming round again tomorrow, on the server and on
+      // the phone alike.
+      let delivered = !wantsEmail;
+
+      if (wantsEmail) {
+        if (!emails.has(row.owner_id)) {
+          const { data: user } = await admin.auth.admin.getUserById(row.owner_id);
+          emails.set(row.owner_id, user?.user?.email ?? null);
+        }
+        const to = emails.get(row.owner_id);
+
+        if (to) {
+          const title = row.decks.data?.title?.trim() || 'your deck';
+          const cardCount = await countCards(admin, row.deck_id);
+          delivered = await sendEmail(resendKey, to, title, row.deck_id, cardCount);
+          if (delivered) sent += 1;
+          else failed += 1;
+        } else {
+          // No address to send to. The schedule is still moved on, so this row
+          // does not sit permanently due and get retried every hour forever.
+          failed += 1;
+        }
       } else {
-        // No address to send to. The schedule is still moved on, so this row
-        // does not sit permanently due and get retried every hour forever.
-        failed += 1;
+        skipped += 1;
       }
 
       // Recomputed with `lastSentAt` set to now, which is what stops an
       // inactivity reminder mailing again tomorrow and every day after.
       const sentAt = now.toISOString();
-      const following = nextSendAt(
-        {
-          cadence: row.cadence,
-          timeOfDay: row.time_of_day,
-          timeZone: row.time_zone,
-          createdAt: row.created_at,
-          lastSentAt: sentAt,
-          lastStudiedAt,
-        },
-        now,
-      );
+      const following = nextSendAt({ ...schedule, lastSentAt: sentAt }, now);
 
       if (!following) {
         // A one-off that has now gone. Nothing left for this row to do.
@@ -205,8 +219,10 @@ Deno.serve(async (request) => {
     }
   }
 
-  console.log(`reminders: ${sent} sent, ${scheduled} scheduled, ${dropped} dropped, ${failed} failed`);
-  return json({ ok: true, considered: rows.length, sent, scheduled, dropped, failed });
+  console.log(
+    `reminders: ${sent} sent, ${skipped} push-only, ${scheduled} scheduled, ${dropped} dropped, ${failed} failed`,
+  );
+  return json({ ok: true, considered: rows.length, sent, skipped, scheduled, dropped, failed });
 });
 
 /** When this deck was last studied, from the account's session history. */

@@ -25,6 +25,8 @@ function makeAuth(): AuthService {
     signIn: async () => makeSession('someone'),
     signUp: async () => ({ status: 'authenticated', session: makeSession('someone') }),
     signInWithGoogle: async () => {},
+    startGoogleSignIn: async () => 'https://accounts.google.com/o/oauth2/auth',
+    restoreFromUrl: async () => null,
     signOut: async () => {},
     restore: async (session) => session,
     updateProfile: async (user, patch) => ({ ...user, ...patch }),
@@ -204,6 +206,35 @@ describe('createAuthStore.signInWithGoogle', () => {
     await store.getState().signInWithGoogle('https://x.test/auth/callback');
 
     expect(store.getState().pendingConfirmationEmail).toBeNull();
+  });
+});
+
+describe('createAuthStore.startGoogleSignIn', () => {
+  it('resolves to the authorize URL the service hands back', async () => {
+    const store = createAuthStore(makeAuth(), createMemoryStorage());
+
+    await expect(
+      store.getState().startGoogleSignIn('https://x.test/auth/callback'),
+    ).resolves.toBe('https://accounts.google.com/o/oauth2/auth');
+
+    expect(store.getState().status).toBe('loading');
+  });
+
+  it('reports the failure and stops loading when the provider refuses', async () => {
+    const auth: AuthService = {
+      ...makeAuth(),
+      startGoogleSignIn: async () => {
+        throw new Error('Provider is not enabled.');
+      },
+    };
+    const store = createAuthStore(auth, createMemoryStorage());
+
+    await expect(
+      store.getState().startGoogleSignIn('https://x.test/auth/callback'),
+    ).resolves.toBeNull();
+
+    expect(store.getState().status).toBe('signed-out');
+    expect(store.getState().error).toBe('Provider is not enabled.');
   });
 });
 
