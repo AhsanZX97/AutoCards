@@ -54,7 +54,7 @@ export default function SignUpScreen() {
   return (
     <Screen>
       <View style={{ marginBottom: spacing.xl, marginTop: spacing.xl }}>
-        <Image source={require('../../assets/icon.png')} style={{ width: 40, height: 40, borderRadius: 10 }} />
+        <Image source={require('../../assets/favicon.png')} style={{ width: 40, height: 40, borderRadius: 10 }} />
         <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: spacing.md }}>
           Create your account
         </Text>

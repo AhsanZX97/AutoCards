@@ -21,7 +21,7 @@ import {
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, useDifficultyColors, usePriorityColors, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
-import { Badge, Button, Card, Chip, Field, ProgressBar, Screen } from '../../../src/components';
+import { Badge, Button, Card, Chip, Field, IconButton, ProgressBar, Screen } from '../../../src/components';
 import { EMPTY_ARRAY } from '../../../src/lib/empty';
 import { CardEditorModal } from '../../../src/features/decks/CardEditorModal';
 import { DeckEditorModal, type DeckEdits } from '../../../src/features/decks/DeckEditorModal';
@@ -278,29 +278,15 @@ export default function DeckDetailScreen() {
             {deck.description}
           </Text>
         </View>
-        <Pressable
-          onPress={() => setRemindersOpen(true)}
-          accessibilityLabel={reminderStatus.label}
-          style={{ padding: spacing.sm }}
-        >
-          <Text style={{ fontSize: 18 }}>🔔</Text>
-          {reminderStatus.dot && (
-            <View
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: theme.success,
-              }}
-            />
-          )}
-        </Pressable>
-        <Pressable onPress={() => setDeckEditorOpen(true)} accessibilityLabel="Edit deck" style={{ padding: spacing.sm }}>
-          <Text style={{ fontSize: 18 }}>✏️</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <IconButton
+            icon="🔔"
+            accessibilityLabel={reminderStatus.label}
+            onPress={() => setRemindersOpen(true)}
+            dotColor={reminderStatus.dot ? theme.success : undefined}
+          />
+          <IconButton icon="✏️" accessibilityLabel="Edit deck" onPress={() => setDeckEditorOpen(true)} />
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' }}>
