@@ -12,7 +12,6 @@ import {
   hasCloze,
   isReminderActive,
   parseCloze,
-  serializeDeckExport,
   shareUrlForDeck,
   type CardDraft,
   type Difficulty,
@@ -21,7 +20,7 @@ import {
 import { useApp } from '../../../src/lib/appContext';
 import { useTheme, useDifficultyColors, usePriorityColors, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
-import { Badge, Button, Card, Chip, Field, IconButton, ProgressBar, Screen } from '../../../src/components';
+import { Badge, Button, Card, Chip, Field, IconButton, ProgressBar, Screen, ShareIcon } from '../../../src/components';
 import { EMPTY_ARRAY } from '../../../src/lib/empty';
 import { CardEditorModal } from '../../../src/features/decks/CardEditorModal';
 import { DeckEditorModal, type DeckEdits } from '../../../src/features/decks/DeckEditorModal';
@@ -238,15 +237,6 @@ export default function DeckDetailScreen() {
     }
   }
 
-  async function handleExport() {
-    const payload = buildDeckExport(currentDeck, cards);
-    try {
-      await Share.share({ title: payload.title, message: serializeDeckExport(payload) });
-    } catch {
-      // User dismissed the share sheet.
-    }
-  }
-
   const emptyState = (
     <Card>
       <Text style={{ textAlign: 'center', color: theme.textMuted }}>
@@ -279,6 +269,10 @@ export default function DeckDetailScreen() {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <IconButton icon="➕" accessibilityLabel="Add card" onPress={handleAddCard} />
+          <IconButton accessibilityLabel="Share deck" onPress={() => void handleShare()}>
+            <ShareIcon color={theme.text} />
+          </IconButton>
           <IconButton
             icon="🔔"
             accessibilityLabel={reminderStatus.label}
@@ -289,17 +283,12 @@ export default function DeckDetailScreen() {
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' }}>
-        <Button title="Add card" variant="outline" onPress={handleAddCard} style={{ flexGrow: 1 }} />
-        <Button title="Share" variant="outline" onPress={handleShare} style={{ flexGrow: 1 }} />
-        <Button title="Export" variant="outline" onPress={handleExport} style={{ flexGrow: 1 }} />
-        <Button
-          title="Study now"
-          onPress={() => router.push(`/study/${deckId}/setup`)}
-          disabled={stats.total === 0}
-          style={{ flexGrow: 1.5 }}
-        />
-      </View>
+      <Button
+        title="Study now"
+        onPress={() => router.push(`/study/${deckId}/setup`)}
+        disabled={stats.total === 0}
+        style={{ marginBottom: spacing.lg }}
+      />
 
       <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textMuted, marginBottom: spacing.sm }}>Progress</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>

@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { describeSubscription, type AccountSubscription } from '@autocards/core';
+import { computeOverallStats, describeSubscription, type AccountSubscription } from '@autocards/core';
 import { useApp, getSupabaseClient } from '../../src/lib/appContext';
-import { useTheme, spacing } from '../../src/lib/theme';
+import { useTheme, radius, spacing } from '../../src/lib/theme';
 import { toast } from '../../src/lib/toastStore';
 import { useUploadQuota, formatQuota } from '../../src/lib/useUploadQuota';
-import { Badge, Button, Card, Field, Modal, ProgressBar, Screen, SwitchRow } from '../../src/components';
+import { Badge, Button, Card, Field, GradientPanel, IconTile, Modal, ProgressBar, Screen, SwitchRow } from '../../src/components';
 import { FeedbackModal } from '../../src/features/feedback/FeedbackModal';
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const;
@@ -28,6 +28,8 @@ export default function SettingsScreen() {
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const quota = useUploadQuota();
+  const history = app.studyStore((s) => s.history);
+  const stats = useMemo(() => computeOverallStats(history), [history]);
   const [subscription, setSubscription] = useState<AccountSubscription | null>(null);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -157,6 +159,29 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: spacing.lg }}>Settings</Text>
+
+      <GradientPanel style={{ marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: radius.lg,
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>👤</Text>
+          </View>
+          <View>
+            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>{user.username}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+              Level {stats.level.level} · {stats.streak.current} day streak
+            </Text>
+          </View>
+        </View>
+      </GradientPanel>
 
       <Card style={{ marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Profile</Text>

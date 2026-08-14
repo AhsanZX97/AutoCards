@@ -128,7 +128,27 @@ export function useResolvedScheme(): ResolvedTheme {
 }
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radius = { sm: 8, md: 12, lg: 16, xl: 20, full: 999 };
+export const radius = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, full: 999 };
+
+/** Soft elevation for white/surface cards — shadow reads on light, the faint border carries dark. */
+export const cardShadow = {
+  shadowColor: '#0f172a',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+} as const;
+
+/** Tinted glow for gradient panels and the primary button — pass the brand color it should glow. */
+export function glowShadow(color: string) {
+  return {
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 8,
+  } as const;
+}
 
 export const ACCENT_HEX: Record<Accent, string> = {
   indigo: '#6366f1',

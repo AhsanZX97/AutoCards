@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { useApp } from '../../lib/appContext';
-import { useTheme, radius, spacing } from '../../lib/theme';
+import { useTheme, spacing } from '../../lib/theme';
 import { toast } from '../../lib/toastStore';
-import { Button, Field } from '../../components';
+import { Button, Field, Modal } from '../../components';
 
 interface FeedbackModalProps {
   open: boolean;
@@ -46,48 +46,35 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
   }
 
   return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.5)' }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderTopLeftRadius: radius.xl,
-            borderTopRightRadius: radius.xl,
-            padding: spacing.lg,
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text }}>Send feedback</Text>
-          <Text style={{ marginTop: 4, fontSize: 13, color: theme.textMuted }}>
-            Bugs, ideas, anything that&apos;s not working — it goes straight to the team.
-          </Text>
-
-          <View style={{ marginTop: spacing.lg }}>
-            <Field
-              label="Your message"
-              hint={`${message.length}/${MAX_MESSAGE_CHARS}`}
-              multiline
-              numberOfLines={6}
-              maxLength={MAX_MESSAGE_CHARS}
-              placeholder="What's on your mind?"
-              value={message}
-              onChangeText={setMessage}
-              style={{ minHeight: 120, textAlignVertical: 'top' }}
-            />
-          </View>
-          {error && <Text style={{ marginTop: -spacing.sm, marginBottom: spacing.sm, fontSize: 13, color: theme.danger }}>{error}</Text>}
-
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
-            <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-            <Button
-              title={sending ? 'Sending…' : 'Send'}
-              onPress={() => void handleSend()}
-              disabled={sending || !message.trim()}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </View>
-      </View>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Send feedback"
+      description="Bugs, ideas, anything that's not working — it goes straight to the team."
+      footer={
+        <>
+          <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button
+            title={sending ? 'Sending…' : 'Send'}
+            onPress={() => void handleSend()}
+            disabled={sending || !message.trim()}
+            style={{ flex: 1 }}
+          />
+        </>
+      }
+    >
+      <Field
+        label="Your message"
+        hint={`${message.length}/${MAX_MESSAGE_CHARS}`}
+        multiline
+        numberOfLines={6}
+        maxLength={MAX_MESSAGE_CHARS}
+        placeholder="What's on your mind?"
+        value={message}
+        onChangeText={setMessage}
+        style={{ minHeight: 120, textAlignVertical: 'top' }}
+      />
+      {error && <Text style={{ marginTop: spacing.xs, fontSize: 13, color: theme.danger }}>{error}</Text>}
     </Modal>
   );
 }

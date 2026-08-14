@@ -15,3 +15,6 @@ export * from './TimeField';
 export * from './OrDivider';
 export * from './GoogleMark';
 export * from './GoogleButton';
+export * from './IconTile';
+export * from './GradientPanel';
+export * from './NavIcons';

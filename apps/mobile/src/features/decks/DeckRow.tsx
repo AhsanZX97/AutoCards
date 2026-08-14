@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import type { Deck, DeckStats } from '@autocards/core';
-import { useTheme, ACCENT_HEX, radius, spacing } from '../../lib/theme';
-import { Badge, ProgressBar } from '../../components';
+import { useTheme, ACCENT_HEX, cardShadow, radius, spacing } from '../../lib/theme';
+import { Badge, IconTile, ProgressBar } from '../../components';
 
 interface DeckRowProps {
   deck: Deck;
@@ -18,30 +18,22 @@ export function DeckRow({ deck, stats, onPress, onMenu }: DeckRowProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-        padding: spacing.md,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: theme.border,
-        backgroundColor: pressed ? theme.surfaceAlt : theme.surface,
-        opacity: deck.archived ? 0.7 : 1,
-      })}
-    >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: radius.md,
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: `${accentColor}22`,
-        }}
-      >
-        <Text style={{ fontSize: 20 }}>{deck.icon}</Text>
-      </View>
+          gap: spacing.md,
+          padding: spacing.md,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: theme.border,
+          backgroundColor: pressed ? theme.surfaceAlt : theme.surface,
+          opacity: deck.archived ? 0.7 : 1,
+        },
+        cardShadow,
+      ]}
+    >
+      <IconTile icon={deck.icon} color={accentColor} size={44} fontSize={20} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }} numberOfLines={1}>

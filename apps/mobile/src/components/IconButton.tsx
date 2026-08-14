@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { useTheme, radius } from '../lib/theme';
+import { useTheme, cardShadow, radius } from '../lib/theme';
 
 interface IconButtonProps {
-  /** The emoji or glyph shown inside the button. */
-  icon: string;
+  /** The emoji or glyph shown inside the button. Ignored if `children` is given. */
+  icon?: string;
+  /** An SVG icon or other custom node, for glyphs that aren't real emoji. */
+  children?: ReactNode;
   /** Spoken by screen readers — the button has no visible label. */
   accessibilityLabel: string;
   onPress: () => void;
@@ -16,7 +19,7 @@ interface IconButtonProps {
  * A square, bordered button for a single glyph — the outline `Button` without
  * room for a label. Used where a header action has no space for words.
  */
-export function IconButton({ icon, accessibilityLabel, onPress, dotColor, style }: IconButtonProps) {
+export function IconButton({ icon, children, accessibilityLabel, onPress, dotColor, style }: IconButtonProps) {
   const theme = useTheme();
 
   return (
@@ -31,15 +34,14 @@ export function IconButton({ icon, accessibilityLabel, onPress, dotColor, style 
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: theme.borderStrong,
           backgroundColor: theme.surface,
           opacity: pressed ? 0.85 : 1,
         },
+        cardShadow,
         style,
       ]}
     >
-      <Text style={{ fontSize: 18 }}>{icon}</Text>
+      {children ?? <Text style={{ fontSize: 18 }}>{icon}</Text>}
       {dotColor && (
         <View
           style={{

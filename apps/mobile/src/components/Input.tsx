@@ -19,14 +19,14 @@ export function Field({ label, error, hint, style, ...rest }: FieldProps) {
         placeholderTextColor={theme.textFaint}
         style={[
           {
-            borderWidth: 1,
-            borderColor: error ? theme.danger : theme.borderStrong,
-            borderRadius: radius.md,
+            borderWidth: error ? 2 : 1,
+            borderColor: error ? theme.danger : theme.border,
+            borderRadius: radius.lg,
             paddingHorizontal: spacing.md,
-            paddingVertical: 10,
+            paddingVertical: 12,
             fontSize: 15,
             color: theme.text,
-            backgroundColor: theme.surface,
+            backgroundColor: theme.surfaceAlt,
           },
           style,
         ]}

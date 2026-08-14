@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme, radius, spacing, BRAND_GRADIENT } from '../lib/theme';
+import { useTheme, radius, spacing, BRAND_GRADIENT, glowShadow } from '../lib/theme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
@@ -51,6 +51,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'md', loadi
           borderColor: theme.borderStrong,
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
         },
+        variant === 'primary' && !isDisabled ? glowShadow(theme.primary) : null,
         style,
       ]}
     >

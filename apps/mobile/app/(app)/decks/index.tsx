@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
-import { useTheme, spacing } from '../../../src/lib/theme';
+import { useTheme, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
 import { Button, Card, Chip, Field, Screen } from '../../../src/components';
 import { DeckRow } from '../../../src/features/decks/DeckRow';
@@ -122,11 +122,29 @@ export default function DeckLibraryScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <Card>
-          <Text style={{ textAlign: 'center', color: theme.textMuted }}>
-            {filter === 'archived' ? 'Nothing archived yet.' : 'No decks found.'}
-          </Text>
-        </Card>
+        filter === 'active' && !query ? (
+          <View
+            style={{
+              borderRadius: radius.xl,
+              borderWidth: 2,
+              borderStyle: 'dashed',
+              borderColor: theme.borderStrong,
+              paddingVertical: spacing.xl,
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <Text style={{ fontSize: 28 }}>✨</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textMuted }}>Create a new deck</Text>
+            <Button title="+ New Deck" onPress={() => router.push('/(app)/decks/new')} style={{ marginTop: spacing.xs }} />
+          </View>
+        ) : (
+          <Card>
+            <Text style={{ textAlign: 'center', color: theme.textMuted }}>
+              {filter === 'archived' ? 'Nothing archived yet.' : 'No decks found.'}
+            </Text>
+          </Card>
+        )
       ) : (
         <View style={{ gap: spacing.sm }}>
           {filtered.map((deck) => (

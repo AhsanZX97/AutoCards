@@ -24,11 +24,14 @@ export function Modal({ open, onClose, title, description, children, footer }: M
         <View
           style={{
             backgroundColor: theme.surface,
-            borderTopLeftRadius: radius.xl,
-            borderTopRightRadius: radius.xl,
+            borderTopLeftRadius: radius.xxl,
+            borderTopRightRadius: radius.xxl,
             maxHeight: '90%',
           }}
         >
+          <View style={{ alignItems: 'center', paddingTop: spacing.sm }}>
+            <View style={{ width: 40, height: 4, borderRadius: radius.full, backgroundColor: theme.surfaceAlt }} />
+          </View>
           <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text }}>{title}</Text>
             {description && (

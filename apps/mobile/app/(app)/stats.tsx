@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { computeAchievements, computeOverallStats } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, spacing } from '../../src/lib/theme';
-import { Badge, Card, ProgressBar, Screen } from '../../src/components';
+import { Badge, Card, IconTile, ProgressBar, Screen } from '../../src/components';
 import { ActivityHeatmap } from '../../src/features/stats/ActivityHeatmap';
 
 export default function StatsScreen() {
@@ -33,8 +33,8 @@ export default function StatsScreen() {
       </Card>
 
       <Card style={{ marginBottom: spacing.md, alignItems: 'center' }}>
-        <Text style={{ fontSize: 32 }}>🔥</Text>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 4 }}>{stats.streak.current}</Text>
+        <IconTile icon="🔥" color={theme.warning} size={56} fontSize={28} />
+        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: spacing.sm }}>{stats.streak.current}</Text>
         <Text style={{ color: theme.textMuted, fontSize: 13 }}>day streak · best {stats.streak.longest}</Text>
         {stats.streak.atRisk && (
           <View style={{ marginTop: spacing.sm }}>
@@ -89,8 +89,8 @@ export default function StatsScreen() {
               paddingVertical: spacing.md,
             }}
           >
-            <Text style={{ fontSize: 22 }}>{a.icon}</Text>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.text, marginTop: 4, textAlign: 'center' }}>
+            <IconTile icon={a.icon} color={theme.primary} size={40} fontSize={18} />
+            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.text, marginTop: spacing.xs, textAlign: 'center' }}>
               {a.name}
             </Text>
             {!a.unlocked && (

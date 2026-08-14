@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { computeDeckStats, computeOverallStats, formatRelative, type SessionSummary } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
-import { Badge, Button, Card, Screen } from '../../src/components';
+import { Badge, Button, Card, GradientPanel, IconTile, Screen } from '../../src/components';
 import { DeckRow } from '../../src/features/decks/DeckRow';
 
 export default function DashboardScreen() {
@@ -32,14 +32,51 @@ export default function DashboardScreen() {
         {activeDecks.length > 0 ? `${activeDecks.length} deck${activeDecks.length === 1 ? '' : 's'} ready to study.` : 'Create your first deck to get started.'}
       </Text>
 
-      <Button title="Create deck" onPress={() => router.push('/(app)/decks/new')} />
+      <GradientPanel>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+          {stats.streak.current > 0 ? "Today's Goal" : 'Get started'}
+        </Text>
+        <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: 4 }}>
+          {stats.streak.current > 0 ? 'Keep your streak!' : 'Create your first deck'}
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4 }}>
+          {activeDecks.length > 0 ? 'Review at least 1 deck today' : 'Upload a document to generate flashcards'}
+        </Text>
+        <Pressable
+          onPress={() =>
+            activeDecks.length > 0
+              ? router.push(`/(app)/decks/${activeDecks[0]!.id}`)
+              : router.push('/(app)/decks/new')
+          }
+          style={({ pressed }) => ({
+            marginTop: spacing.md,
+            alignSelf: 'flex-start',
+            paddingHorizontal: spacing.lg,
+            paddingVertical: 10,
+            borderRadius: radius.md,
+            backgroundColor: 'rgba(255,255,255,0.25)',
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>
+            {activeDecks.length > 0 ? 'Start Studying →' : 'Create deck →'}
+          </Text>
+        </Pressable>
+      </GradientPanel>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
-        <StatTile icon="🔥" label="Streak" value={String(stats.streak.current)} />
-        <StatTile icon="⭐" label="Level" value={String(stats.level.level)} />
-        <StatTile icon="🎯" label="Accuracy" value={`${Math.round(stats.accuracy * 100)}%`} />
-        <StatTile icon="📚" label="Decks" value={String(activeDecks.length)} />
+        <StatTile icon="🔥" label="Streak" value={String(stats.streak.current)} color={theme.warning} />
+        <StatTile icon="⭐" label="Level" value={String(stats.level.level)} color={theme.warning} />
+        <StatTile icon="🎯" label="Accuracy" value={`${Math.round(stats.accuracy * 100)}%`} color={theme.danger} />
+        <StatTile icon="📚" label="Decks" value={String(activeDecks.length)} color={theme.primary} />
       </View>
+
+      <Button
+        title="Create deck"
+        variant="outline"
+        onPress={() => router.push('/(app)/decks/new')}
+        style={{ marginTop: spacing.lg }}
+      />
 
       <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, marginTop: spacing.xl, marginBottom: spacing.md }}>
         Your decks
@@ -143,12 +180,12 @@ function SessionRow({
   );
 }
 
-function StatTile({ icon, label, value }: { icon: string; label: string; value: string }) {
+function StatTile({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
   const theme = useTheme();
   return (
     <Card style={{ flexBasis: '47%', flexGrow: 1 }}>
-      <Text style={{ fontSize: 18 }}>{icon}</Text>
-      <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, marginTop: 6 }}>{value}</Text>
+      <IconTile icon={icon} color={color} size={36} fontSize={16} />
+      <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, marginTop: 8 }}>{value}</Text>
       <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{label}</Text>
     </Card>
   );

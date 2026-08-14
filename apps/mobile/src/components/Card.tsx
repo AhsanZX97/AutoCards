@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import { useTheme, radius, spacing } from '../lib/theme';
+import { useTheme, cardShadow, radius, spacing } from '../lib/theme';
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
@@ -14,6 +14,7 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
           borderColor: theme.border,
           padding: spacing.lg,
         },
+        cardShadow,
         style,
       ]}
     >
