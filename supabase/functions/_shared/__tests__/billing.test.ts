@@ -5,7 +5,6 @@ import {
   eventTimestamp,
   isHandled,
   isOneTimePlan,
-  isStaleEvent,
   ownsOutright,
   paymentSettled,
   planForPrice,
@@ -13,6 +12,7 @@ import {
   readCheckoutPurchase,
   readPriceMap,
   readSubscription,
+  subscriptionEventId,
 } from '../billing';
 
 const PRICES = { price_pro_monthly: 'pro', price_lifetime: 'lifetime' } as const;
@@ -259,41 +259,15 @@ describe('eventTimestamp', () => {
   });
 });
 
-describe('isStaleEvent', () => {
-  const earlier = new Date(1_800_000_000 * 1000).toISOString();
-  const later = new Date(1_800_000_060 * 1000).toISOString();
-
-  it('rejects an event older than the one already applied', () => {
-    expect(isStaleEvent(later, earlier)).toBe(true);
+describe('subscriptionEventId', () => {
+  it('reads the id off a subscription event', () => {
+    expect(subscriptionEventId({ id: 'sub_123', status: 'canceled' })).toBe('sub_123');
   });
 
-  it('accepts an event newer than the one already applied', () => {
-    expect(isStaleEvent(earlier, later)).toBe(false);
-  });
-
-  /**
-   * Stripe stamps whole seconds, so a checkout completing and its subscription
-   * being created routinely share one. Treating a tie as stale would drop the
-   * second of the pair, so the later arrival wins as it did before.
-   */
-  it('accepts an event from the same second', () => {
-    expect(isStaleEvent(earlier, earlier)).toBe(false);
-  });
-
-  it('accepts anything when there is nothing on file to compare against', () => {
-    expect(isStaleEvent(null, later)).toBe(false);
-    expect(isStaleEvent(undefined, later)).toBe(false);
-  });
-
-  /**
-   * An event we cannot date must still be applied. Dropping it would leave
-   * someone who paid on the free plan over a missing field.
-   */
-  it('accepts an event with no timestamp of its own', () => {
-    expect(isStaleEvent(later, undefined)).toBe(false);
-  });
-
-  it('accepts when what is on file is unreadable', () => {
-    expect(isStaleEvent('not a date', later)).toBe(false);
+  it('refuses an object with no usable id', () => {
+    expect(subscriptionEventId(null)).toBeUndefined();
+    expect(subscriptionEventId({})).toBeUndefined();
+    expect(subscriptionEventId({ id: 42 })).toBeUndefined();
   });
 });
+

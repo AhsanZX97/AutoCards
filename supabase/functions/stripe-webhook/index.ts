@@ -2,13 +2,13 @@ import {
   entitledPlan,
   eventTimestamp,
   isHandled,
-  isStaleEvent,
   ownsOutright,
   paymentSettled,
   planForPrice,
   readCheckoutPurchase,
   readPriceMap,
   readSubscription,
+  subscriptionEventId,
   type PurchaseFacts,
   type SubscriptionFacts,
 } from '../_shared/billing.ts';
@@ -107,8 +107,9 @@ async function handle(
   stripe: ReturnType<typeof stripeClient>,
   event: { type: string; data: { object: unknown } },
 ): Promise<void> {
-  // When Stripe says this happened, carried through so a delivery that arrived
-  // out of order can be recognised as older than what is already on file.
+  // When Stripe says this happened, stored on the row purely for
+  // observability — every write below comes from a live Stripe fetch, not
+  // this event's own payload, so nothing here gates on it.
   const occurredAt = eventTimestamp(event);
 
   if (
@@ -143,10 +144,23 @@ async function handle(
     return;
   }
 
-  // customer.subscription.created / updated / deleted all carry the
-  // subscription itself, including the cancelled state — `deleted` arrives
-  // with status 'canceled', which reads as no entitlement like any other.
-  await apply(admin, event.data.object, undefined, occurredAt);
+  // customer.subscription.created / updated / deleted — the only other
+  // events `isHandled` lets through.
+  //
+  // The subscription itself is re-fetched live rather than trusting the
+  // object embedded in the event: Stripe does not guarantee delivery order,
+  // and a `customer.subscription.updated` for a cancellation processed ahead
+  // of an earlier `.created` (or redelivered after it) must still land on
+  // the subscription's actual current state, not whichever snapshot happened
+  // to arrive last. `deleted` arrives with status 'canceled', which reads as
+  // no entitlement like any other.
+  const subscriptionId = subscriptionEventId(event.data.object);
+  if (!subscriptionId) {
+    console.error('a subscription event carried no id');
+    return;
+  }
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  await apply(admin, subscription, undefined, occurredAt);
 }
 
 /**
@@ -229,20 +243,6 @@ async function apply(
     console.log('ignored a subscription event for an account that owns its plan outright', {
       user: userId,
       subscription: facts.subscriptionId,
-    });
-    return;
-  }
-
-  // Stripe guarantees delivery, not order. An update held up in a retry can
-  // land after a newer one, and applying it would roll the account back to a
-  // state it has already left — cancelling someone who has resubscribed, or
-  // restoring a plan they just dropped.
-  if (isStaleEvent(existing?.last_event_at, occurredAt)) {
-    console.log('ignored a Stripe event older than the one already applied', {
-      user: userId,
-      subscription: facts.subscriptionId,
-      applied: existing?.last_event_at,
-      arrived: occurredAt,
     });
     return;
   }

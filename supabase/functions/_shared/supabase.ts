@@ -104,8 +104,10 @@ export interface SubscriptionRow {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   /**
-   * When Stripe says the event behind this row happened. Read back on the next
-   * event to spot one that arrived out of order — see `isStaleEvent`.
+   * When Stripe says the event behind this row happened. Informational only —
+   * every write comes from a live `stripe.subscriptions.retrieve()` rather
+   * than the event's own payload, so this never gates whether a write
+   * applies (see `stripe-webhook/index.ts`).
    */
   last_event_at?: string | null;
 }

@@ -12,7 +12,7 @@ import {
 } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
-import { Badge, Button, Card, GradientPanel, IconTile, Screen } from '../../src/components';
+import { Badge, Card, GradientPanel, IconTile, Screen } from '../../src/components';
 import { DeckRow } from '../../src/features/decks/DeckRow';
 
 export default function DashboardScreen() {
@@ -109,13 +109,6 @@ export default function DashboardScreen() {
         <StatTile icon="🎯" label="Accuracy" value={`${Math.round(stats.accuracy * 100)}%`} color={theme.danger} />
         <StatTile icon="📚" label="Decks" value={String(activeDecks.length)} color={theme.primary} />
       </View>
-
-      <Button
-        title="Create deck"
-        variant="outline"
-        onPress={() => router.push('/(app)/decks/new')}
-        style={{ marginTop: spacing.lg }}
-      />
 
       <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, marginTop: spacing.xl, marginBottom: spacing.md }}>
         Your decks

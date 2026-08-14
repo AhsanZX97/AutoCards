@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Text, View } from 'react-native';
+import { Alert, AppState, Linking, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { computeOverallStats, describeSubscription, type AccountSubscription } from '@autocards/core';
 import { useApp, getSupabaseClient } from '../../src/lib/appContext';
@@ -45,14 +45,30 @@ export default function SettingsScreen() {
       return;
     }
     let live = true;
+
+    function refetch() {
+      void account!.fetchSubscription(userId!).then((found) => {
+        if (live) setSubscription(found);
+      });
+    }
+
     setSubscriptionLoaded(false);
     void account.fetchSubscription(userId).then((found) => {
       if (!live) return;
       setSubscription(found);
       setSubscriptionLoaded(true);
     });
+
+    // The Stripe portal opens in the system browser (see `handleManagePlan`),
+    // so cancelling a plan there doesn't remount this screen — only
+    // foregrounding the app again does, which is what this catches.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refetch();
+    });
+
     return () => {
       live = false;
+      sub.remove();
     };
   }, [app, userId]);
 
@@ -279,13 +295,6 @@ export default function SettingsScreen() {
           loading={openingPortal}
           onPress={handleManagePlan}
         />
-      </Card>
-
-      <Card style={{ marginBottom: spacing.md }}>
-        <Text style={{ color: theme.textMuted, fontSize: 12 }}>
-          Reading text out of a PDF is not available on mobile yet, so creating decks from your own
-          files is web-only for now.
-        </Text>
       </Card>
 
       <Button

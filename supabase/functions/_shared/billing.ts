@@ -172,24 +172,17 @@ export function eventTimestamp(event: unknown): string | undefined {
 }
 
 /**
- * Whether an event is older than the one already applied to this account.
+ * The subscription id carried on a `customer.subscription.*` event.
  *
- * Stripe guarantees delivery, not order. A `customer.subscription.updated`
- * held up in a retry can land after a newer one, and without this the older
- * state would win — cancelling an account that has since resubscribed, or
- * restoring a plan somebody just dropped.
- *
- * Everything unknown resolves to "apply it". A tie is not stale either:
- * Stripe stamps whole seconds, and a checkout completing and its subscription
- * being created routinely share one, so treating a tie as stale would drop
- * the second of the pair.
+ * This is the only thing read off the event itself — the rest of its payload
+ * is not trusted. Stripe does not guarantee delivery order, so an event
+ * processed out of turn must still land on the subscription's actual current
+ * state, not a snapshot that happened to be attached to whichever event
+ * arrived first. The id is only used to know what to re-fetch live.
  */
-export function isStaleEvent(appliedAt: unknown, incomingAt: string | undefined): boolean {
-  if (typeof appliedAt !== 'string' || !incomingAt) return false;
-  const applied = Date.parse(appliedAt);
-  const incoming = Date.parse(incomingAt);
-  if (!Number.isFinite(applied) || !Number.isFinite(incoming)) return false;
-  return incoming < applied;
+export function subscriptionEventId(raw: unknown): string | undefined {
+  if (!isRecord(raw)) return undefined;
+  return typeof raw.id === 'string' ? raw.id : undefined;
 }
 
 /** Events worth acting on. Everything else is acknowledged and ignored. */
