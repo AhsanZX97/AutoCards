@@ -27,7 +27,7 @@ export default function AppTabsLayout() {
   }
 
   if (status !== 'authenticated') {
-    return <Redirect href="/(auth)/sign-in" />;
+    return <Redirect href="/(auth)/welcome" />;
   }
 
   const tabBarMarginBottom = insets.bottom + spacing.sm;

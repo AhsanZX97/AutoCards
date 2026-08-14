@@ -119,7 +119,7 @@ export default function SettingsScreen() {
     const done = await signOut();
     setSigningOut(false);
     if (done) {
-      router.replace('/(auth)/sign-in');
+      router.replace('/(auth)/welcome');
       return;
     }
     setUnsyncedWarning(true);
@@ -130,7 +130,7 @@ export default function SettingsScreen() {
     await signOut({ force: true });
     setSigningOut(false);
     setUnsyncedWarning(false);
-    router.replace('/(auth)/sign-in');
+    router.replace('/(auth)/welcome');
   }
 
   async function handleDeleteAccount() {
@@ -156,7 +156,7 @@ export default function SettingsScreen() {
               // there is nothing left to flush unsynced changes to — forcing
               // skips a flush that could only ever fail.
               await signOut({ force: true });
-              router.replace('/(auth)/sign-in');
+              router.replace('/(auth)/welcome');
             } catch (err) {
               toast({
                 variant: 'error',

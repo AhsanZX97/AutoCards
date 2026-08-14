@@ -14,7 +14,7 @@ export default function StudyLayout() {
       </View>
     );
   }
-  if (status !== 'authenticated') return <Redirect href="/(auth)/sign-in" />;
+  if (status !== 'authenticated') return <Redirect href="/(auth)/welcome" />;
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }
