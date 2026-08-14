@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   DIFFICULTIES,
   PRIORITIES,
@@ -18,9 +19,25 @@ import {
   type Flashcard,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
-import { useTheme, useDifficultyColors, usePriorityColors, spacing } from '../../../src/lib/theme';
+import { useTheme, useDifficultyColors, usePriorityColors, BRAND_GRADIENT, cardShadow, glowShadow, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
-import { Badge, Button, Card, Chip, Field, IconButton, ProgressBar, Screen, ShareIcon } from '../../../src/components';
+import {
+  BackIcon,
+  Badge,
+  Button,
+  Card,
+  Chip,
+  FilterIcon,
+  IconButton,
+  IconTile,
+  Modal,
+  MoreIcon,
+  PlayIcon,
+  ProgressBar,
+  Screen,
+  SearchIcon,
+  ShareIcon,
+} from '../../../src/components';
 import { EMPTY_ARRAY } from '../../../src/lib/empty';
 import { CardEditorModal } from '../../../src/features/decks/CardEditorModal';
 import { DeckEditorModal, type DeckEdits } from '../../../src/features/decks/DeckEditorModal';
@@ -64,6 +81,9 @@ export default function DeckDetailScreen() {
   const [deckEditorOpen, setDeckEditorOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [addCardOpen, setAddCardOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [view, setView] = useState<'list' | 'flashcards'>('list');
 
@@ -110,6 +130,7 @@ export default function DeckDetailScreen() {
 
   const isFiltered =
     query.trim() !== '' || categoryFilter !== null || difficultyFilter !== 'all' || starredOnly || suspendedOnly;
+  const filterButtonActive = filtersOpen || difficultyFilter !== 'all' || starredOnly || suspendedOnly;
 
   if (!deck || !deckId) {
     return (
@@ -215,11 +236,7 @@ export default function DeckDetailScreen() {
   }
 
   function handleAddCard() {
-    Alert.alert('Add card', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: '✍️ Write one myself', onPress: openNewCard },
-      { text: '📄 Generate from a document', onPress: () => setGenerateOpen(true) },
-    ]);
+    setAddCardOpen(true);
   }
 
   async function handleShare() {
@@ -257,50 +274,125 @@ export default function DeckDetailScreen() {
 
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
-        <Text style={{ fontSize: 32 }}>{deck.icon}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
+        <IconButton accessibilityLabel="Back" onPress={() => router.back()}>
+          <BackIcon color={theme.text} />
+        </IconButton>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{deck.title}</Text>
+            <Text style={{ fontSize: 16 }}>{deck.icon}</Text>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: theme.text }} numberOfLines={1}>
+              {deck.title}
+            </Text>
             {deck.archived && <Badge label="Archived" color={theme.warning} softColor={theme.warningSoft} />}
           </View>
-          <Text style={{ fontSize: 13, color: theme.textMuted }} numberOfLines={2}>
-            {deck.description}
+          <Text style={{ fontSize: 12, color: theme.textFaint, fontWeight: '600' }} numberOfLines={1}>
+            {deck.description || `${stats.total} card${stats.total === 1 ? '' : 's'}`}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <IconButton icon="➕" accessibilityLabel="Add card" onPress={handleAddCard} />
-          <IconButton accessibilityLabel="Share deck" onPress={() => void handleShare()}>
-            <ShareIcon color={theme.text} />
-          </IconButton>
-          <IconButton
-            icon="🔔"
-            accessibilityLabel={reminderStatus.label}
-            onPress={() => setRemindersOpen(true)}
-            dotColor={reminderStatus.dot ? theme.success : undefined}
-          />
-          <IconButton icon="✏️" accessibilityLabel="Edit deck" onPress={() => setDeckEditorOpen(true)} />
-        </View>
+        <IconButton
+          accessibilityLabel="Deck actions"
+          onPress={() => setActionsOpen(true)}
+          dotColor={reminderStatus.dot ? theme.success : undefined}
+        >
+          <MoreIcon color={theme.text} />
+        </IconButton>
       </View>
 
-      <Button
-        title="Study now"
+      <Card style={{ padding: 0, marginBottom: spacing.lg }}>
+        <View style={{ padding: spacing.lg, paddingBottom: spacing.md }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textFaint, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Mastery
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.primaryText }}>{stats.averageMastery}%</Text>
+          </View>
+          <ProgressBar value={stats.averageMastery} max={100} height={8} />
+        </View>
+        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.border }}>
+          <StatPill label="Cards" value={stats.total} theme={theme} borderRight />
+          <StatPill label="New" value={stats.new} color={theme.primary} theme={theme} borderRight />
+          <StatPill label="Learning" value={stats.learning} color={theme.warning} theme={theme} borderRight />
+          <StatPill label="Mastered" value={stats.mastered} color={theme.success} theme={theme} />
+        </View>
+      </Card>
+
+      <Pressable
         onPress={() => router.push(`/study/${deckId}/setup`)}
         disabled={stats.total === 0}
-        style={{ marginBottom: spacing.lg }}
-      />
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.sm,
+            paddingVertical: 14,
+            borderRadius: radius.xl,
+            overflow: 'hidden',
+            opacity: stats.total === 0 ? 0.5 : pressed ? 0.88 : 1,
+            marginBottom: spacing.lg,
+          },
+          stats.total === 0 ? null : glowShadow(theme.primary),
+        ]}
+      >
+        <LinearGradient
+          colors={[...BRAND_GRADIENT]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <PlayIcon color="#ffffff" size={16} />
+        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Study Now</Text>
+      </Pressable>
 
-      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textMuted, marginBottom: spacing.sm }}>Progress</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-        <MiniStat label="Cards" value={stats.total} theme={theme} />
-        <MiniStat label="New" value={stats.new} theme={theme} />
-        <MiniStat label="Learning" value={stats.learning} theme={theme} />
-        <MiniStat label="Mastered" value={stats.mastered} theme={theme} />
-        <MiniStat label="Avg mastery" value={`${stats.averageMastery}%`} theme={theme} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            borderRadius: radius.lg,
+            backgroundColor: theme.surfaceAlt,
+            paddingHorizontal: spacing.md,
+          }}
+        >
+          <SearchIcon color={theme.textFaint} size={16} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search cards…"
+            placeholderTextColor={theme.textFaint}
+            style={{ flex: 1, paddingVertical: 12, fontSize: 14, color: theme.text }}
+          />
+        </View>
+        <Pressable
+          onPress={() => setFiltersOpen((v) => !v)}
+          accessibilityLabel="Toggle filters"
+          style={({ pressed }) => [
+            {
+              width: 44,
+              height: 44,
+              borderRadius: radius.lg,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: filterButtonActive ? theme.primary : theme.surface,
+              opacity: pressed ? 0.85 : 1,
+            },
+            cardShadow,
+          ]}
+        >
+          <FilterIcon color={filterButtonActive ? '#ffffff' : theme.textMuted} size={16} />
+        </Pressable>
       </View>
 
       {deck.categories.length > 0 && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.sm }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: spacing.sm }}
+          contentContainerStyle={{ flexDirection: 'row' }}
+        >
           <Chip label={`All categories (${cards.length})`} active={categoryFilter === null} onPress={() => setCategoryFilter(null)} />
           {deck.categories.map((cat) => (
             <Chip
@@ -317,18 +409,48 @@ export default function DeckDetailScreen() {
               onPress={() => setCategoryFilter(UNCATEGORIZED)}
             />
           )}
-        </View>
+        </ScrollView>
       )}
 
-      <Field label="" placeholder="Search cards…" value={query} onChangeText={setQuery} style={{ marginBottom: spacing.xs }} />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: spacing.sm }}>
-        <Chip label="Any difficulty" active={difficultyFilter === 'all'} onPress={() => setDifficultyFilter('all')} />
-        {DIFFICULTIES.map((d) => (
-          <Chip key={d} label={d[0]!.toUpperCase() + d.slice(1)} active={difficultyFilter === d} onPress={() => setDifficultyFilter(d)} />
-        ))}
-        <Chip label="⭐ Starred" active={starredOnly} onPress={() => setStarredOnly((v) => !v)} />
-        <Chip label="⏸ Suspended" active={suspendedOnly} onPress={() => setSuspendedOnly((v) => !v)} />
-      </View>
+      {filtersOpen && (
+        <Card style={{ marginBottom: spacing.sm }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: '700',
+              color: theme.textFaint,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              marginBottom: spacing.sm,
+            }}
+          >
+            Difficulty
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.sm }}>
+            <Chip label="Any" active={difficultyFilter === 'all'} onPress={() => setDifficultyFilter('all')} />
+            {DIFFICULTIES.map((d) => (
+              <Chip key={d} label={d[0]!.toUpperCase() + d.slice(1)} active={difficultyFilter === d} onPress={() => setDifficultyFilter(d)} />
+            ))}
+          </View>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: '700',
+              color: theme.textFaint,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              marginBottom: spacing.sm,
+            }}
+          >
+            Other
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <Chip label="⭐ Starred" active={starredOnly} onPress={() => setStarredOnly((v) => !v)} />
+            <Chip label="⏸ Suspended" active={suspendedOnly} onPress={() => setSuspendedOnly((v) => !v)} />
+          </View>
+        </Card>
+      )}
+
       {isFiltered && (
         <Pressable onPress={clearFilters} style={{ marginBottom: spacing.sm }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryText }}>Clear filters</Text>
@@ -391,16 +513,117 @@ export default function DeckDetailScreen() {
         deckId={deckId}
         deckTitle={deck.title}
       />
+
+      <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Deck actions">
+        <DeckActionRow
+          icon={<IconTile icon="➕" color={theme.primary} size={36} fontSize={16} />}
+          label="Add card"
+          onPress={() => {
+            setActionsOpen(false);
+            handleAddCard();
+          }}
+        />
+        <View style={{ height: 1, backgroundColor: theme.border }} />
+        <DeckActionRow
+          icon={
+            <IconTile color={theme.text} size={36}>
+              <ShareIcon color={theme.text} size={16} />
+            </IconTile>
+          }
+          label="Share deck"
+          onPress={() => {
+            setActionsOpen(false);
+            void handleShare();
+          }}
+        />
+        <View style={{ height: 1, backgroundColor: theme.border }} />
+        <DeckActionRow
+          icon={<IconTile icon="🔔" color={theme.warning} size={36} fontSize={16} />}
+          label={reminderStatus.label}
+          onPress={() => {
+            setActionsOpen(false);
+            setRemindersOpen(true);
+          }}
+        />
+        <View style={{ height: 1, backgroundColor: theme.border }} />
+        <DeckActionRow
+          icon={<IconTile icon="✏️" color={theme.primaryText} size={36} fontSize={16} />}
+          label="Edit deck"
+          onPress={() => {
+            setActionsOpen(false);
+            setDeckEditorOpen(true);
+          }}
+        />
+      </Modal>
+
+      <Modal open={addCardOpen} onClose={() => setAddCardOpen(false)} title="Add card">
+        <DeckActionRow
+          icon={<IconTile icon="✍️" color={theme.primaryText} size={36} fontSize={16} />}
+          label="Write one myself"
+          onPress={() => {
+            setAddCardOpen(false);
+            openNewCard();
+          }}
+        />
+        <View style={{ height: 1, backgroundColor: theme.border }} />
+        <DeckActionRow
+          icon={<IconTile icon="📄" color={theme.primary} size={36} fontSize={16} />}
+          label="Generate from a document"
+          onPress={() => {
+            setAddCardOpen(false);
+            setGenerateOpen(true);
+          }}
+        />
+      </Modal>
     </Screen>
   );
 }
 
-function MiniStat({ label, value, theme }: { label: string; value: number | string; theme: ReturnType<typeof useTheme> }) {
+function DeckActionRow({ icon, label, onPress }: { icon: ReactNode; label: string; onPress: () => void }) {
+  const theme = useTheme();
   return (
-    <Card style={{ flexBasis: '30%', flexGrow: 1, alignItems: 'center', paddingVertical: spacing.sm }}>
-      <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text }}>{value}</Text>
-      <Text style={{ fontSize: 10, color: theme.textFaint }}>{label}</Text>
-    </Card>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingVertical: spacing.md,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {icon}
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: theme.text }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function StatPill({
+  label,
+  value,
+  color,
+  theme,
+  borderRight,
+}: {
+  label: string;
+  value: number | string;
+  color?: string;
+  theme: ReturnType<typeof useTheme>;
+  borderRight?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: spacing.md,
+        borderRightWidth: borderRight ? 1 : 0,
+        borderRightColor: theme.border,
+      }}
+    >
+      <Text style={{ fontSize: 16, fontWeight: '800', color: color ?? theme.text }}>{value}</Text>
+      <Text style={{ fontSize: 10, fontWeight: '600', color: theme.textFaint, marginTop: 2 }}>{label}</Text>
+    </View>
   );
 }
 

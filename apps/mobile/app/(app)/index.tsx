@@ -1,7 +1,15 @@
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { computeDeckStats, computeOverallStats, formatRelative, type SessionSummary } from '@autocards/core';
+import {
+  computeDeckStats,
+  computeOverallStats,
+  formatNextReminder,
+  formatRelative,
+  nextReminderAt,
+  type DeckReminder,
+  type SessionSummary,
+} from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
 import { useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
 import { Badge, Button, Card, GradientPanel, IconTile, Screen } from '../../src/components';
@@ -14,6 +22,7 @@ export default function DashboardScreen() {
   const allDecks = app.deckStore((s) => s.decks);
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
   const history = app.studyStore((s) => s.history);
+  const remindersByDeck = app.reminderStore((s) => s.remindersByDeck);
 
   const stats = useMemo(() => computeOverallStats(history), [history]);
   const activeDecks = useMemo(() => allDecks.filter((d) => !d.archived), [allDecks]);
@@ -25,6 +34,34 @@ export default function DashboardScreen() {
   const existingDeckIds = useMemo(() => new Set(allDecks.map((d) => d.id)), [allDecks]);
   const firstName = user?.username ?? 'there';
 
+  /* The soonest reminder still ahead, across every deck — same math the
+     device's local notifications use, so the two never disagree. */
+  const nextReminder = useMemo(() => {
+    const now = new Date();
+    let best: { reminder: DeckReminder; deckTitle: string; at: Date } | null = null;
+    for (const deck of activeDecks) {
+      const reminders = remindersByDeck[deck.id];
+      if (!reminders?.length) continue;
+      const lastStudiedAt = history.find((s) => s.deckId === deck.id)?.endedAt;
+      for (const reminder of reminders) {
+        const at = nextReminderAt(reminder, { now, lastStudiedAt });
+        if (at && (!best || at.getTime() < best.at.getTime())) best = { reminder, deckTitle: deck.title, at };
+      }
+    }
+    return best;
+  }, [activeDecks, remindersByDeck, history]);
+
+  /* The deck to send someone into next: whichever needs the most work, so
+     "Start Studying" never points at something already mastered. */
+  const nextDeckToStudy = useMemo(() => {
+    const withCards = deckSummaries.filter(({ stats: s }) => s.total > 0);
+    const pool = withCards.length > 0 ? withCards : deckSummaries;
+    if (pool.length === 0) return activeDecks[0];
+    return pool.reduce((lowest, current) =>
+      current.stats.averageMastery < lowest.stats.averageMastery ? current : lowest,
+    ).deck;
+  }, [deckSummaries, activeDecks]);
+
   return (
     <Screen>
       <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Welcome back, {firstName} 👋</Text>
@@ -34,19 +71,21 @@ export default function DashboardScreen() {
 
       <GradientPanel>
         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-          {stats.streak.current > 0 ? "Today's Goal" : 'Get started'}
+          {nextReminder ? 'Next Reminder' : activeDecks.length > 0 ? "Today's Goal" : 'Get started'}
         </Text>
         <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: 4 }}>
-          {stats.streak.current > 0 ? 'Keep your streak!' : 'Create your first deck'}
+          {nextReminder ? nextReminder.deckTitle : activeDecks.length > 0 ? 'Keep your streak!' : 'Create your first deck'}
         </Text>
         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4 }}>
-          {activeDecks.length > 0 ? 'Review at least 1 deck today' : 'Upload a document to generate flashcards'}
+          {nextReminder
+            ? `Reminder ${formatNextReminder(nextReminder.at)}`
+            : activeDecks.length > 0
+              ? 'Review at least 1 deck today'
+              : 'Upload a document to generate flashcards'}
         </Text>
         <Pressable
           onPress={() =>
-            activeDecks.length > 0
-              ? router.push(`/(app)/decks/${activeDecks[0]!.id}`)
-              : router.push('/(app)/decks/new')
+            nextDeckToStudy ? router.push(`/(app)/decks/${nextDeckToStudy.id}`) : router.push('/(app)/decks/new')
           }
           style={({ pressed }) => ({
             marginTop: spacing.md,
@@ -59,7 +98,7 @@ export default function DashboardScreen() {
           })}
         >
           <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>
-            {activeDecks.length > 0 ? 'Start Studying →' : 'Create deck →'}
+            {nextDeckToStudy ? 'Start Studying →' : 'Create deck →'}
           </Text>
         </Pressable>
       </GradientPanel>

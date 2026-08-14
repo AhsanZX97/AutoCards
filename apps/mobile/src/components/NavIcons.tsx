@@ -62,6 +62,57 @@ export function PlusIcon({ color, size = 24 }: NavIconProps) {
   );
 }
 
+export function MoreIcon({ color, size = 20 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill={color}>
+      <Circle cx="12" cy="5" r="1.8" />
+      <Circle cx="12" cy="12" r="1.8" />
+      <Circle cx="12" cy="19" r="1.8" />
+    </Svg>
+  );
+}
+
+export function SearchIcon({ color, size = 16 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2}>
+      <Circle cx="11" cy="11" r="8" />
+      <Path d="m21 21-4.35-4.35" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function FilterIcon({ color, size = 16 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M3 4h18M7 12h10M11 20h2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function PlayIcon({ color, size = 16 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2.5}>
+      <Path d="M5 3l14 9-14 9V3z" strokeLinejoin="round" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function BackIcon({ color, size = 20 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2.5}>
+      <Path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function CheckIcon({ color, size = 16 }: NavIconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={3}>
+      <Path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function ShareIcon({ color, size = 20 }: NavIconProps) {
   return (
     <Svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2}>

@@ -129,12 +129,12 @@ export function DeckFlashcardView({
         </Card>
       </Pressable>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xxl }}>
         <Button title="← Back" variant="outline" onPress={() => go(-1)} disabled={total < 2} style={{ flex: 1 }} />
         <View style={{ width: spacing.sm }} />
         <Button
           title={revealed ? 'Hide answer' : 'Show answer'}
-          variant="ghost"
+          variant="outline"
           onPress={() => setRevealed((v) => !v)}
           style={{ flex: 1 }}
         />
