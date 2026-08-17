@@ -137,6 +137,6 @@ async function schedule(reminder: DeckReminder, deckTitle: string, at: Date): Pr
       data: { deckId: reminder.deckId, reminderId: reminder.id },
       ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL } : {}),
     },
-    trigger: { date: at },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
   });
 }
