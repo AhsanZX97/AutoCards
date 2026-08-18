@@ -1,4 +1,5 @@
 import type { StorageAdapter } from './lib/storage';
+import { createTranslator, resolveLocale, type Translator } from './i18n';
 import type { AuthService } from './services/auth/types';
 import { RoutingLlmService } from './services/llm';
 import type { EdgeLlmConfig, LlmService, OpenRouterConfig } from './services/llm';
@@ -49,6 +50,15 @@ export interface CreateAppOptions {
    * for a deployment that sells plans.
    */
   openRouter?: OpenRouterConfig;
+  /**
+   * The device's own language tags, most preferred first — `navigator.languages`
+   * on web, `Localization.getLocales()` on mobile. Combined with the settings
+   * store's own `language` preference to translate the chrome text a
+   * generation reports (progress messages, thrown errors) — never the target
+   * language of the cards themselves, which is `GenerationOptions.language`
+   * and can be overridden per deck.
+   */
+  getDeviceLocales?: () => readonly string[];
   /** Override for tests; a real client requires either this or `supabase`. */
   authService?: AuthService;
   /** A pre-built Supabase client — required (via this or `authService`) for real accounts and cross-device deck sync. */
@@ -73,15 +83,26 @@ export function createApp(options: CreateAppOptions) {
 
   const settingsStore = createSettingsStore(options.storage);
 
+  // Same reasoning as the key below: read fresh so a language changed in
+  // Settings takes effect on the next generation, not the next reload. This
+  // is the app's own chrome language — progress messages, thrown errors —
+  // never the language the cards are written in.
+  const getT = (): Translator =>
+    createTranslator(resolveLocale(settingsStore.getState().language, options.getDeviceLocales?.() ?? []));
+
   // Resolved per call rather than once here: the user can paste a key into
   // Settings long after the app object was built, and it should take effect
   // on the next generation instead of on the next page load. With no key
   // anywhere — the normal case — the call goes to the server instead.
-  const llm: LlmService = new RoutingLlmService(() => {
-    const saved = settingsStore.getState().openRouterApiKey.trim();
-    if (saved) return { ...options.openRouter, apiKey: saved };
-    return options.openRouter;
-  }, options.edge);
+  const llm: LlmService = new RoutingLlmService(
+    () => {
+      const saved = settingsStore.getState().openRouterApiKey.trim();
+      if (saved) return { ...options.openRouter, apiKey: saved };
+      return options.openRouter;
+    },
+    options.edge,
+    getT,
+  );
 
   // Only available where the functions are: checkout has to be started by the
   // server, since that is where the prices and the Stripe key live.

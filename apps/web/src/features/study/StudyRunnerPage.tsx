@@ -10,6 +10,8 @@ import {
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
+import type { Translator } from '@autocards/core';
 import { Button, Progress } from '../../components/ui';
 import { cn } from '../../lib/cn';
 import { EMPTY_ARRAY } from '../../lib/empty';
@@ -22,12 +24,11 @@ const GRADE_STYLES: Record<Grade, string> = {
   easy: 'bg-sky-600 hover:bg-sky-500',
 };
 
-const GRADE_LABELS: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' };
-
 export function StudyRunnerPage() {
   const { deckId } = useParams<{ deckId: string }>();
   const navigate = useNavigate();
   const app = useApp();
+  const t = useT();
 
   const session = app.studyStore((s) => s.activeSession);
   const answer = app.studyStore((s) => s.answer);
@@ -107,6 +108,7 @@ export function StudyRunnerPage() {
   if (!currentCard) {
     return (
       <MissingCard
+        t={t}
         deckId={deckId}
         onEnd={() => {
           pauseAndAbandon();
@@ -158,7 +160,7 @@ export function StudyRunnerPage() {
   }
 
   function handleExit() {
-    if (confirm('End this study session early?')) {
+    if (confirm(t('runner.confirmEnd'))) {
       pauseAndAbandon();
       navigate(`/app/decks/${deckId}`);
     }
@@ -170,7 +172,7 @@ export function StudyRunnerPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-950">
       <div className="flex items-center gap-4 px-4 py-4 sm:px-8">
-        <button onClick={handleExit} className="text-slate-400 hover:text-white" aria-label="Exit session">
+        <button onClick={handleExit} className="text-slate-400 hover:text-white" aria-label={t('runner.exitSession')}>
           ✕
         </button>
         <div className="flex-1">
@@ -216,14 +218,14 @@ export function StudyRunnerPage() {
                       onClick={() => setHintRevealed(true)}
                       className="text-sm font-medium text-slate-400 hover:text-slate-200"
                     >
-                      💡 Show hint
+                      {t('runner.showHint')}
                     </button>
                   )}
                   {hintRevealed && currentCard.hint && (
                     <p className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300">{currentCard.hint}</p>
                   )}
                   <Button size="lg" onClick={() => setFlipped(true)} className="w-full max-w-xs">
-                    Show answer
+                    {t('runner.showAnswer')}
                   </Button>
                 </div>
               ) : (
@@ -239,13 +241,13 @@ export function StudyRunnerPage() {
                         onClick={() => handleSelfGrade('again')}
                         className={cn('rounded-xl py-3.5 font-semibold text-white transition-colors', GRADE_STYLES.again)}
                       >
-                        Incorrect
+                        {t('runner.incorrect')}
                       </button>
                       <button
                         onClick={() => handleSelfGrade('good')}
                         className={cn('rounded-xl py-3.5 font-semibold text-white transition-colors', GRADE_STYLES.good)}
                       >
-                        Correct
+                        {t('runner.correct')}
                       </button>
                     </div>
                   ) : (
@@ -256,7 +258,7 @@ export function StudyRunnerPage() {
                           onClick={() => handleSelfGrade(grade)}
                           className={cn('rounded-xl py-3.5 text-sm font-semibold text-white transition-colors', GRADE_STYLES[grade])}
                         >
-                          {GRADE_LABELS[grade]}
+                          {t(`grade.${grade}` as const)}
                         </button>
                       ))}
                     </div>
@@ -266,6 +268,7 @@ export function StudyRunnerPage() {
             </>
           ) : (
             <AutoGradedCard
+              t={t}
               card={currentCard}
               revealed={revealed}
               selectedChoiceId={selectedChoiceId}
@@ -291,23 +294,20 @@ export function StudyRunnerPage() {
  * run here files it rather than discarding it — `pauseAndAbandon` writes the
  * summary as long as at least one answer was given.
  */
-function MissingCard({ deckId, onEnd }: { deckId: string; onEnd: () => void }) {
+function MissingCard({ t, deckId, onEnd }: { t: Translator; deckId: string; onEnd: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <div className="max-w-sm text-center">
         <span className="text-4xl">🃏</span>
-        <h1 className="mt-4 text-lg font-semibold text-white">This card isn&apos;t here any more</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          It was deleted somewhere else while you were studying. Everything you answered up to now
-          has been counted.
-        </p>
+        <h1 className="mt-4 text-lg font-semibold text-white">{t('runner.missingTitle')}</h1>
+        <p className="mt-2 text-sm text-slate-400">{t('runner.missingBody')}</p>
         <div className="mt-6 flex justify-center gap-3">
-          <Button onClick={onEnd}>End session</Button>
+          <Button onClick={onEnd}>{t('runner.endSession')}</Button>
           <Link
             to={`/app/study/${deckId}`}
             className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
           >
-            Start a new one
+            {t('runner.startNewOne')}
           </Link>
         </div>
       </div>
@@ -316,6 +316,7 @@ function MissingCard({ deckId, onEnd }: { deckId: string; onEnd: () => void }) {
 }
 
 function AutoGradedCard({
+  t,
   card,
   revealed,
   selectedChoiceId,
@@ -327,6 +328,7 @@ function AutoGradedCard({
   hintRevealed,
   onRevealHint,
 }: {
+  t: Translator;
   card: Flashcard;
   revealed: { correct: boolean; grade: Grade } | null;
   selectedChoiceId: string | null;
@@ -344,7 +346,7 @@ function AutoGradedCard({
 
       {card.hint && !hintRevealed && !revealed && (
         <button onClick={onRevealHint} className="mt-3 text-sm font-medium text-slate-400 hover:text-slate-200">
-          💡 Show hint
+          {t('runner.showHint')}
         </button>
       )}
       {hintRevealed && card.hint && <p className="mt-3 text-sm text-slate-400">{card.hint}</p>}
@@ -382,7 +384,7 @@ function AutoGradedCard({
             value={typedResponse}
             onChange={(e) => onTypedResponseChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onTypeInSubmit()}
-            placeholder="Type your answer…"
+            placeholder={t('runner.typePlaceholder')}
             className={cn(
               'w-full rounded-xl border bg-slate-800 px-4 py-3 text-center text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500',
               revealed === null
@@ -394,12 +396,12 @@ function AutoGradedCard({
           />
           {revealed && !revealed.correct && (
             <p className="mt-2 text-sm text-slate-400">
-              Accepted: {(card.acceptedAnswers ?? [card.back]).join(', ')}
+              {t('runner.accepted', { answers: (card.acceptedAnswers ?? [card.back]).join(', ') })}
             </p>
           )}
           {revealed === null && (
             <Button className="mt-4 w-full" onClick={onTypeInSubmit} disabled={!typedResponse.trim()}>
-              Submit
+              {t('runner.submit')}
             </Button>
           )}
         </div>
@@ -408,11 +410,11 @@ function AutoGradedCard({
       {revealed && (
         <div className="mt-6">
           <p className={cn('mb-3 text-sm font-semibold', revealed.correct ? 'text-emerald-400' : 'text-rose-400')}>
-            {revealed.correct ? '✓ Correct!' : '✗ Not quite'}
+            {revealed.correct ? t('runner.correctBang') : t('runner.notQuite')}
           </p>
           {card.explanation && <p className="mb-4 text-sm text-slate-400">{card.explanation}</p>}
           <Button size="lg" className="w-full" onClick={onNext}>
-            Next card
+            {t('runner.nextCard')}
           </Button>
         </div>
       )}

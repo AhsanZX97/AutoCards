@@ -108,3 +108,4 @@ Notes:
 - Board schema: `Name` (title) and `Status`, one of `Todo` / `Doing` / `Review` / `Done` /
   `Backlog`. New tickets go to **Backlog** unless I say otherwise.
 - The Jira Board and the **Test Cases** page both live under the AutoCards page.
+- Treat a question as a question — answer it, then stop. Treat an imperative ("add," "fix," "build") as the go-ahead to work: make reasonable assumptions, no preamble/summaries, only ask if genuinely blocked. Don't explain things I didn't ask about.

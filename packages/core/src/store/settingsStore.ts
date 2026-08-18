@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { STORAGE_KEYS, type StorageAdapter } from '../lib/storage';
 import type { ThemePreference } from '../lib/theme';
+import type { LanguagePreference } from '../i18n/locale';
 import { toZustandStorage } from './persistBridge';
 import { DEFAULT_MODEL_ID } from '../services/llm/models';
 import type { CardType, Difficulty, GenerationOptions } from '../types';
@@ -11,6 +12,13 @@ export type { ThemePreference };
 
 export interface SettingsState {
   theme: ThemePreference;
+  /**
+   * The app's own UI language. `system` follows the device — see
+   * `resolveLocale`. Card generation defaults to the same language (see
+   * `generationDefaults.language`), but that field can be overridden per
+   * deck without touching this one.
+   */
+  language: LanguagePreference;
   /** Stored locally only; generation stays mocked until this is wired to a live call. */
   openRouterApiKey: string;
   /**
@@ -25,6 +33,7 @@ export interface SettingsState {
   hasCompletedOnboarding: boolean;
 
   setTheme: (theme: ThemePreference) => void;
+  setLanguage: (language: LanguagePreference) => void;
   setApiKey: (key: string) => void;
   updateGenerationDefaults: (patch: Partial<SettingsState['generationDefaults']>) => void;
   completeOnboarding: () => void;
@@ -38,6 +47,7 @@ export function createSettingsStore(storage: StorageAdapter) {
     persist(
       (set) => ({
         theme: 'light',
+        language: 'system',
         openRouterApiKey: '',
         generationDefaults: {
           model: DEFAULT_MODEL_ID,
@@ -57,6 +67,7 @@ export function createSettingsStore(storage: StorageAdapter) {
         hasCompletedOnboarding: false,
 
         setTheme: (theme) => set({ theme }),
+        setLanguage: (language) => set({ language }),
         setApiKey: (openRouterApiKey) => set({ openRouterApiKey }),
         updateGenerationDefaults: (patch) =>
           set((state) => ({ generationDefaults: { ...state.generationDefaults, ...patch } })),

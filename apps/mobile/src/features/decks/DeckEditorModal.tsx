@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { createId, type Accent, type Category, type Deck } from '@autocards/core';
 import { useTheme, radius, spacing } from '../../lib/theme';
+import { useT } from '../../lib/i18n';
 import { Button, Card, Field, Modal } from '../../components';
 import { IconPicker, AccentPicker } from './pickers';
 
@@ -29,6 +30,7 @@ interface DeckEditorModalProps {
  *  handed back on Save, so Cancel discards category adds/deletes too. */
 export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, deck }: DeckEditorModalProps) {
   const theme = useTheme();
+  const t = useT();
   const [edits, setEdits] = useState<DeckEdits>(() => editsFromDeck(deck));
 
   useEffect(() => {
@@ -69,57 +71,57 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit deck"
+      title={t('deckEditor.title')}
       footer={
         <>
-          <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-          <Button title="Save changes" onPress={handleSave} disabled={!isValid} style={{ flex: 1 }} />
+          <Button title={t('deckEditor.cancel')} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button title={t('deckEditor.saveChanges')} onPress={handleSave} disabled={!isValid} style={{ flex: 1 }} />
         </>
       }
     >
-      <Field label="Title" value={edits.title} onChangeText={(v) => update('title', v)} placeholder="Deck title" />
+      <Field label={t('deckEditor.deckTitle')} value={edits.title} onChangeText={(v) => update('title', v)} placeholder={t('deckEditor.deckTitlePlaceholder')} />
       <Field
-        label="Description"
-        hint="optional"
+        label={t('deckEditor.description')}
+        hint={t('common.optional')}
         multiline
         numberOfLines={3}
         value={edits.description}
         onChangeText={(v) => update('description', v)}
-        placeholder="What this deck covers"
+        placeholder={t('deckEditor.descriptionPlaceholder')}
       />
 
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.xs }}>Icon</Text>
-        <IconPicker value={edits.icon} onChange={(icon) => update('icon', icon)} label="deck icon" />
+        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.xs }}>{t('deckEditor.icon')}</Text>
+        <IconPicker value={edits.icon} onChange={(icon) => update('icon', icon)} label={t('deckEditor.deckIcon')} />
       </View>
 
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.xs }}>Accent</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.xs }}>{t('deckEditor.accent')}</Text>
         <AccentPicker value={edits.accent} onChange={(accent) => update('accent', accent)} />
       </View>
 
       <Field
-        label="Tags"
-        hint="Comma separated"
+        label={t('deckEditor.tags')}
+        hint={t('deckEditor.tagsHint')}
         value={edits.tags.join(', ')}
-        onChangeText={(v) => update('tags', v.split(',').map((t) => t.trim()).filter(Boolean))}
-        placeholder="exam, semester-1"
+        onChangeText={(v) => update('tags', v.split(',').map((tag) => tag.trim()).filter(Boolean))}
+        placeholder={t('deckEditor.tagsPlaceholder')}
       />
 
       <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingTop: spacing.md, marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
           <View>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>Categories</Text>
-            <Text style={{ fontSize: 12, color: theme.textFaint }}>Used to group and filter cards inside this deck.</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>{t('deckEditor.categories')}</Text>
+            <Text style={{ fontSize: 12, color: theme.textFaint }}>{t('deckEditor.categoriesHint')}</Text>
           </View>
           <Pressable onPress={addCategory}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryText }}>+ Add category</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryText }}>{t('deckEditor.addCategory')}</Text>
           </Pressable>
         </View>
 
         {edits.categories.length === 0 ? (
           <Text style={{ textAlign: 'center', color: theme.textFaint, fontSize: 13, paddingVertical: spacing.lg }}>
-            No categories yet.
+            {t('deckEditor.noCategories')}
           </Text>
         ) : (
           <View style={{ gap: spacing.sm }}>
@@ -129,18 +131,18 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
                   <IconPicker
                     value={category.icon}
                     onChange={(icon) => updateCategory(category.id, { icon })}
-                    label={`icon for ${category.name || 'this category'}`}
+                    label={t('deckEditor.iconForCategory', { name: category.name || t('deckEditor.thisCategory') })}
                   />
                   <View style={{ flex: 1 }}>
                     <Field
                       label=""
                       value={category.name}
                       onChangeText={(v) => updateCategory(category.id, { name: v })}
-                      placeholder="Category name"
+                      placeholder={t('deckEditor.categoryNamePlaceholder')}
                       style={{ marginBottom: 0 }}
                     />
                   </View>
-                  <Pressable onPress={() => removeCategory(category.id)} accessibilityLabel={`Remove ${category.name || 'category'}`}>
+                  <Pressable onPress={() => removeCategory(category.id)} accessibilityLabel={t('deckEditor.removeCategory', { name: category.name || t('deckEditor.category') })}>
                     <Text style={{ color: theme.textFaint, fontSize: 16 }}>✕</Text>
                   </Pressable>
                 </View>
@@ -154,19 +156,17 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
       </View>
 
       <View style={{ borderWidth: 1, borderColor: theme.danger, borderRadius: radius.lg, padding: spacing.md }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>Danger zone</Text>
-        <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>
-          These apply straight away, without waiting for Save changes.
-        </Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>{t('deckEditor.dangerZone')}</Text>
+        <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{t('deckEditor.dangerZoneHint')}</Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
           <Button
-            title={deck.archived ? 'Restore deck' : 'Archive deck'}
+            title={deck.archived ? t('deckEditor.restoreDeck') : t('deckEditor.archiveDeck')}
             variant="outline"
             size="sm"
             onPress={onArchive}
             style={{ flex: 1 }}
           />
-          <Button title="Delete deck" variant="danger" size="sm" onPress={onDelete} style={{ flex: 1 }} />
+          <Button title={t('deckEditor.deleteDeck')} variant="danger" size="sm" onPress={onDelete} style={{ flex: 1 }} />
         </View>
       </View>
     </Modal>

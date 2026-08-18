@@ -9,12 +9,15 @@ import 'react-native-url-polyfill/auto';
 import 'fast-text-encoding';
 import {
   createApp,
+  createTranslator,
+  resolveLocale,
   EdgePdfExtractor,
   RoutingDocumentExtractor,
   StubDocumentExtractor,
   type App,
   type EdgeLlmConfig,
 } from '@autocards/core';
+import * as Localization from 'expo-localization';
 import { toByteArray } from 'base64-js';
 import { createMobileStorage } from './storage';
 import { configureNotificationHandler, syncScheduledNotifications } from './reminderNotifications';
@@ -93,6 +96,7 @@ function getApp(): App {
         edge ? new EdgePdfExtractor(edge) : new StubDocumentExtractor(),
       ),
       supabase: supabaseClient,
+      getDeviceLocales: () => Localization.getLocales().map((entry) => entry.languageTag),
       ...(edge ? { edge } : {}),
     });
   }
@@ -103,6 +107,11 @@ export function getSupabaseClient(): SupabaseClient | undefined {
   return supabaseClient;
 }
 
+/**
+ * Renders before `AppProvider` has anything to provide — no settings store,
+ * no language preference — so this reads the device language directly rather
+ * than going through `useT`, the same way the error boundary does.
+ */
 function ConfigurationNeeded() {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
@@ -111,25 +120,26 @@ function ConfigurationNeeded() {
   const textMuted = dark ? '#94a3b8' : '#64748b';
   const surface = dark ? '#0f172a' : '#ffffff';
   const border = dark ? '#334155' : '#cbd5e1';
+  const t = createTranslator(resolveLocale('system', Localization.getLocales().map((entry) => entry.languageTag)));
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, padding: 24 }}>
       <Text style={{ fontSize: 36 }}>🔌</Text>
       <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '800', color: text, textAlign: 'center' }}>
-        Auto Cards isn&apos;t connected to its database
+        {t('config.notConnectedTitle')}
       </Text>
       <Text style={{ marginTop: 8, fontSize: 14, color: textMuted, textAlign: 'center' }}>
-        This build is missing{' '}
+        {t('config.notConnectedBefore')}{' '}
         <Text
           style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: surface, borderColor: border }}
         >
           EXPO_PUBLIC_SUPABASE_URL
         </Text>{' '}
-        and{' '}
+        {t('config.notConnectedMiddle')}{' '}
         <Text style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: surface, borderColor: border }}>
           EXPO_PUBLIC_SUPABASE_ANON_KEY
         </Text>
-        . Set both and build again.
+        . {t('config.notConnectedAfterMobile')}
       </Text>
     </View>
   );

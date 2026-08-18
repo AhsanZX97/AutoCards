@@ -3,6 +3,7 @@ import { Redirect, router, Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthGate } from '../../src/lib/useAuthGate';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, BRAND_GRADIENT, cardShadow, glowShadow, radius, spacing } from '../../src/lib/theme';
 import { DecksIcon, HomeIcon, PlusIcon, SettingsIcon, StatsIcon } from '../../src/components';
 
@@ -15,6 +16,7 @@ function TabIcon(icon: (props: { color: string; size?: number }) => JSX.Element)
 
 export default function AppTabsLayout() {
   const { ready, status } = useAuthGate();
+  const t = useT();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -56,10 +58,10 @@ export default function AppTabsLayout() {
           ],
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: TabIcon(HomeIcon) }} />
-        <Tabs.Screen name="decks/index" options={{ title: 'Decks', tabBarIcon: TabIcon(DecksIcon) }} />
-        <Tabs.Screen name="stats" options={{ title: 'Stats', tabBarIcon: TabIcon(StatsIcon) }} />
-        <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: TabIcon(SettingsIcon) }} />
+        <Tabs.Screen name="index" options={{ title: t('nav.home'), tabBarIcon: TabIcon(HomeIcon) }} />
+        <Tabs.Screen name="decks/index" options={{ title: t('nav.myDecks'), tabBarIcon: TabIcon(DecksIcon) }} />
+        <Tabs.Screen name="stats" options={{ title: t('nav.stats'), tabBarIcon: TabIcon(StatsIcon) }} />
+        <Tabs.Screen name="settings" options={{ title: t('nav.settings'), tabBarIcon: TabIcon(SettingsIcon) }} />
         <Tabs.Screen name="decks/new" options={{ href: null }} />
         <Tabs.Screen name="decks/[deckId]" options={{ href: null }} />
       </Tabs>
@@ -67,7 +69,7 @@ export default function AppTabsLayout() {
       <Pressable
         onPress={() => router.push('/(app)/decks/new')}
         accessibilityRole="button"
-        accessibilityLabel="Create deck"
+        accessibilityLabel={t('nav.createDeck')}
         style={({ pressed }) => [
           {
             position: 'absolute',

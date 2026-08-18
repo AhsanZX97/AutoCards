@@ -11,6 +11,7 @@ import {
 } from '@autocards/core';
 import { Button } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
+import { useT } from '../../lib/i18n';
 
 /**
  * More than this and one upload starts crowding every document's share of the
@@ -37,6 +38,7 @@ interface UploadDropzoneProps {
  * them rather than one batch per file that repeat each other.
  */
 export function UploadDropzone({ files, onChange, hint, compact = false }: UploadDropzoneProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -75,19 +77,19 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
       }
 
       for (const name of rejected) {
-        toast({ variant: 'error', title: 'Cannot read that file', description: describeUnsupported(name) });
+        toast({ variant: 'error', title: t('uploadDropzone.cannotReadTitle'), description: describeUnsupported(name) });
       }
       for (const file of oversized) {
         toast({
           variant: 'error',
-          title: 'That file is too big',
+          title: t('uploadDropzone.tooBigTitle'),
           description: describeOversized(file.name, file.size),
         });
       }
       if (duplicates > 0) {
         toast({
           variant: 'info',
-          title: duplicates === 1 ? 'That file is already added' : `${duplicates} files were already added`,
+          title: t.plural('uploadDropzone.alreadyAdded', duplicates, { count: duplicates }),
         });
       }
       if (accepted.length === 0) return;
@@ -96,8 +98,8 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
       if (accepted.length > room) {
         toast({
           variant: 'error',
-          title: `You can upload up to ${MAX_UPLOAD_FILES} files at once`,
-          description: 'Generate this deck, then add cards from the rest.',
+          title: t('uploadDropzone.tooManyTitle', { max: MAX_UPLOAD_FILES }),
+          description: t('uploadDropzone.tooManyDescription'),
         });
       }
       if (room <= 0) return;
@@ -127,7 +129,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
                 <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => removeAt(index)}>
-                Remove
+                {t('uploadDropzone.remove')}
               </Button>
             </li>
           ))}
@@ -161,12 +163,12 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
         <span className="text-3xl">{files.length > 0 ? '➕' : '📄'}</span>
         <p className="mt-3 font-semibold text-slate-800 dark:text-slate-200">
           {full
-            ? `That is the limit of ${MAX_UPLOAD_FILES} files`
+            ? t('uploadDropzone.atLimit', { max: MAX_UPLOAD_FILES })
             : files.length > 0
-              ? 'Add another file, or drop one here'
-              : 'Drop your files here, or click to browse'}
+              ? t('uploadDropzone.addAnother')
+              : t('uploadDropzone.dropHere')}
         </p>
-        <p className="mt-1 text-sm text-slate-400">{full ? 'Remove one to swap it out.' : hint}</p>
+        <p className="mt-1 text-sm text-slate-400">{full ? t('uploadDropzone.removeToSwap') : hint}</p>
       </div>
 
       <input

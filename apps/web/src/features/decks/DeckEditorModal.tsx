@@ -3,6 +3,7 @@ import { ACCENTS, createId, type Accent, type Category, type Deck } from '@autoc
 import { Button, Field, Input, Modal, Textarea } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
 import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n';
 
 /** The full set an icon can be picked from. Chosen, not typed, so an icon is
  *  always a single emoji rather than whatever text ended up in the box. */
@@ -40,6 +41,7 @@ interface DeckEditorModalProps {
  * against the deck's current categories before touching the store.
  */
 export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, deck }: DeckEditorModalProps) {
+  const t = useT();
   const [edits, setEdits] = useState<DeckEdits>(() => editsFromDeck(deck));
 
   useEffect(() => {
@@ -82,67 +84,67 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit deck"
+      title={t('deckEditor.title')}
       size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('deckEditor.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={!isValid}>
-            Save changes
+            {t('deckEditor.saveChanges')}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
-        <Field label="Title">
-          <Input value={edits.title} onChange={(e) => update('title', e.target.value)} placeholder="Deck title" />
+        <Field label={t('deckEditor.deckTitle')}>
+          <Input value={edits.title} onChange={(e) => update('title', e.target.value)} placeholder={t('deckEditor.deckTitlePlaceholder')} />
         </Field>
 
-        <Field label="Description" hint="optional">
+        <Field label={t('deckEditor.description')} hint={t('common.optional')}>
           <Textarea
             rows={3}
             value={edits.description}
             onChange={(e) => update('description', e.target.value)}
-            placeholder="What this deck covers"
+            placeholder={t('deckEditor.descriptionPlaceholder')}
           />
         </Field>
 
-        <Field label="Icon">
-          <IconPicker value={edits.icon} onChange={(icon) => update('icon', icon)} label="deck icon" />
+        <Field label={t('deckEditor.icon')}>
+          <IconPicker value={edits.icon} onChange={(icon) => update('icon', icon)} label={t('deckEditor.deckIcon')} t={t} />
         </Field>
 
-        <Field label="Accent">
+        <Field label={t('deckEditor.accent')}>
           <AccentPicker value={edits.accent} onChange={(accent) => update('accent', accent)} />
         </Field>
 
-        <Field label="Tags" hint="Comma separated">
+        <Field label={t('deckEditor.tags')} hint={t('deckEditor.tagsHint')}>
           <Input
             value={edits.tags.join(', ')}
-            onChange={(e) => update('tags', e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
-            placeholder="exam, semester-1"
+            onChange={(e) => update('tags', e.target.value.split(',').map((tag) => tag.trim()).filter(Boolean))}
+            placeholder={t('deckEditor.tagsPlaceholder')}
           />
         </Field>
 
         <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Categories</p>
-              <p className="text-xs text-slate-400">Used to group and filter cards inside this deck.</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('deckEditor.categories')}</p>
+              <p className="text-xs text-slate-400">{t('deckEditor.categoriesHint')}</p>
             </div>
             <button
               type="button"
               onClick={addCategory}
               className="text-xs font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400"
             >
-              + Add category
+              {t('deckEditor.addCategory')}
             </button>
           </div>
 
           {edits.categories.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-400 dark:border-slate-700">
-              No categories yet.
+              {t('deckEditor.noCategories')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -152,19 +154,20 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
                     <IconPicker
                       value={category.icon}
                       onChange={(icon) => updateCategory(category.id, { icon })}
-                      label={`icon for ${category.name || 'this category'}`}
+                      label={t('deckEditor.iconForCategory', { name: category.name || t('deckEditor.thisCategory') })}
+                      t={t}
                     />
                     <Input
                       className="flex-1"
                       value={category.name}
                       onChange={(e) => updateCategory(category.id, { name: e.target.value })}
-                      placeholder="Category name"
+                      placeholder={t('deckEditor.categoryNamePlaceholder')}
                     />
                     <button
                       type="button"
                       onClick={() => removeCategory(category.id)}
                       className="px-1 text-slate-400 hover:text-rose-500"
-                      aria-label={`Remove ${category.name || 'category'}`}
+                      aria-label={t('deckEditor.removeCategory', { name: category.name || t('deckEditor.category') })}
                     >
                       ✕
                     </button>
@@ -181,13 +184,11 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
         </div>
 
         <div className="rounded-xl border border-rose-200 p-4 dark:border-rose-500/30">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Danger zone</p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            These apply straight away, without waiting for Save changes.
-          </p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('deckEditor.dangerZone')}</p>
+          <p className="mt-0.5 text-xs text-slate-400">{t('deckEditor.dangerZoneHint')}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={onArchive}>
-              {deck.archived ? 'Restore deck' : 'Archive deck'}
+              {deck.archived ? t('deckEditor.restoreDeck') : t('deckEditor.archiveDeck')}
             </Button>
             <Button
               variant="ghost"
@@ -195,7 +196,7 @@ export function DeckEditorModal({ open, onClose, onSave, onArchive, onDelete, de
               onClick={onDelete}
               className="text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
             >
-              Delete deck
+              {t('deckEditor.deleteDeck')}
             </Button>
           </div>
         </div>
@@ -212,10 +213,12 @@ function IconPicker({
   value,
   onChange,
   label,
+  t,
 }: {
   value: string;
   onChange: (icon: string) => void;
   label: string;
+  t: ReturnType<typeof useT>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -224,7 +227,7 @@ function IconPicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={`Change ${label}`}
+        aria-label={t('deckEditor.changeIcon', { label })}
         aria-haspopup="true"
         aria-expanded={open}
         className="flex h-11 w-14 items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white text-xl transition-colors hover:border-brand-400 dark:border-slate-700 dark:bg-slate-900"

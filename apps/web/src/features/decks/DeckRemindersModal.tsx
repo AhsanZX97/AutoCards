@@ -19,6 +19,8 @@ import {
 import { Button, Chip, Field, Input, Modal, Select } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
+import type { Translator } from '@autocards/core';
 import { cn } from '../../lib/cn';
 
 interface DeckRemindersModalProps {
@@ -35,14 +37,16 @@ interface DeckRemindersModalProps {
  * then lived with, so the whole thing has to be readable in a glance. Each one
  * opens at most a single extra control, and four of the six need none at all.
  */
-const CADENCE_OPTIONS: Array<{ kind: ReminderCadenceKind; label: string; hint: string }> = [
-  { kind: 'daily', label: 'Every day', hint: 'A steady habit — best for language and vocab decks.' },
-  { kind: 'weekdays', label: 'Weekdays', hint: 'Monday to Friday, nothing at the weekend.' },
-  { kind: 'weekly', label: 'Certain days', hint: 'Pick the days that suit your timetable.' },
-  { kind: 'monthly', label: 'Monthly', hint: 'A once-a-month sweep to keep old decks warm.' },
-  { kind: 'inactivity', label: 'If I fall behind', hint: 'Nothing while you keep up — a nudge when you stop.' },
-  { kind: 'once', label: 'Just once', hint: 'A single reminder, for an exam or a deadline.' },
-];
+function cadenceOptions(t: Translator): Array<{ kind: ReminderCadenceKind; label: string; hint: string }> {
+  return [
+    { kind: 'daily', label: t('reminders.cadence.daily'), hint: t('reminders.cadence.daily.hint') },
+    { kind: 'weekdays', label: t('reminders.cadence.weekdays'), hint: t('reminders.cadence.weekdays.hint') },
+    { kind: 'weekly', label: t('reminders.cadence.weekly'), hint: t('reminders.cadence.weekly.hint') },
+    { kind: 'monthly', label: t('reminders.cadence.monthly'), hint: t('reminders.cadence.monthly.hint') },
+    { kind: 'inactivity', label: t('reminders.cadence.inactivity'), hint: t('reminders.cadence.inactivity.hint') },
+    { kind: 'once', label: t('reminders.cadence.once'), hint: t('reminders.cadence.once.hint') },
+  ];
+}
 
 /** A starting shape for each cadence, so switching preset never needs a form reset. */
 function cadenceFor(kind: ReminderCadenceKind, current: ReminderCadence): ReminderCadence {
@@ -73,6 +77,7 @@ function cadenceFor(kind: ReminderCadenceKind, current: ReminderCadence): Remind
  */
 export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRemindersModalProps) {
   const app = useApp();
+  const t = useT();
   const reminders = app.reminderStore((s) => s.remindersByDeck[deckId]);
   const addReminder = app.reminderStore((s) => s.addReminder);
   const updateReminder = app.reminderStore((s) => s.updateReminder);
@@ -115,7 +120,7 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
 
   function handleDelete(reminder: DeckReminder) {
     removeReminder(deckId, reminder.id);
-    toast({ variant: 'success', title: 'Reminder deleted' });
+    toast({ variant: 'success', title: t('reminders.deleted') });
   }
 
   function handleSave() {
@@ -123,10 +128,10 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
     const reminder = { ...draft, timeZone: localTimeZone() };
     if (isNew) {
       addReminder(reminder);
-      toast({ variant: 'success', title: 'Reminder added', description: describeCadence(reminder) });
+      toast({ variant: 'success', title: t('reminders.added'), description: describeCadence(reminder) });
     } else {
       updateReminder(reminder);
-      toast({ variant: 'success', title: 'Reminder updated', description: describeCadence(reminder) });
+      toast({ variant: 'success', title: t('reminders.updated'), description: describeCadence(reminder) });
     }
     setDraft(null);
     setIsNew(false);
@@ -140,17 +145,17 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
     <Modal
       open={open}
       onClose={onClose}
-      title={draft ? (isNew ? 'New reminder' : 'Edit reminder') : 'Study reminders'}
-      description={draft ? deckTitle : email ? `Emailed to ${email}` : deckTitle}
+      title={draft ? (isNew ? t('reminders.newTitle') : t('reminders.editTitle')) : t('reminders.listTitle')}
+      description={draft ? deckTitle : email ? t('reminders.emailedTo', { email }) : deckTitle}
       size="lg"
       footer={
         draft ? (
           <>
             <Button variant="ghost" onClick={() => setDraft(null)}>
-              Cancel
+              {t('reminders.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={incomplete}>
-              {isNew ? 'Add reminder' : 'Save changes'}
+              {isNew ? t('reminders.addReminder') : t('reminders.saveChanges')}
             </Button>
           </>
         ) : (
@@ -160,17 +165,18 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
               className="mr-auto"
               onClick={startAdding}
               disabled={isFull}
-              title={isFull ? `A deck can hold ${MAX_REMINDERS_PER_DECK} reminders` : undefined}
+              title={isFull ? t('reminders.limitHint', { max: MAX_REMINDERS_PER_DECK }) : undefined}
             >
-              + Add reminder
+              {t('reminders.addReminderButton')}
             </Button>
-            <Button onClick={onClose}>Done</Button>
+            <Button onClick={onClose}>{t('reminders.done')}</Button>
           </>
         )
       }
     >
       {draft ? (
         <ReminderEditor
+          t={t}
           draft={draft}
           onChange={setDraft}
           lastStudiedAt={lastStudiedAt}
@@ -178,6 +184,7 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
         />
       ) : (
         <ReminderList
+          t={t}
           reminders={saved}
           now={now}
           lastStudiedAt={lastStudiedAt}
@@ -192,6 +199,7 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
 }
 
 function ReminderList({
+  t,
   reminders,
   now,
   lastStudiedAt,
@@ -200,6 +208,7 @@ function ReminderList({
   onEdit,
   onDelete,
 }: {
+  t: Translator;
   reminders: DeckReminder[];
   now: Date;
   lastStudiedAt?: string;
@@ -213,14 +222,13 @@ function ReminderList({
       <div className="py-10 text-center">
         <span className="text-3xl">🔔</span>
         <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
-          No reminders on this deck yet
+          {t('reminders.emptyTitle')}
         </p>
         <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
-          Add one and we&apos;ll email you when it&apos;s time to study — daily, on set days, or
-          just once before an exam.
+          {t('reminders.emptyBody')}
         </p>
         <Button className="mt-4" onClick={onAdd}>
-          + Add reminder
+          {t('reminders.addReminderButton')}
         </Button>
       </div>
     );
@@ -240,12 +248,12 @@ function ReminderList({
                 {describeCadence(reminder)}
               </p>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                {next ? `Next email ${formatNextReminder(next, now)}` : 'Already sent — nothing more to come'}
+                {next ? t('reminders.nextEmail', { when: formatNextReminder(next, now) }) : t('reminders.alreadySent')}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <Button size="sm" variant="ghost" onClick={() => onEdit(reminder)}>
-                Edit
+                {t('reminders.edit')}
               </Button>
               <Button
                 size="sm"
@@ -253,7 +261,7 @@ function ReminderList({
                 onClick={() => onDelete(reminder)}
                 className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
               >
-                Delete
+                {t('reminders.delete')}
               </Button>
             </div>
           </div>
@@ -261,19 +269,21 @@ function ReminderList({
       })}
       <p className="pt-1 text-xs text-slate-400">
         {isFull
-          ? `That's the limit of ${MAX_REMINDERS_PER_DECK} reminders on one deck.`
-          : `${reminders.length} of ${MAX_REMINDERS_PER_DECK} reminders used.`}
+          ? t('reminders.limitReached', { max: MAX_REMINDERS_PER_DECK })
+          : t('reminders.usedOf', { used: reminders.length, max: MAX_REMINDERS_PER_DECK })}
       </p>
     </div>
   );
 }
 
 function ReminderEditor({
+  t,
   draft,
   onChange,
   lastStudiedAt,
   now,
 }: {
+  t: Translator;
   draft: DeckReminder;
   onChange: (reminder: DeckReminder) => void;
   lastStudiedAt?: string;
@@ -296,9 +306,9 @@ function ReminderEditor({
   return (
     <div className="space-y-6">
       <section>
-        <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">How often</p>
+        <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('reminders.howOften')}</p>
         <div className="flex flex-wrap gap-2">
-          {CADENCE_OPTIONS.map((option) => (
+          {cadenceOptions(t).map((option) => (
             <Chip
               key={option.kind}
               active={draft.cadence.kind === option.kind}
@@ -309,7 +319,7 @@ function ReminderEditor({
           ))}
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          {CADENCE_OPTIONS.find((o) => o.kind === draft.cadence.kind)?.hint}
+          {cadenceOptions(t).find((o) => o.kind === draft.cadence.kind)?.hint}
         </p>
       </section>
 
@@ -317,7 +327,7 @@ function ReminderEditor({
           needs, and nothing more. */}
       {draft.cadence.kind === 'weekly' && (
         <section>
-          <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Which days</p>
+          <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('reminders.whichDays')}</p>
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((day) => {
               const picked = draft.cadence.kind === 'weekly' && draft.cadence.days.includes(day);
@@ -343,7 +353,7 @@ function ReminderEditor({
       )}
 
       {draft.cadence.kind === 'monthly' && (
-        <Field label="Day of the month" hint="The 29th to 31st fall back to the last day">
+        <Field label={t('reminders.dayOfMonth')} hint={t('reminders.dayOfMonthHint')}>
           <Select
             className="w-auto"
             value={draft.cadence.dayOfMonth}
@@ -359,7 +369,7 @@ function ReminderEditor({
       )}
 
       {draft.cadence.kind === 'inactivity' && (
-        <Field label="Nudge me after" hint="Counted from your last session on this deck">
+        <Field label={t('reminders.nudgeAfter')} hint={t('reminders.nudgeAfterHint')}>
           <Select
             className="w-auto"
             value={draft.cadence.afterDays}
@@ -367,7 +377,7 @@ function ReminderEditor({
           >
             {INACTIVITY_DAY_CHOICES.map((days) => (
               <option key={days} value={days}>
-                {days} days without studying
+                {t('reminders.daysWithoutStudying', { days })}
               </option>
             ))}
           </Select>
@@ -375,7 +385,7 @@ function ReminderEditor({
       )}
 
       {draft.cadence.kind === 'once' && (
-        <Field label="On this date">
+        <Field label={t('reminders.onThisDate')}>
           <Input
             type="date"
             className="w-auto"
@@ -386,7 +396,7 @@ function ReminderEditor({
         </Field>
       )}
 
-      <Field label="Time of day" hint={draft.timeZone || localTimeZone()}>
+      <Field label={t('reminders.timeOfDay')} hint={draft.timeZone || localTimeZone()}>
         <Input
           type="time"
           className="w-auto"
@@ -399,7 +409,7 @@ function ReminderEditor({
           sentence that says what will actually happen. */}
       <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/50">
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-          {next ? `Next email ${formatNextReminder(next, now)}` : 'Pick at least one day'}
+          {next ? t('reminders.nextEmail', { when: formatNextReminder(next, now) }) : t('reminders.pickOneDay')}
         </p>
         {next && (
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{describeCadence(draft)}</p>

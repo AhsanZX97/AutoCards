@@ -1,19 +1,24 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
+import type { Translator } from '@autocards/core';
 import { FeedbackModal } from '../../features/feedback/FeedbackModal';
 import { Avatar, Button, Modal, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
 
-const NAV_ITEMS = [
-  { to: '/app', label: 'Dashboard', icon: '🏠', end: true },
-  { to: '/app/decks', label: 'My Decks', icon: '🗂️' },
-  { to: '/app/stats', label: 'Stats', icon: '📊' },
-  { to: '/app/settings', label: 'Settings', icon: '⚙️' },
-];
+function navItems(t: Translator) {
+  return [
+    { to: '/app', label: t('nav.dashboard'), icon: '🏠', end: true },
+    { to: '/app/decks', label: t('nav.myDecks'), icon: '🗂️' },
+    { to: '/app/stats', label: t('nav.stats'), icon: '📊' },
+    { to: '/app/settings', label: t('nav.settings'), icon: '⚙️' },
+  ];
+}
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const app = useApp();
+  const t = useT();
   const navigate = useNavigate();
   const user = app.authStore((s) => s.session?.user);
   const signOut = app.authStore((s) => s.signOut);
@@ -53,7 +58,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
-        <SidebarContent onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
+        <SidebarContent t={t} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
       </aside>
 
       {/* Mobile sidebar */}
@@ -62,6 +67,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
             <SidebarContent
+              t={t}
               onNavigate={() => setMobileNavOpen(false)}
               onFeedback={() => {
                 setMobileNavOpen(false);
@@ -77,7 +83,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <button
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileNavOpen(true)}
-            aria-label="Open menu"
+            aria-label={t('nav.openMenu')}
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -108,14 +114,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Settings
+                    {t('nav.settings')}
                   </NavLink>
                   <button
                     onClick={() => void handleSignOut()}
                     disabled={signingOut}
                     className="block w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-400 dark:hover:bg-rose-500/10"
                   >
-                    {signingOut ? 'Saving your work…' : 'Sign out'}
+                    {signingOut ? t('nav.savingWork') : t('common.signOut')}
                   </button>
                 </div>
               </>
@@ -130,38 +136,42 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <Modal
         open={unsyncedWarning}
         onClose={() => setUnsyncedWarning(false)}
-        title="Some changes haven’t saved yet"
-        description="We couldn’t reach the server to save your most recent work."
+        title={t('nav.unsyncedTitle')}
+        description={t('nav.unsyncedBody')}
         size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setUnsyncedWarning(false)}>
-              Stay signed in
+              {t('nav.staySignedIn')}
             </Button>
             <Button variant="danger" onClick={() => void signOutAnyway()} disabled={signingOut}>
-              Sign out and lose them
+              {t('nav.signOutAndLose')}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Signing out clears this device, so anything not yet saved to your account would be lost.
-          Staying signed in until you&apos;re back online is usually what you want — it saves on its
-          own once the connection returns.
-        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('nav.unsyncedBodyDetail')}</p>
       </Modal>
     </div>
   );
 }
 
-function SidebarContent({ onNavigate, onFeedback }: { onNavigate: () => void; onFeedback: () => void }) {
+function SidebarContent({
+  t,
+  onNavigate,
+  onFeedback,
+}: {
+  t: Translator;
+  onNavigate: () => void;
+  onFeedback: () => void;
+}) {
   return (
     <>
       <div className="flex h-16 items-center border-b border-slate-200 px-6 dark:border-slate-800">
         <Wordmark className="text-lg" />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV_ITEMS.map((item) => (
+        {navItems(t).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -187,13 +197,13 @@ function SidebarContent({ onNavigate, onFeedback }: { onNavigate: () => void; on
           onClick={onNavigate}
           className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-opacity brand-gradient hover:opacity-90"
         >
-          <span>+</span> New deck
+          <span>+</span> {t('nav.newDeck')}
         </NavLink>
         <button
           onClick={onFeedback}
           className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
-          <span aria-hidden>💬</span> Feedback
+          <span aria-hidden>💬</span> {t('nav.feedback')}
         </button>
       </div>
     </>

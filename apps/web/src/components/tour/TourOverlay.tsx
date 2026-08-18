@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { placeTourTooltip, spotlightRect, type TourRect } from '@autocards/core';
 import { Button } from '../ui';
 import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n';
 import type { TourStep } from './types';
 
 /** Breathing room between the highlighted element and the edge of the hole. */
@@ -28,6 +29,7 @@ interface TourOverlayProps {
  * rather than four panes around it.
  */
 export function TourOverlay({ open, steps, onFinish }: TourOverlayProps) {
+  const t = useT();
   const [visibleSteps, setVisibleSteps] = useState<TourStep[]>([]);
   const [index, setIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<TourRect | null>(null);
@@ -202,7 +204,7 @@ export function TourOverlay({ open, steps, onFinish }: TourOverlayProps) {
         )}
 
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
-          Step {index + 1} of {visibleSteps.length}
+          {t('tour.stepOf', { current: index + 1, total: visibleSteps.length })}
         </p>
         <h2 id="tour-title" className="mt-1 font-display text-lg font-bold text-slate-900 dark:text-white">
           {step.title}
@@ -215,16 +217,16 @@ export function TourOverlay({ open, steps, onFinish }: TourOverlayProps) {
             onClick={onFinish}
             className="text-xs font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline dark:hover:text-slate-200"
           >
-            Skip tour
+            {t('tour.skip')}
           </button>
           <div className="flex items-center gap-2">
             {index > 0 && (
               <Button size="sm" variant="ghost" onClick={() => setIndex((i) => i - 1)}>
-                Back
+                {t('tour.back')}
               </Button>
             )}
             <Button ref={nextRef} size="sm" onClick={next}>
-              {isLast ? 'Got it' : 'Next'}
+              {isLast ? t('tour.gotIt') : t('tour.next')}
             </Button>
           </div>
         </div>

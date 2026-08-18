@@ -1,6 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, Text, useColorScheme, View } from 'react-native';
 import { router } from 'expo-router';
+import * as Localization from 'expo-localization';
+import { createTranslator, resolveLocale } from '@autocards/core';
 
 interface Props {
   children: ReactNode;
@@ -63,29 +65,31 @@ function ErrorScreen({
   const textMuted = dark ? '#94a3b8' : '#64748b';
   const border = dark ? '#334155' : '#cbd5e1';
   const surface = dark ? '#0f172a' : '#ffffff';
+  // Mounted outside AppProvider, so there is no settings store to read a
+  // language preference from — falls back to the device language directly.
+  const t = createTranslator(resolveLocale('system', Localization.getLocales().map((entry) => entry.languageTag)));
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, padding: 24 }}>
       <Text style={{ fontSize: 36 }}>⚠️</Text>
       <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '800', color: text, textAlign: 'center' }}>
-        Something went wrong on this screen
+        {t('nav.errorBoundary.title')}
       </Text>
       <Text style={{ marginTop: 8, fontSize: 14, color: textMuted, textAlign: 'center' }}>
-        Your decks are safe. Trying again usually clears it — if it keeps happening, send us the
-        details below and we&apos;ll fix it.
+        {t('nav.errorBoundary.bodyMobile')}
       </Text>
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
         <Pressable
           onPress={onTryAgain}
           style={{ borderRadius: 12, backgroundColor: '#0e7490', paddingHorizontal: 16, paddingVertical: 10 }}
         >
-          <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>Try again</Text>
+          <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>{t('nav.errorBoundary.tryAgain')}</Text>
         </Pressable>
         <Pressable
           onPress={onBackToDecks}
           style={{ borderRadius: 12, borderWidth: 1, borderColor: border, paddingHorizontal: 16, paddingVertical: 10 }}
         >
-          <Text style={{ color: text, fontSize: 14, fontWeight: '600' }}>Back to my decks</Text>
+          <Text style={{ color: text, fontSize: 14, fontWeight: '600' }}>{t('nav.errorBoundary.backToDecks')}</Text>
         </Pressable>
       </View>
       <View

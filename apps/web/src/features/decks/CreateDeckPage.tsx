@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CARD_TYPE_DESCRIPTIONS,
-  CARD_TYPE_LABELS,
   CARD_TYPES,
   DEFAULT_GENERATION_PRESET,
   DEFAULT_MODEL_ID,
   DIFFICULTIES,
-  GENERATION_PRESET_DESCRIPTIONS,
-  GENERATION_PRESET_LABELS,
   GENERATION_PRESETS,
-  GENERATION_STAGE_LABELS,
   GenerationAbortedError,
+  LOCALE_LABELS,
   PLAN_LIMITS,
   SUPPORTED_FORMATS_LABEL,
+  SUPPORTED_LOCALES,
   UploadQuotaExceededError,
   canCreateDeck,
   oversizedDocuments,
@@ -23,9 +20,11 @@ import {
   type Difficulty,
   type GenerationPresetId,
   type GenerationProgress,
+  type Locale,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
-import { Button, Card, CardBody, Chip, Field, InfoButton, Input, Modal, Progress, Slider, Switch, Tabs, Textarea } from '../../components/ui';
+import { useLocale, useT } from '../../lib/i18n';
+import { Button, Card, CardBody, Chip, Field, InfoButton, Input, Modal, Progress, Select, Slider, Switch, Tabs, Textarea } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { formatQuota, useUploadQuota } from '../../lib/useUploadQuota';
 import { PlanLimitNotice } from '../billing/PlanLimitNotice';
@@ -35,14 +34,15 @@ type Step = 'idle' | 'generating' | 'error';
 /** Deck cards come from uploads, or the deck starts empty and is filled in by hand. */
 type Mode = 'ai' | 'manual';
 
-const MODE_TABS = [
-  { id: 'ai', label: 'Generate with AI', icon: '✨' },
-  { id: 'manual', label: 'Start from scratch', icon: '✏️' },
-];
-
 export function CreateDeckPage() {
   const app = useApp();
+  const t = useT();
+  const appLocale = useLocale();
   const navigate = useNavigate();
+  const MODE_TABS = [
+    { id: 'ai', label: t('createDeck.tab.ai'), icon: '✨' },
+    { id: 'manual', label: t('createDeck.tab.manual'), icon: '✏️' },
+  ];
 
   const user = app.authStore((s) => s.session?.user);
   const userId = user?.id;
@@ -78,6 +78,9 @@ export function CreateDeckPage() {
   const [readImages, setReadImages] = useState(defaults.readImages ?? false);
   const [instructions, setInstructions] = useState('');
   const [typeHelpOpen, setTypeHelpOpen] = useState(false);
+  // Defaults to the app's own language; picking a different one here only
+  // affects this generation, not the app-wide setting.
+  const [language, setLanguage] = useState<Locale>(appLocale);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -141,7 +144,10 @@ export function CreateDeckPage() {
       if (tooLong.length > 0) {
         const names = tooLong.map((document) => document.filename).join(', ');
         throw new Error(
-          `${names} ${tooLong.length === 1 ? 'is' : 'are'} longer than the ${PLAN_LIMITS[plan].maxPagesPerPdf} pages your plan reads in one document. Split it up, or move to a bigger plan.`,
+          t.plural('createDeck.documentTooLong', tooLong.length, {
+            names,
+            maxPages: PLAN_LIMITS[plan].maxPagesPerPdf,
+          }),
         );
       }
 
@@ -162,7 +168,7 @@ export function CreateDeckPage() {
           includeSourceQuotes,
           readImages,
           instructions: instructions.trim() || undefined,
-          language: 'en',
+          language,
         },
         onProgress: setProgress,
       });
@@ -171,7 +177,11 @@ export function CreateDeckPage() {
       // the model — a bad key, an unreadable file — costs nothing to fix.
       // The server counts it too, and its number wins where it sent one.
       quota.record(result.quota);
-      toast({ variant: 'success', title: 'Deck created!', description: `${result.cards.length} flashcards generated.` });
+      toast({
+        variant: 'success',
+        title: t('createDeck.deckCreatedTitle'),
+        description: t.plural('createDeck.deckCreatedDescription', result.cards.length, { count: result.cards.length }),
+      });
       navigate(`/app/decks/${deck.id}`);
     } catch (err) {
       // Cancelling is a choice, not a failure — back to the form, no error
@@ -183,7 +193,7 @@ export function CreateDeckPage() {
       // Being turned away is itself news about the allowance: the meter was
       // showing uploads left or the button would have been disabled.
       if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
-      setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your deck.');
+      setErrorMessage(err instanceof Error ? err.message : t('createDeck.genericError'));
       setStep('error');
     } finally {
       abortRef.current = null;
@@ -200,7 +210,11 @@ export function CreateDeckPage() {
     // No upload, no model call — so this never touches the upload quota.
     const deck = createBlankDeck(userId, name);
     if (description.trim()) updateDeck(deck.id, { description: description.trim() });
-    toast({ variant: 'success', title: 'Deck created!', description: 'Add your first card to get going.' });
+    toast({
+      variant: 'success',
+      title: t('createDeck.deckCreatedTitle'),
+      description: t('createDeck.blankDeckCreatedDescription'),
+    });
     navigate(`/app/decks/${deck.id}`);
   }
 
@@ -212,30 +226,26 @@ export function CreateDeckPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Create a deck</h1>
+        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('createDeck.title')}</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {mode === 'ai'
-            ? 'Upload your material and Auto Cards will write the flashcards for you.'
-            : 'Start with an empty deck and write the cards yourself.'}
+          {mode === 'ai' ? t('createDeck.subtitleAi') : t('createDeck.subtitleManual')}
         </p>
       </div>
 
       {step === 'idle' && <Tabs items={MODE_TABS} active={mode} onChange={(id) => setMode(id as Mode)} />}
 
       {step === 'idle' && !hasDeckRoom && (
-        <PlanLimitNotice
-          message={`You have all ${PLAN_LIMITS[plan].maxDecks} decks your plan allows. Delete one to make room, or move to a plan with no limit.`}
-        />
+        <PlanLimitNotice message={t('createDeck.deckLimitReached', { count: PLAN_LIMITS[plan].maxDecks })} />
       )}
 
       {step === 'error' && (
         <Card>
           <CardBody className="flex flex-col items-center py-14 text-center">
             <span className="text-4xl">⚠️</span>
-            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">Generation failed</p>
+            <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">{t('createDeck.generationFailed')}</p>
             <p className="mt-1 max-w-sm text-sm text-slate-400">{errorMessage}</p>
             <Button className="mt-6" onClick={tryAgain}>
-              Try again
+              {t('createDeck.tryAgain')}
             </Button>
           </CardBody>
         </Card>
@@ -248,15 +258,13 @@ export function CreateDeckPage() {
               <img src="/favicon.svg" alt="" className="h-12 w-12 animate-pulse rounded-lg" />
             </div>
             <p className="mt-4 font-semibold text-slate-800 dark:text-slate-200">
-              {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}
+              {progress ? t(`generationStage.${progress.stage}` as const) : t('createDeck.gettingStarted')}
             </p>
             {progress && <p className="mt-1 text-sm text-slate-400">{progress.message}</p>}
             <Progress value={progress?.progress ?? 0} className="mt-6 w-full max-w-xs" />
-            <p className="mt-6 text-xs text-slate-400">
-              Reading your files and writing cards. Larger decks take a minute.
-            </p>
+            <p className="mt-6 text-xs text-slate-400">{t('createDeck.generatingHint')}</p>
             <Button variant="ghost" className="mt-4" onClick={cancelGeneration}>
-              Cancel
+              {t('createDeck.cancel')}
             </Button>
           </CardBody>
         </Card>
@@ -265,10 +273,10 @@ export function CreateDeckPage() {
       {step === 'idle' && mode === 'manual' && (
         <Card>
           <CardBody className="space-y-6">
-            <Field label="Deck name">
+            <Field label={t('createDeck.deckName')}>
               <Input
                 autoFocus
-                placeholder="e.g. Financial Accounting, Chapter 4"
+                placeholder={t('createDeck.deckNamePlaceholder')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -276,17 +284,17 @@ export function CreateDeckPage() {
                 }}
               />
             </Field>
-            <Field label="Description" hint="optional">
+            <Field label={t('createDeck.description')} hint={t('common.optional')}>
               <Textarea
                 rows={2}
-                placeholder="What this deck covers…"
+                placeholder={t('createDeck.descriptionPlaceholder')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </Field>
             <div className="flex items-center justify-end">
               <Button size="lg" disabled={!title.trim() || !hasDeckRoom} onClick={createManualDeck}>
-                Create empty deck
+                {t('createDeck.createEmptyDeck')}
               </Button>
             </div>
           </CardBody>
@@ -296,24 +304,22 @@ export function CreateDeckPage() {
       {step === 'idle' && mode === 'ai' && (
         <div className="space-y-6">
           {!quota.canUpload && (
-            <PlanLimitNotice
-              message={`You have used all ${quota.limit} of this month’s generations. Your allowance resets on the 1st.`}
-            />
+            <PlanLimitNotice message={t('createDeck.quotaUsedUp', { limit: quota.limit })} />
           )}
           <Card>
             <CardBody className="space-y-6">
-              <Field label="Deck name">
+              <Field label={t('createDeck.deckName')}>
                 <Input
                   autoFocus
-                  placeholder="e.g. Financial Accounting, Chapter 4"
+                  placeholder={t('createDeck.deckNamePlaceholder')}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </Field>
-              <Field label="Description" hint="optional">
+              <Field label={t('createDeck.description')} hint={t('common.optional')}>
                 <Textarea
                   rows={2}
-                  placeholder="What this deck covers…"
+                  placeholder={t('createDeck.descriptionPlaceholder')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -326,97 +332,104 @@ export function CreateDeckPage() {
               <UploadDropzone
                 files={files}
                 onChange={handleFilesChange}
-                hint={`Slides, notes, a chapter, a past paper. Takes ${SUPPORTED_FORMATS_LABEL}. Add several and the cards are written from all of them at once.`}
+                hint={t('createDeck.uploadHint', { formats: SUPPORTED_FORMATS_LABEL })}
               />
             </CardBody>
           </Card>
 
           <Card>
             <CardBody className="space-y-6">
-              <h3 className="font-semibold text-slate-900 dark:text-white">Generation options</h3>
+              <h3 className="font-semibold text-slate-900 dark:text-white">{t('createDeck.generationOptions')}</h3>
 
-              <Field
-                label="What are these cards for?"
-                hint="Sets the card types to match. Change them below if you want."
-              >
+              <Field label={t('createDeck.whatFor')} hint={t('createDeck.whatForHint')}>
                 <div className="flex flex-wrap gap-2">
                   {GENERATION_PRESETS.map((id) => (
                     <Chip key={id} active={preset === id} onClick={() => choosePreset(id)}>
-                      {GENERATION_PRESET_LABELS[id]}
+                      {t(`generationPreset.${id}` as const)}
                     </Chip>
                   ))}
                 </div>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {GENERATION_PRESET_DESCRIPTIONS[preset]}
+                  {t(`generationPreset.${preset}.description` as const)}
                 </p>
               </Field>
 
               <Slider
-                label="Number of cards"
+                label={t('createDeck.numberOfCards')}
                 value={cardCount}
                 min={5}
                 max={60}
                 step={5}
                 onChange={setCardCount}
-                formatValue={(v) => `${v} cards`}
+                formatValue={(v) => t('createDeck.cardsUnit', { count: v })}
               />
 
               <div>
                 <div className="mb-2 flex items-center gap-1.5">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Card types to include</p>
-                  <InfoButton label="What do these card types mean?" onClick={() => setTypeHelpOpen(true)} />
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('createDeck.cardTypesToInclude')}</p>
+                  <InfoButton label={t('createDeck.cardTypesHelp')} onClick={() => setTypeHelpOpen(true)} />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {CARD_TYPES.map((type) => (
                     <Chip key={type} active={cardTypes.includes(type)} onClick={() => toggleCardType(type)}>
-                      {CARD_TYPE_LABELS[type]}
+                      {t(`cardType.${type}` as const)}
                     </Chip>
                   ))}
                 </div>
               </div>
 
-              <Field label="Target difficulty">
+              <Field label={t('createDeck.targetDifficulty')}>
                 <div className="flex flex-wrap gap-2">
                   {DIFFICULTIES.map((d) => (
                     <Chip key={d} active={difficulty === d} onClick={() => setDifficulty(d)}>
-                      {d[0]?.toUpperCase() + d.slice(1)}
+                      {t(`difficulty.${d}` as const)}
                     </Chip>
                   ))}
                 </div>
               </Field>
 
-              <Field label="Custom instructions" hint="optional">
+              <Field label={t('createDeck.customInstructions')} hint={t('common.optional')}>
                 <Textarea
                   rows={2}
-                  placeholder="e.g. Focus on chapter 3, write cards for a final exam…"
+                  placeholder={t('createDeck.customInstructionsPlaceholder')}
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                 />
               </Field>
 
+              <Field label={t('createDeck.language')} hint={t('createDeck.languageHint')}>
+                <Select value={language} onChange={(e) => setLanguage(e.target.value as Locale)}>
+                  {SUPPORTED_LOCALES.map((locale) => (
+                    <option key={locale} value={locale}>
+                      {LOCALE_LABELS[locale]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
               <div className="space-y-1 border-t border-slate-100 pt-4 dark:border-slate-800">
-                <Switch checked={autoCategories} onChange={setAutoCategories} label="Auto-categorize" description="Group related cards under headings picked to suit what the cards are for" />
-                <Switch checked={includeHints} onChange={setIncludeHints} label="Include hints" description="Add a hint to harder cards" />
-                <Switch checked={includeExplanations} onChange={setIncludeExplanations} label="Include explanations" description="Explain why the answer is correct" />
-                <Switch checked={includeSourceQuotes} onChange={setIncludeSourceQuotes} label="Quote source passages" description="Show the original text each card was based on" />
+                <Switch checked={autoCategories} onChange={setAutoCategories} label={t('createDeck.autoCategorize')} description={t('createDeck.autoCategorizeDescription')} />
+                <Switch checked={includeHints} onChange={setIncludeHints} label={t('createDeck.includeHints')} description={t('createDeck.includeHintsDescription')} />
+                <Switch checked={includeExplanations} onChange={setIncludeExplanations} label={t('createDeck.includeExplanations')} description={t('createDeck.includeExplanationsDescription')} />
+                <Switch checked={includeSourceQuotes} onChange={setIncludeSourceQuotes} label={t('createDeck.quoteSource')} description={t('createDeck.quoteSourceDescription')} />
                 <Switch
                   checked={readImages}
                   onChange={setReadImages}
-                  label="Read the pictures too"
-                  description="Reads diagrams and charts as well as the text. Slower and costs more, so best saved for slides that are mostly pictures."
+                  label={t('createDeck.readImages')}
+                  description={t('createDeck.readImagesDescription')}
                 />
               </div>
             </CardBody>
           </Card>
 
           <div className="flex items-center justify-end gap-4">
-            <span className="text-xs text-slate-400">{formatQuota(quota)}</span>
+            <span className="text-xs text-slate-400">{formatQuota(t, quota)}</span>
             <Button
               size="lg"
               disabled={files.length === 0 || !quota.canUpload || !hasDeckRoom}
               onClick={startGeneration}
             >
-              Generate flashcards
+              {t('createDeck.generateFlashcards')}
             </Button>
           </div>
         </div>
@@ -425,16 +438,16 @@ export function CreateDeckPage() {
       <Modal
         open={typeHelpOpen}
         onClose={() => setTypeHelpOpen(false)}
-        title="Card types"
-        description="What each one looks like when you study."
+        title={t('createDeck.cardTypesModalTitle')}
+        description={t('createDeck.cardTypesModalDescription')}
         size="md"
-        footer={<Button onClick={() => setTypeHelpOpen(false)}>Got it</Button>}
+        footer={<Button onClick={() => setTypeHelpOpen(false)}>{t('createDeck.gotIt')}</Button>}
       >
         <dl className="space-y-3.5 text-sm">
           {CARD_TYPES.map((type) => (
             <div key={type}>
-              <dt className="font-semibold text-slate-800 dark:text-slate-100">{CARD_TYPE_LABELS[type]}</dt>
-              <dd className="mt-0.5 text-slate-600 dark:text-slate-400">{CARD_TYPE_DESCRIPTIONS[type]}</dd>
+              <dt className="font-semibold text-slate-800 dark:text-slate-100">{t(`cardType.${type}` as const)}</dt>
+              <dd className="mt-0.5 text-slate-600 dark:text-slate-400">{t(`cardType.${type}.description` as const)}</dd>
             </div>
           ))}
         </dl>

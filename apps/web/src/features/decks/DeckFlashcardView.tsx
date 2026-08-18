@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { cardTypeLabel, getAnswerText, getPromptText, type Flashcard } from '@autocards/core';
+import { getAnswerText, getPromptText, type Flashcard } from '@autocards/core';
 import { Badge, Button, Card, CardBody, Progress } from '../../components/ui';
+import { useT } from '../../lib/i18n';
+import { cardTypeLabelT } from '../../lib/cardTypeLabel';
 import { DIFFICULTY_BADGE } from '../../lib/badges';
 import { cn } from '../../lib/cn';
 
@@ -33,6 +35,7 @@ export function DeckFlashcardView({
   deckCards: Flashcard[];
   emptyState: ReactNode;
 }) {
+  const t = useT();
   // `null` means deck order. Otherwise a permutation of the *whole deck's* ids,
   // so narrowing the filters just hides part of it and clearing them brings the
   // same shuffle back, instead of snapping to deck order.
@@ -116,16 +119,16 @@ export function DeckFlashcardView({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-          Card {safeIndex + 1} of {total}
-          {shuffleOrder && <span className="ml-2 text-xs text-slate-400">shuffled</span>}
+          {t('flashcardView.cardOf', { current: safeIndex + 1, total })}
+          {shuffleOrder && <span className="ml-2 text-xs text-slate-400">{t('flashcardView.shuffled')}</span>}
         </p>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={handleShuffle} disabled={deckCards.length < 2}>
-            🔀 Shuffle
+            {t('flashcardView.shuffle')}
           </Button>
           {shuffleOrder && (
             <Button size="sm" variant="ghost" onClick={handleReset}>
-              Reset order
+              {t('flashcardView.resetOrder')}
             </Button>
           )}
         </div>
@@ -150,12 +153,12 @@ export function DeckFlashcardView({
       >
         <CardBody className="flex min-h-[320px] flex-col items-center justify-center gap-5 p-8 text-center">
           <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <Badge variant="neutral">{cardTypeLabel(card.type)}</Badge>
+            <Badge variant="neutral">{cardTypeLabelT(t, card.type)}</Badge>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
-              {DIFFICULTY_BADGE[card.difficulty].label}
+              {t(`difficulty.${card.difficulty}` as const)}
             </span>
             {card.starred && <span className="text-sm">⭐</span>}
-            {card.suspended && <Badge variant="warning">Suspended</Badge>}
+            {card.suspended && <Badge variant="warning">{t('flashcardView.suspended')}</Badge>}
           </div>
 
           <p className="max-w-2xl whitespace-pre-wrap break-words text-lg font-semibold leading-snug text-slate-900 dark:text-white sm:text-xl">
@@ -164,9 +167,9 @@ export function DeckFlashcardView({
 
           {revealed ? (
             <div className="w-full max-w-2xl border-t border-slate-200 pt-5 dark:border-slate-800">
-              <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">Answer</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{t('flashcardView.answer')}</p>
               <p className="mt-2 whitespace-pre-wrap break-words text-base text-slate-800 dark:text-slate-100 sm:text-lg">
-                {answer || <span className="italic text-slate-400">No answer set.</span>}
+                {answer || <span className="italic text-slate-400">{t('flashcardView.noAnswerSet')}</span>}
               </p>
               {card.explanation && (
                 <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-500 dark:text-slate-400">
@@ -175,24 +178,24 @@ export function DeckFlashcardView({
               )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400">Click the card to show the answer</p>
+            <p className="text-xs text-slate-400">{t('flashcardView.clickToShow')}</p>
           )}
         </CardBody>
       </Card>
 
       <div className="flex items-center justify-between gap-2">
         <Button variant="outline" onClick={() => go(-1)} disabled={total < 2}>
-          ← Back
+          {t('flashcardView.back')}
         </Button>
         <Button
           variant="ghost"
           onClick={() => setRevealed((v) => !v)}
           className={cn(revealed && 'text-brand-700 dark:text-brand-400')}
         >
-          {revealed ? 'Hide answer' : 'Show answer'}
+          {revealed ? t('flashcardView.hideAnswer') : t('flashcardView.showAnswer')}
         </Button>
         <Button variant="outline" onClick={() => go(1)} disabled={total < 2}>
-          Next →
+          {t('flashcardView.next')}
         </Button>
       </div>
     </div>

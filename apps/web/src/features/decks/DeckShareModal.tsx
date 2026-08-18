@@ -2,6 +2,7 @@ import { serializeDeckExport, slugify } from '@autocards/core';
 import { Button, Modal } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 
 interface DeckShareModalProps {
   open: boolean;
@@ -21,6 +22,7 @@ interface DeckShareModalProps {
  */
 export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
   const app = useApp();
+  const t = useT();
 
   if (!open) return null;
 
@@ -41,8 +43,8 @@ export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
     URL.revokeObjectURL(url);
     toast({
       variant: 'success',
-      title: 'Deck downloaded',
-      description: 'Send the file on — they can import it from their deck library.',
+      title: t('deckShare.downloadedTitle'),
+      description: t('deckShare.downloadedDescription'),
     });
     onClose();
   }
@@ -51,33 +53,24 @@ export function DeckShareModal({ open, onClose, deckId }: DeckShareModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Share deck"
-      description={`${payload.title} · ${payload.cards.length} card${payload.cards.length === 1 ? '' : 's'}`}
+      title={t('deckShare.title')}
+      description={t.plural('deckShare.descriptionCards', payload.cards.length, {
+        title: payload.title,
+        count: payload.cards.length,
+      })}
       size="md"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
-          <Button onClick={download}>Download .json</Button>
+          <Button onClick={download}>{t('deckShare.download')}</Button>
         </>
       }
     >
       <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-        <p>
-          This saves the deck as a single{' '}
-          <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-800">.json</code>{' '}
-          file. Send it however you like — email, a chat, a shared drive — and whoever receives it
-          can bring it in from{' '}
-          <span className="font-medium text-slate-800 dark:text-slate-100">
-            My Decks → Import deck
-          </span>
-          .
-        </p>
-        <p className="text-xs text-slate-400">
-          Cards arrive with a fresh study schedule, so your mastery, streak and review history stay
-          yours. The file works offline and doesn&apos;t expire.
-        </p>
+        <p>{t('deckShare.body1')}</p>
+        <p className="text-xs text-slate-400">{t('deckShare.body2')}</p>
       </div>
     </Modal>
   );

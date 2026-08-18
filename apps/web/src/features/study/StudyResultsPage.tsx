@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { formatDuration, formatSeconds } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { Button, Card, CardBody } from '../../components/ui';
 
 const LETTER_COLORS: Record<string, string> = {
@@ -17,6 +18,7 @@ export function StudyResultsPage() {
   const { deckId, sessionId } = useParams<{ deckId: string; sessionId: string }>();
   const navigate = useNavigate();
   const app = useApp();
+  const t = useT();
 
   const activeSession = app.studyStore((s) => s.activeSession);
   const history = app.studyStore((s) => s.history);
@@ -45,7 +47,7 @@ export function StudyResultsPage() {
   const letter = score?.letter ?? summary?.letter ?? 'F';
   const maxStreak = score?.maxStreak ?? summary?.maxStreak ?? 0;
   const durationMs = fullSession?.durationMs ?? summary?.durationMs ?? 0;
-  const deckTitle = fullSession?.deckTitle ?? summary?.deckTitle ?? 'Deck';
+  const deckTitle = fullSession?.deckTitle ?? summary?.deckTitle ?? t('results.deck');
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-4 py-10">
@@ -53,42 +55,42 @@ export function StudyResultsPage() {
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{deckTitle}</p>
         <h1 className={`font-display mt-2 text-7xl font-extrabold ${LETTER_COLORS[letter] ?? 'text-slate-500'}`}>{letter}</h1>
         <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-          {finalScore.toLocaleString()} points · +{xp} XP
+          {t('results.pointsXp', { points: finalScore.toLocaleString(), xp })}
         </p>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Accuracy" value={`${Math.round(accuracy * 100)}%`} />
-        <Stat label="Correct" value={`${correct}/${answered}`} />
-        <Stat label="Best streak" value={maxStreak} />
-        <Stat label="Time" value={formatDuration(durationMs)} />
+        <Stat label={t('results.accuracy')} value={`${Math.round(accuracy * 100)}%`} />
+        <Stat label={t('results.correct')} value={`${correct}/${answered}`} />
+        <Stat label={t('results.bestStreak')} value={maxStreak} />
+        <Stat label={t('results.time')} value={formatDuration(durationMs)} />
       </div>
 
       {score && (
         <Card className="mt-8">
           <CardBody className="space-y-2">
-            <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">Score breakdown</h3>
-            <BreakdownRow label="Base points" value={score.basePoints} />
-            {score.difficultyBonus > 0 && <BreakdownRow label="Difficulty bonus" value={score.difficultyBonus} positive />}
-            {score.speedBonus > 0 && <BreakdownRow label="Speed bonus" value={score.speedBonus} positive />}
-            {score.streakBonus > 0 && <BreakdownRow label="Streak bonus" value={score.streakBonus} positive />}
-            {score.hintPenalty > 0 && <BreakdownRow label="Hint penalty" value={-score.hintPenalty} />}
-            {score.timeoutPenalty > 0 && <BreakdownRow label="Timeout penalty" value={-score.timeoutPenalty} />}
+            <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">{t('results.scoreBreakdown')}</h3>
+            <BreakdownRow label={t('results.basePoints')} value={score.basePoints} />
+            {score.difficultyBonus > 0 && <BreakdownRow label={t('results.difficultyBonus')} value={score.difficultyBonus} positive />}
+            {score.speedBonus > 0 && <BreakdownRow label={t('results.speedBonus')} value={score.speedBonus} positive />}
+            {score.streakBonus > 0 && <BreakdownRow label={t('results.streakBonus')} value={score.streakBonus} positive />}
+            {score.hintPenalty > 0 && <BreakdownRow label={t('results.hintPenalty')} value={-score.hintPenalty} />}
+            {score.timeoutPenalty > 0 && <BreakdownRow label={t('results.timeoutPenalty')} value={-score.timeoutPenalty} />}
             <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white">
-              <span>Final score</span>
+              <span>{t('results.finalScore')}</span>
               <span>{score.finalScore}</span>
             </div>
-            <p className="pt-1 text-xs text-slate-400">Average answer time: {formatSeconds(score.averageTimeMs)}</p>
+            <p className="pt-1 text-xs text-slate-400">{t('results.averageAnswerTime', { time: formatSeconds(score.averageTimeMs) })}</p>
           </CardBody>
         </Card>
       )}
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
         <Button variant="outline" className="flex-1" onClick={() => navigate(`/app/decks/${deckId}`)}>
-          Back to deck
+          {t('results.backToDeck')}
         </Button>
         <Button className="flex-1" onClick={() => navigate(`/app/study/${deckId}`)}>
-          Study again
+          {t('results.studyAgain')}
         </Button>
       </div>
     </div>

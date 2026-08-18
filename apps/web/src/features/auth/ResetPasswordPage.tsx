@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MIN_PASSWORD_LENGTH } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { Button, Field, Input } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 
@@ -17,6 +18,7 @@ import { toast } from '../../components/ui/toastStore';
  */
 export function ResetPasswordPage() {
   const app = useApp();
+  const t = useT();
   const navigate = useNavigate();
   const status = app.authStore((s) => s.status);
 
@@ -53,11 +55,11 @@ export function ResetPasswordPage() {
     setError(null);
 
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setError(t('auth.resetPassword.tooShort', { min: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmation) {
-      setError('Those two passwords don’t match.');
+      setError(t('auth.resetPassword.mismatch'));
       return;
     }
 
@@ -66,12 +68,12 @@ export function ResetPasswordPage() {
       await app.services.auth.updatePassword(password);
       toast({
         variant: 'success',
-        title: 'Password changed',
-        description: 'You’re signed in with your new password.',
+        title: t('auth.resetPassword.successTitle'),
+        description: t('auth.resetPassword.successBody'),
       });
       navigate('/app', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not set that password.');
+      setError(err instanceof Error ? err.message : t('auth.resetPassword.genericError'));
     } finally {
       setSaving(false);
     }
@@ -84,17 +86,14 @@ export function ResetPasswordPage() {
           ⏳
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">This link has expired</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Reset links last an hour and can only be used once. Ask for a fresh one and it&apos;ll
-            work.
-          </p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{t('auth.resetPassword.expiredTitle')}</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('auth.resetPassword.expiredBody')}</p>
         </div>
         <Link
           to="/forgot-password"
           className="inline-block rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
         >
-          Send a new link
+          {t('auth.resetPassword.sendNewLink')}
         </Link>
       </div>
     );
@@ -110,7 +109,7 @@ export function ResetPasswordPage() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field label="New password" hint={`${MIN_PASSWORD_LENGTH}+ characters`}>
+      <Field label={t('auth.resetPassword.newPassword')} hint={t('auth.signUp.passwordHint', { min: MIN_PASSWORD_LENGTH })}>
         <Input
           type="password"
           required
@@ -122,7 +121,7 @@ export function ResetPasswordPage() {
           placeholder="••••••••"
         />
       </Field>
-      <Field label="Confirm new password">
+      <Field label={t('auth.resetPassword.confirmPassword')}>
         <Input
           type="password"
           required
@@ -134,7 +133,7 @@ export function ResetPasswordPage() {
         />
       </Field>
       <Button type="submit" className="w-full" loading={saving}>
-        Set new password
+        {t('auth.resetPassword.submit')}
       </Button>
     </form>
   );

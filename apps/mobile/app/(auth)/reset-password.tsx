@@ -4,6 +4,7 @@ import { Link, router } from 'expo-router';
 import { useURL } from 'expo-linking';
 import { MIN_PASSWORD_LENGTH } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Button, Field, Screen } from '../../src/components';
 import { toast } from '../../src/lib/toastStore';
@@ -18,6 +19,7 @@ import { toast } from '../../src/lib/toastStore';
  */
 export default function ResetPasswordScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const url = useURL();
 
@@ -62,11 +64,11 @@ export default function ResetPasswordScreen() {
   async function onSubmit() {
     setError(null);
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setError(t('auth.resetPassword.tooShort', { min: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmation) {
-      setError('Those two passwords don’t match.');
+      setError(t('auth.resetPassword.mismatch'));
       return;
     }
     setSaving(true);
@@ -74,12 +76,12 @@ export default function ResetPasswordScreen() {
       await app.services.auth.updatePassword(password);
       toast({
         variant: 'success',
-        title: 'Password changed',
-        description: 'You’re signed in with your new password.',
+        title: t('auth.resetPassword.successTitle'),
+        description: t('auth.resetPassword.successBody'),
       });
       router.replace('/(app)');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not set that password.');
+      setError(err instanceof Error ? err.message : t('auth.resetPassword.genericError'));
     } finally {
       setSaving(false);
     }
@@ -99,7 +101,7 @@ export default function ResetPasswordScreen() {
               textAlign: 'center',
             }}
           >
-            This link has expired
+            {t('auth.resetPassword.expiredTitle')}
           </Text>
           <Text
             style={{
@@ -110,11 +112,10 @@ export default function ResetPasswordScreen() {
               lineHeight: 22,
             }}
           >
-            Reset links last an hour and can only be used once. Ask for a fresh one and it&apos;ll
-            work.
+            {t('auth.resetPassword.expiredBody')}
           </Text>
           <Link href="/(auth)/forgot-password" style={{ marginTop: spacing.xl }}>
-            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>Send a new link</Text>
+            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>{t('auth.resetPassword.sendNewLink')}</Text>
           </Link>
         </View>
       </Screen>
@@ -125,7 +126,7 @@ export default function ResetPasswordScreen() {
     return (
       <Screen>
         <View style={{ marginTop: spacing.xxl, alignItems: 'center' }}>
-          <Text style={{ color: theme.textMuted }}>Checking your link…</Text>
+          <Text style={{ color: theme.textMuted }}>{t('auth.resetPassword.checkingLink')}</Text>
         </View>
       </Screen>
     );
@@ -134,12 +135,12 @@ export default function ResetPasswordScreen() {
   return (
     <Screen>
       <View style={{ marginBottom: spacing.xl, marginTop: spacing.xl }}>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text }}>Set a new password</Text>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text }}>{t('auth.resetPassword.mobileTitle')}</Text>
       </View>
 
       <Field
-        label="New password"
-        hint={`${MIN_PASSWORD_LENGTH}+ characters`}
+        label={t('auth.resetPassword.newPassword')}
+        hint={t('auth.signUp.passwordHint', { min: MIN_PASSWORD_LENGTH })}
         placeholder="••••••••"
         secureTextEntry
         autoFocus
@@ -147,7 +148,7 @@ export default function ResetPasswordScreen() {
         onChangeText={setPassword}
       />
       <Field
-        label="Confirm new password"
+        label={t('auth.resetPassword.confirmPassword')}
         placeholder="••••••••"
         secureTextEntry
         value={confirmation}
@@ -155,7 +156,7 @@ export default function ResetPasswordScreen() {
         error={error ?? undefined}
       />
 
-      <Button title="Set new password" onPress={onSubmit} loading={saving} style={{ marginTop: spacing.sm }} />
+      <Button title={t('auth.resetPassword.submit')} onPress={onSubmit} loading={saving} style={{ marginTop: spacing.sm }} />
     </Screen>
   );
 }

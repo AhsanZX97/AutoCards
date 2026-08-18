@@ -1,5 +1,6 @@
 import type { DayActivity } from '@autocards/core';
 import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n';
 
 interface ActivityHeatmapProps {
   activity: DayActivity[];
@@ -23,6 +24,7 @@ const LEVEL_CLASSES = [
 ];
 
 export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {
+  const t = useT();
   const days = compact ? activity.slice(-63) : activity;
   const weeks: DayActivity[][] = [];
   for (let i = 0; i < days.length; i += 7) {
@@ -37,7 +39,7 @@ export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {
             {week.map((day) => (
               <div
                 key={day.date}
-                title={`${day.date}: ${day.cards} cards, ${day.sessions} sessions`}
+                title={t('stats.heatmap.tooltip', { date: day.date, cards: day.cards, sessions: day.sessions })}
                 className={cn(
                   compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
                   'rounded-sm',
@@ -50,11 +52,11 @@ export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {
       </div>
       {!compact && (
         <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
-          <span>Less</span>
+          <span>{t('stats.heatmap.less')}</span>
           {LEVEL_CLASSES.map((cls, i) => (
             <div key={i} className={cn('h-3 w-3 rounded-sm', cls)} />
           ))}
-          <span>More</span>
+          <span>{t('stats.heatmap.more')}</span>
         </div>
       )}
     </div>

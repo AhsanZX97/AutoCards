@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Linking, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { computeOverallStats, describeSubscription, type AccountSubscription } from '@autocards/core';
+import {
+  computeOverallStats,
+  LOCALE_LABELS,
+  SUPPORTED_LOCALES,
+  type AccountSubscription,
+  type LanguagePreference,
+  type Translator,
+} from '@autocards/core';
 import { useApp, getSupabaseClient } from '../../src/lib/appContext';
+import { useLocale, useT } from '../../src/lib/i18n';
 import { useTheme, radius, spacing } from '../../src/lib/theme';
 import { toast } from '../../src/lib/toastStore';
 import { useUploadQuota, formatQuota } from '../../src/lib/useUploadQuota';
@@ -10,6 +18,37 @@ import { Badge, Button, Card, Field, GradientPanel, IconTile, Modal, ProgressBar
 import { FeedbackModal } from '../../src/features/feedback/FeedbackModal';
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const;
+
+/** Mirrors `describeSubscription` in core, translated — see `SettingsPage.tsx` on web for why this isn't shared as-is. */
+function describeSubscriptionT(t: Translator, locale: string, subscription: AccountSubscription): string {
+  if (subscription.plan === 'lifetime') {
+    return t('settings.billing.boughtOutright');
+  }
+
+  const ends = subscription.currentPeriodEnd
+    ? new Date(subscription.currentPeriodEnd).toLocaleDateString(locale, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : undefined;
+
+  if (subscription.status === 'past_due') {
+    return ends
+      ? t('settings.billing.pastDueUntil', { plan: subscription.plan, date: ends })
+      : t('settings.billing.pastDue');
+  }
+  if (subscription.cancelAtPeriodEnd) {
+    return ends
+      ? t('settings.billing.cancelledUntil', { plan: subscription.plan, date: ends })
+      : t('settings.billing.cancelledPeriodEnd', { plan: subscription.plan });
+  }
+  if (subscription.status === 'active' || subscription.status === 'trialing') {
+    return ends ? t('settings.billing.renewsOn', { date: ends }) : t('settings.billing.active');
+  }
+  if (subscription.status === 'canceled') return t('settings.billing.ended');
+  return t('settings.billing.statusOther', { status: subscription.status });
+}
 
 /**
  * Where someone with no subscription to manage goes to see plans and upgrade —
@@ -20,11 +59,15 @@ const WEB_BILLING_URL = 'https://autocards.study/app/settings?tab=billing';
 
 export default function SettingsScreen() {
   const app = useApp();
+  const t = useT();
+  const locale = useLocale();
   const theme = useTheme();
   const user = app.authStore((s) => s.session?.user);
   const signOut = app.authStore((s) => s.signOut);
   const themePref = app.settingsStore((s) => s.theme);
   const setTheme = app.settingsStore((s) => s.setTheme);
+  const languagePref = app.settingsStore((s) => s.language);
+  const setLanguage = app.settingsStore((s) => s.setLanguage);
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
   const quota = useUploadQuota();
@@ -87,7 +130,11 @@ export default function SettingsScreen() {
       try {
         await Linking.openURL(WEB_BILLING_URL);
       } catch {
-        toast({ variant: 'error', title: 'Could not open browser', description: `Visit ${WEB_BILLING_URL} to see plans.` });
+        toast({
+          variant: 'error',
+          title: t('mobileSettings.couldNotOpenBrowser'),
+          description: t('mobileSettings.visitToSeePlans', { url: WEB_BILLING_URL }),
+        });
       }
       return;
     }
@@ -99,8 +146,8 @@ export default function SettingsScreen() {
     } catch (error) {
       toast({
         variant: 'error',
-        title: 'Could not open billing',
-        description: error instanceof Error ? error.message : 'Try again in a moment.',
+        title: t('mobileSettings.couldNotOpenBilling'),
+        description: error instanceof Error ? error.message : t('mobileSettings.tryAgainMoment'),
       });
     } finally {
       setOpeningPortal(false);
@@ -139,12 +186,12 @@ export default function SettingsScreen() {
     if (!client) return;
 
     Alert.alert(
-      'Delete Account',
-      'This action is permanent and cannot be undone. All your data will be deleted. Are you sure?',
+      t('mobileSettings.deleteAccountTitle'),
+      t('mobileSettings.deleteAccountConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -160,7 +207,7 @@ export default function SettingsScreen() {
             } catch (err) {
               toast({
                 variant: 'error',
-                title: 'Could not delete account',
+                title: t('settings.profile.deleteFailedTitle'),
                 description: err instanceof Error ? err.message : undefined,
               });
             }
@@ -174,7 +221,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: spacing.lg }}>Settings</Text>
+      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: spacing.lg }}>{t('mobileSettings.title')}</Text>
 
       <GradientPanel style={{ marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -193,25 +240,25 @@ export default function SettingsScreen() {
           <View>
             <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>{user.username}</Text>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
-              Level {stats.level.level} · {stats.streak.current} day streak
+              {t('mobileSettings.levelStreak', { level: stats.level.level, streak: stats.streak.current })}
             </Text>
           </View>
         </View>
       </GradientPanel>
 
       <Card style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Profile</Text>
-        <Field label="Username" value={user.username} editable={false} />
-        <Field label="Email" value={user.email} editable={false} />
+        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>{t('mobileSettings.profile')}</Text>
+        <Field label={t('common.username')} value={user.username} editable={false} />
+        <Field label={t('common.email')} value={user.email} editable={false} />
       </Card>
 
       <Card style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Theme</Text>
+        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>{t('settings.appearance.theme')}</Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           {THEME_OPTIONS.map((option) => (
             <Button
               key={option}
-              title={option[0]!.toUpperCase() + option.slice(1)}
+              title={t(`settings.appearance.theme.${option}` as const)}
               variant={themePref === option ? 'primary' : 'outline'}
               size="sm"
               onPress={() => setTheme(option)}
@@ -222,19 +269,35 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>Generation defaults</Text>
+        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>{t('settings.appearance.language')}</Text>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {(['system', ...SUPPORTED_LOCALES] as LanguagePreference[]).map((option) => (
+            <Button
+              key={option}
+              title={option === 'system' ? t('settings.appearance.language.system') : LOCALE_LABELS[option]}
+              variant={languagePref === option ? 'primary' : 'outline'}
+              size="sm"
+              onPress={() => setLanguage(option)}
+              style={{ flex: 1 }}
+            />
+          ))}
+        </View>
+      </Card>
+
+      <Card style={{ marginBottom: spacing.md }}>
+        <Text style={{ fontWeight: '700', color: theme.text, marginBottom: spacing.md }}>{t('mobileSettings.generationDefaults')}</Text>
         <SwitchRow
-          label="Auto-categorize"
+          label={t('createDeck.autoCategorize')}
           value={defaults.autoCategories}
           onValueChange={(v) => updateDefaults({ autoCategories: v })}
         />
         <SwitchRow
-          label="Include hints"
+          label={t('createDeck.includeHints')}
           value={defaults.includeHints}
           onValueChange={(v) => updateDefaults({ includeHints: v })}
         />
         <SwitchRow
-          label="Include explanations"
+          label={t('createDeck.includeExplanations')}
           value={defaults.includeExplanations}
           onValueChange={(v) => updateDefaults({ includeExplanations: v })}
         />
@@ -250,25 +313,25 @@ export default function SettingsScreen() {
           }}
         >
           <Text style={{ fontWeight: '700', color: theme.text, textTransform: 'capitalize' }}>
-            {user.plan} plan
+            {t('mobileSettings.planSuffix', { plan: user.plan })}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             {subscription?.status === 'past_due' && (
-              <Badge label="Payment failed" color={theme.warning} softColor={theme.warningSoft} />
+              <Badge label={t('settings.billing.paymentFailed')} color={theme.warning} softColor={theme.warningSoft} />
             )}
             {subscription?.cancelAtPeriodEnd && (
-              <Badge label="Cancelling" color={theme.primaryText} softColor={theme.primarySoft} />
+              <Badge label={t('settings.billing.cancelling')} color={theme.primaryText} softColor={theme.primarySoft} />
             )}
           </View>
         </View>
         {subscription && (
           <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: spacing.md }}>
-            {describeSubscription(subscription)}
+            {describeSubscriptionT(t, locale, subscription)}
           </Text>
         )}
 
         <Text style={{ fontWeight: '600', color: theme.text, fontSize: 13, marginBottom: spacing.xs }}>
-          Upload allowance
+          {t('mobileSettings.uploadAllowance')}
         </Text>
         {quota.limit !== Number.POSITIVE_INFINITY && (
           <View style={{ marginBottom: spacing.xs }}>
@@ -276,18 +339,18 @@ export default function SettingsScreen() {
           </View>
         )}
         <Text style={{ color: theme.textMuted, fontSize: 12, marginBottom: spacing.md }}>
-          {formatQuota(quota)}
+          {formatQuota(t, quota)}
         </Text>
 
         <Button
           title={
             !subscriptionLoaded
-              ? 'Loading…'
+              ? t('common.loading')
               : subscription
                 ? ownsOutright
-                  ? 'Receipts'
-                  : 'Manage billing'
-                : 'See plans on the web'
+                  ? t('settings.billing.receipts')
+                  : t('settings.billing.manageBilling')
+                : t('mobileSettings.seePlansOnWeb')
           }
           variant="outline"
           size="sm"
@@ -298,38 +361,38 @@ export default function SettingsScreen() {
       </Card>
 
       <Button
-        title="Send feedback"
+        title={t('mobileSettings.sendFeedback')}
         variant="outline"
         onPress={() => setFeedbackOpen(true)}
         style={{ marginBottom: spacing.md }}
       />
 
       <Button
-        title="Delete account"
+        title={t('mobileSettings.deleteAccount')}
         variant="danger"
         onPress={handleDeleteAccount}
         style={{ marginBottom: spacing.sm }}
       />
 
-      <Button title="Sign out" variant="danger" onPress={handleSignOut} loading={signingOut} />
+      <Button title={t('mobileSettings.signOut')} variant="danger" onPress={handleSignOut} loading={signingOut} />
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       <Modal
         open={unsyncedWarning}
         onClose={() => setUnsyncedWarning(false)}
-        title="Some changes haven’t saved yet"
-        description="We couldn’t reach the server to save your most recent work."
+        title={t('nav.unsyncedTitle')}
+        description={t('nav.unsyncedBody')}
         footer={
           <>
             <Button
-              title="Stay signed in"
+              title={t('nav.staySignedIn')}
               variant="ghost"
               onPress={() => setUnsyncedWarning(false)}
               style={{ flex: 1 }}
             />
             <Button
-              title="Sign out and lose them"
+              title={t('nav.signOutAndLose')}
               variant="danger"
               onPress={() => void signOutAnyway()}
               disabled={signingOut}
@@ -338,11 +401,7 @@ export default function SettingsScreen() {
           </>
         }
       >
-        <Text style={{ color: theme.textMuted, fontSize: 13 }}>
-          Signing out clears this device, so anything not yet saved to your account would be lost.
-          Staying signed in until you&apos;re back online is usually what you want — it saves on its
-          own once the connection returns.
-        </Text>
+        <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t('nav.unsyncedBodyDetail')}</Text>
       </Modal>
     </Screen>
   );

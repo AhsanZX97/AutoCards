@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { computeDeckStats, parseDeckExport } from '@autocards/core';
+import { computeDeckStats, parseDeckExport, type Translator } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { Badge, Button, Card, CardBody, Input, Progress } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
 import { toast } from '../../components/ui/toastStore';
@@ -10,6 +11,7 @@ type FilterMode = 'active' | 'archived';
 
 export function DeckLibraryPage() {
   const app = useApp();
+  const t = useT();
   const navigate = useNavigate();
   const decks = app.deckStore((s) => s.decks);
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
@@ -32,29 +34,32 @@ export function DeckLibraryPage() {
   function handleImportFile(file: File | null) {
     if (!file) return;
     if (!userId) {
-      toast({ variant: 'error', title: 'Sign in to import a deck' });
+      toast({ variant: 'error', title: t('deckLibrary.signInToImport') });
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       const payload = parseDeckExport(String(reader.result ?? ''));
       if (!payload) {
-        toast({ variant: 'error', title: 'Not a valid deck file' });
+        toast({ variant: 'error', title: t('deckLibrary.invalidFile') });
         return;
       }
       if (payload.cards.length === 0 && payload.categories.length === 0) {
-        toast({ variant: 'error', title: 'Deck file is empty' });
+        toast({ variant: 'error', title: t('deckLibrary.emptyFile') });
         return;
       }
       const deck = importDeck(payload, userId);
       toast({
         variant: 'success',
-        title: 'Deck imported',
-        description: `${deck.title} · ${payload.cards.length} cards`,
+        title: t('deckLibrary.importedTitle'),
+        description: t.plural('deckLibrary.importedDescription', payload.cards.length, {
+          title: deck.title,
+          count: payload.cards.length,
+        }),
       });
       navigate(`/app/decks/${deck.id}`);
     };
-    reader.onerror = () => toast({ variant: 'error', title: 'Could not read file' });
+    reader.onerror = () => toast({ variant: 'error', title: t('deckLibrary.couldNotRead') });
     reader.readAsText(file);
   }
 
@@ -62,15 +67,17 @@ export function DeckLibraryPage() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">My Decks</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{decks.length} deck{decks.length === 1 ? '' : 's'} total</p>
+          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('deckLibrary.title')}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {t.plural('deckLibrary.deckCount', decks.length, { count: decks.length })}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            Import
+            {t('deckLibrary.import')}
           </Button>
           <Link to="/app/decks/new">
-            <Button>+ Create a deck</Button>
+            <Button>{t('deckLibrary.createDeck')}</Button>
           </Link>
         </div>
       </div>
@@ -87,7 +94,7 @@ export function DeckLibraryPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xs flex-1">
-          <Input placeholder="Search decks…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input placeholder={t('deckLibrary.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/60">
           {(['active', 'archived'] as const).map((mode) => (
@@ -100,7 +107,7 @@ export function DeckLibraryPage() {
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
               }`}
             >
-              {mode === 'active' ? 'Active' : 'Archived'}
+              {mode === 'active' ? t('deckLibrary.active') : t('deckLibrary.archived')}
             </button>
           ))}
         </div>
@@ -110,17 +117,17 @@ export function DeckLibraryPage() {
         <Card>
           <CardBody className="flex flex-col items-center py-14 text-center">
             <span className="text-4xl">🗂️</span>
-            <p className="mt-3 font-medium text-slate-700 dark:text-slate-300">No decks found</p>
+            <p className="mt-3 font-medium text-slate-700 dark:text-slate-300">{t('deckLibrary.noDecksFound')}</p>
             <p className="mt-1 text-sm text-slate-400">
-              {filter === 'archived' ? 'Nothing archived yet.' : 'Create your first deck or import one to get started.'}
+              {filter === 'archived' ? t('deckLibrary.nothingArchived') : t('deckLibrary.emptyPrompt')}
             </p>
             {filter === 'active' && (
               <div className="mt-4 flex gap-2">
                 <Link to="/app/decks/new">
-                  <Button size="sm" variant="outline">Create a deck</Button>
+                  <Button size="sm" variant="outline">{t('deckLibrary.createDeckShort')}</Button>
                 </Link>
                 <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                  Import a deck
+                  {t('deckLibrary.importDeck')}
                 </Button>
               </div>
             )}
@@ -139,10 +146,11 @@ export function DeckLibraryPage() {
                       {deck.icon}
                     </div>
                     <DeckMenu
+                      t={t}
                       archived={deck.archived}
                       onArchive={() => archiveDeck(deck.id, !deck.archived)}
                       onDelete={() => {
-                        if (confirm(`Delete "${deck.title}"? This cannot be undone.`)) {
+                        if (confirm(t('deckLibrary.confirmDelete', { title: deck.title }))) {
                           deleteDeck(deck.id);
                           // Otherwise the schedule outlives the deck.
                           clearReminders(deck.id);
@@ -157,8 +165,8 @@ export function DeckLibraryPage() {
                     <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{deck.description}</p>
                   </Link>
                   <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-                    <span>{stats.total} cards</span>
-                    <span>{stats.averageMastery}% mastered</span>
+                    <span>{t.plural('deckLibrary.cardCount', stats.total, { count: stats.total })}</span>
+                    <span>{t('deckLibrary.percentMastered', { percent: stats.averageMastery })}</span>
                   </div>
                   <Progress value={stats.averageMastery} max={100} className="mt-2" />
                   <div className="mt-4 flex items-center gap-2">
@@ -166,10 +174,10 @@ export function DeckLibraryPage() {
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate(`/app/decks/${deck.id}`)}>
-                      Manage
+                      {t('deckLibrary.manage')}
                     </Button>
                     <Button size="sm" className="flex-1" onClick={() => navigate(`/app/study/${deck.id}`)} disabled={stats.total === 0}>
-                      Study
+                      {t('deckLibrary.study')}
                     </Button>
                   </div>
                 </CardBody>
@@ -182,14 +190,24 @@ export function DeckLibraryPage() {
   );
 }
 
-function DeckMenu({ archived, onArchive, onDelete }: { archived: boolean; onArchive: () => void; onDelete: () => void }) {
+function DeckMenu({
+  t,
+  archived,
+  onArchive,
+  onDelete,
+}: {
+  t: Translator;
+  archived: boolean;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         className="rounded-lg p-1.5 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-slate-800"
-        aria-label="Deck options"
+        aria-label={t('deckLibrary.deckOptions')}
       >
         ⋯
       </button>
@@ -204,7 +222,7 @@ function DeckMenu({ archived, onArchive, onDelete }: { archived: boolean; onArch
               }}
               className="block w-full px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-              {archived ? 'Unarchive' : 'Archive'}
+              {archived ? t('deckLibrary.unarchive') : t('deckLibrary.archive')}
             </button>
             <button
               onClick={() => {
@@ -213,7 +231,7 @@ function DeckMenu({ archived, onArchive, onDelete }: { archived: boolean; onArch
               }}
               className="block w-full px-3.5 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
             >
-              Delete
+              {t('deckLibrary.delete')}
             </button>
           </div>
         </>

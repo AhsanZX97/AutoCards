@@ -1,7 +1,10 @@
 import type { GenerationResult } from '../../types';
+import { createTranslator, type Translator } from '../../i18n/translate';
 import { EdgeLlmService, type EdgeLlmConfig } from './edgeTransport';
 import { OpenRouterLlmService, type OpenRouterConfig } from './openRouter';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
+
+const defaultGetT = (): Translator => createTranslator('en');
 
 /**
  * Thrown when there is nowhere to send a generation: no server configured and
@@ -10,8 +13,8 @@ import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './t
  * without its backend is our problem, not theirs.
  */
 export class LlmConfigError extends Error {
-  constructor() {
-    super('Card generation is not switched on for this app yet.');
+  constructor(message = 'Card generation is not switched on for this app yet.') {
+    super(message);
     this.name = 'LlmConfigError';
   }
 }
@@ -39,8 +42,9 @@ export class RoutingLlmService implements LlmService {
   constructor(
     private readonly resolveConfig: () => OpenRouterConfig | undefined,
     edge?: EdgeLlmConfig,
+    private readonly getT: () => Translator = defaultGetT,
   ) {
-    this.edge = edge ? new EdgeLlmService(edge) : undefined;
+    this.edge = edge ? new EdgeLlmService(edge, getT) : undefined;
   }
 
   get id(): string {
@@ -67,11 +71,11 @@ export class RoutingLlmService implements LlmService {
     if (!config || !key) {
       this.real = undefined;
       if (this.edge) return this.edge;
-      throw new LlmConfigError();
+      throw new LlmConfigError(this.getT()('llmProgress.notConfigured'));
     }
 
     if (this.real?.key !== key) {
-      this.real = { key, service: new OpenRouterLlmService({ ...config, apiKey: key }) };
+      this.real = { key, service: new OpenRouterLlmService({ ...config, apiKey: key }, this.getT) };
     }
     return this.real.service;
   }

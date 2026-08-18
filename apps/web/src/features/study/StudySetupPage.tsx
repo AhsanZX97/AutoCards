@@ -4,9 +4,7 @@ import {
   DIFFICULTIES,
   PRIORITIES,
   STUDY_MODES,
-  STUDY_MODE_INFO,
   SHUFFLE_MODES,
-  SHUFFLE_MODE_LABELS,
   applyModePreset,
   computeDeckStats,
   createDefaultStudySettings,
@@ -15,16 +13,19 @@ import {
   type StudySettings,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { useTour } from '../../lib/useTour';
 import { Button, Card, CardBody, Chip, Field, FormNotice, Select, Slider, Switch } from '../../components/ui';
 import { TourOverlay } from '../../components/tour';
 import { EMPTY_ARRAY } from '../../lib/empty';
-import { STUDY_TOUR_STEPS } from './studyTourSteps';
+import { studyTourSteps } from './studyTourSteps';
+import { STUDY_MODE_ICONS } from './studyModeIcons';
 
 export function StudySetupPage() {
   const { deckId } = useParams<{ deckId: string }>();
   const navigate = useNavigate();
   const app = useApp();
+  const t = useT();
 
   const deck = app.deckStore((s) => (deckId ? s.getDeck(deckId) : undefined));
   const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? EMPTY_ARRAY : EMPTY_ARRAY));
@@ -48,7 +49,7 @@ export function StudySetupPage() {
   if (!deck) {
     return (
       <Card>
-        <CardBody className="py-16 text-center text-slate-500 dark:text-slate-400">Deck not found.</CardBody>
+        <CardBody className="py-16 text-center text-slate-500 dark:text-slate-400">{t('studySetup.notFound')}</CardBody>
       </Card>
     );
   }
@@ -99,18 +100,19 @@ export function StudySetupPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Study "{deck.title}"</h1>
+        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+          {t('studySetup.title', { deckTitle: deck.title })}
+        </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {activeCount} card{activeCount === 1 ? '' : 's'} available
+          {t.plural('studySetup.cardsAvailable', activeCount, { count: activeCount })}
         </p>
       </div>
 
       <Card data-tour="study-mode">
         <CardBody>
-          <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">Study mode</h3>
+          <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">{t('studySetup.studyMode')}</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {STUDY_MODES.map((mode) => {
-              const info = STUDY_MODE_INFO[mode];
               const active = settings.mode === mode;
               return (
                 <button
@@ -122,10 +124,14 @@ export function StudySetupPage() {
                       : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700'
                   }`}
                 >
-                  <span className="text-xl">{info.icon}</span>
+                  <span className="text-xl">{STUDY_MODE_ICONS[mode]}</span>
                   <span>
-                    <span className="block text-sm font-semibold text-slate-900 dark:text-white">{info.label}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{info.description}</span>
+                    <span className="block text-sm font-semibold text-slate-900 dark:text-white">
+                      {t(`studyMode.${mode}` as const)}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                      {t(`studyMode.${mode}.description` as const)}
+                    </span>
                   </span>
                 </button>
               );
@@ -136,57 +142,57 @@ export function StudySetupPage() {
 
       <Card data-tour="study-pacing">
         <CardBody className="space-y-5">
-          <h3 className="font-semibold text-slate-900 dark:text-white">Card order & pacing</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-white">{t('studySetup.cardOrderPacing')}</h3>
 
-          <Field label="Shuffle">
+          <Field label={t('studySetup.shuffle')}>
             <Select value={settings.shuffle} onChange={(e) => update('shuffle', e.target.value as StudySettings['shuffle'])}>
               {SHUFFLE_MODES.map((mode) => (
                 <option key={mode} value={mode}>
-                  {SHUFFLE_MODE_LABELS[mode]}
+                  {t(`shuffleMode.${mode}` as const)}
                 </option>
               ))}
             </Select>
           </Field>
 
           <Slider
-            label="Card limit"
+            label={t('studySetup.cardLimit')}
             value={settings.filters.cardLimit}
             min={0}
             max={Math.max(20, activeCount)}
             step={5}
             onChange={(v) => updateFilters('cardLimit', v)}
-            formatValue={(v) => (v === 0 ? 'No limit' : `${v} cards`)}
+            formatValue={(v) => (v === 0 ? t('studySetup.noLimit') : t('studySetup.cardsUnit', { count: v }))}
           />
 
           <Switch
             checked={settings.timer.enabled}
             onChange={(v) => updateTimer('enabled', v)}
-            label="Timer"
-            description="Countdown per card"
+            label={t('studySetup.timer')}
+            description={t('studySetup.timerDescription')}
           />
           {settings.timer.enabled && (
             <Slider
-              label="Seconds per card"
+              label={t('studySetup.secondsPerCard')}
               value={settings.timer.perCardSeconds}
               min={5}
               max={90}
               step={5}
               onChange={(v) => updateTimer('perCardSeconds', v)}
-              formatValue={(v) => `${v}s`}
+              formatValue={(v) => t('studySetup.secondsUnit', { count: v })}
             />
           )}
 
-          <Switch checked={settings.reversed} onChange={(v) => update('reversed', v)} label="Reversed" description="Show the answer first, ask for the question" />
+          <Switch checked={settings.reversed} onChange={(v) => update('reversed', v)} label={t('studySetup.reversed')} description={t('studySetup.reversedDescription')} />
         </CardBody>
       </Card>
 
       <Card data-tour="study-filters">
         <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">Filters</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-white">{t('studySetup.filters')}</h3>
 
           {deck.categories.length > 0 && (
             <div>
-              <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Categories</p>
+              <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('studySetup.categories')}</p>
               <div className="flex flex-wrap gap-2">
                 {deck.categories.map((cat) => (
                   <Chip key={cat.id} active={settings.filters.categoryIds.includes(cat.id)} onClick={() => toggleCategory(cat.id)}>
@@ -198,60 +204,63 @@ export function StudySetupPage() {
           )}
 
           <div>
-            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Difficulty</p>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('studySetup.difficulty')}</p>
             <div className="flex flex-wrap gap-2">
               {DIFFICULTIES.map((d) => (
                 <Chip key={d} active={settings.filters.difficulties.includes(d)} onClick={() => toggleDifficulty(d)}>
-                  {d[0]?.toUpperCase() + d.slice(1)}
+                  {t(`difficulty.${d}` as const)}
                 </Chip>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Priority</p>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{t('studySetup.priority')}</p>
             <div className="flex flex-wrap gap-2">
               {PRIORITIES.map((p) => (
                 <Chip key={p} active={settings.filters.priorities.includes(p)} onClick={() => togglePriority(p)}>
-                  {p[0]?.toUpperCase() + p.slice(1)}
+                  {t(`priority.${p}` as const)}
                 </Chip>
               ))}
             </div>
           </div>
 
-          <Switch checked={settings.filters.starredOnly} onChange={(v) => updateFilters('starredOnly', v)} label="Starred only" />
-          <Switch checked={settings.filters.excludeMastered} onChange={(v) => updateFilters('excludeMastered', v)} label="Exclude mastered" description={`Skip cards at ${settings.filters.masteredThreshold}%+ mastery`} />
+          <Switch checked={settings.filters.starredOnly} onChange={(v) => updateFilters('starredOnly', v)} label={t('studySetup.starredOnly')} />
+          <Switch
+            checked={settings.filters.excludeMastered}
+            onChange={(v) => updateFilters('excludeMastered', v)}
+            label={t('studySetup.excludeMastered')}
+            description={t('studySetup.excludeMasteredDescription', { threshold: settings.filters.masteredThreshold })}
+          />
         </CardBody>
       </Card>
 
       <Card data-tour="study-scoring">
         <CardBody className="space-y-1">
-          <h3 className="mb-2 font-semibold text-slate-900 dark:text-white">Scoring</h3>
-          <Switch checked={settings.streakBonus} onChange={(v) => update('streakBonus', v)} label="Streak bonus" description="Extra points for consecutive correct answers" />
-          <Switch checked={settings.speedBonus} onChange={(v) => update('speedBonus', v)} label="Speed bonus" description="Extra points for fast answers" />
-          <Switch checked={settings.hintPenalty} onChange={(v) => update('hintPenalty', v)} label="Hint penalty" description="Deduct points when a hint is revealed" />
-          <Switch checked={settings.sound} onChange={(v) => update('sound', v)} label="Sound effects" />
+          <h3 className="mb-2 font-semibold text-slate-900 dark:text-white">{t('studySetup.scoring')}</h3>
+          <Switch checked={settings.streakBonus} onChange={(v) => update('streakBonus', v)} label={t('studySetup.streakBonus')} description={t('studySetup.streakBonusDescription')} />
+          <Switch checked={settings.speedBonus} onChange={(v) => update('speedBonus', v)} label={t('studySetup.speedBonus')} description={t('studySetup.speedBonusDescription')} />
+          <Switch checked={settings.hintPenalty} onChange={(v) => update('hintPenalty', v)} label={t('studySetup.hintPenalty')} description={t('studySetup.hintPenaltyDescription')} />
+          <Switch checked={settings.sound} onChange={(v) => update('sound', v)} label={t('studySetup.soundEffects')} />
         </CardBody>
       </Card>
 
       {matchingCount === 0 && (
         <FormNotice>
-          {activeCount === 0
-            ? 'Every card in this deck is suspended, so there is nothing to study yet.'
-            : 'No cards match these filters. Widen them to start studying.'}
+          {activeCount === 0 ? t('studySetup.allSuspended') : t('studySetup.noMatches')}
         </FormNotice>
       )}
 
       <div className="flex justify-end gap-3 pb-8">
         <Button variant="outline" onClick={() => navigate(`/app/decks/${deckId}`)}>
-          Cancel
+          {t('studySetup.cancel')}
         </Button>
         <Button size="lg" data-tour="study-start" onClick={handleStart} disabled={matchingCount === 0}>
-          Start studying
+          {t('studySetup.startStudying')}
         </Button>
       </div>
 
-      <TourOverlay open={tour.open} steps={STUDY_TOUR_STEPS} onFinish={tour.finish} />
+      <TourOverlay open={tour.open} steps={studyTourSteps(t)} onFinish={tour.finish} />
     </div>
   );
 }

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { cardTypeLabel, getAnswerText, getPromptText, type Flashcard } from '@autocards/core';
+import { isRetiredCardType, getAnswerText, getPromptText, type CardType, type Flashcard } from '@autocards/core';
 import { useTheme, useDifficultyColors, spacing } from '../../lib/theme';
+import { useT } from '../../lib/i18n';
 import { Badge, Button, Card, ProgressBar } from '../../components';
+
+/** Label for a type read back off a stored card, retired ones included — see `cardTypeLabel` in core. */
+function cardTypeLabelT(t: ReturnType<typeof useT>, type: string): string {
+  const key = (isRetiredCardType(type) ? 'basic' : type) as CardType;
+  return t(`cardType.${key}` as const);
+}
 
 /** Fisher-Yates on a copy, so the caller's array is left alone. */
 function shuffleIds(ids: string[]): string[] {
@@ -33,6 +40,7 @@ export function DeckFlashcardView({
   emptyState: ReactNode;
 }) {
   const theme = useTheme();
+  const t = useT();
   const difficultyColors = useDifficultyColors();
   const [shuffleOrder, setShuffleOrder] = useState<string[] | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -81,12 +89,12 @@ export function DeckFlashcardView({
     <View style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textMuted }}>
-          Card {safeIndex + 1} of {total}
-          {shuffleOrder && <Text style={{ fontSize: 11, color: theme.textFaint }}>  shuffled</Text>}
+          {t('flashcardView.cardOf', { current: safeIndex + 1, total })}
+          {shuffleOrder && <Text style={{ fontSize: 11, color: theme.textFaint }}>  {t('flashcardView.shuffled')}</Text>}
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Button title="🔀 Shuffle" variant="outline" size="sm" onPress={handleShuffle} disabled={deckCards.length < 2} />
-          {shuffleOrder && <Button title="Reset order" variant="ghost" size="sm" onPress={handleReset} />}
+          <Button title={t('flashcardView.shuffle')} variant="outline" size="sm" onPress={handleShuffle} disabled={deckCards.length < 2} />
+          {shuffleOrder && <Button title={t('flashcardView.resetOrder')} variant="ghost" size="sm" onPress={handleReset} />}
         </View>
       </View>
 
@@ -95,14 +103,14 @@ export function DeckFlashcardView({
       <Pressable onPress={() => setRevealed((v) => !v)}>
         <Card style={{ minHeight: 280, alignItems: 'center', justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.xl }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
-            <Badge label={cardTypeLabel(card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
+            <Badge label={cardTypeLabelT(t, card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
             <Badge
-              label={card.difficulty}
+              label={t(`difficulty.${card.difficulty}` as const)}
               color={difficultyColors[card.difficulty]}
               softColor={`${difficultyColors[card.difficulty]}22`}
             />
             {card.starred && <Text style={{ fontSize: 14 }}>⭐</Text>}
-            {card.suspended && <Badge label="Suspended" color={theme.warning} softColor={theme.warningSoft} />}
+            {card.suspended && <Badge label={t('flashcardView.suspended')} color={theme.warning} softColor={theme.warningSoft} />}
           </View>
 
           <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, textAlign: 'center' }}>
@@ -112,10 +120,10 @@ export function DeckFlashcardView({
           {revealed ? (
             <View style={{ width: '100%', borderTopWidth: 1, borderTopColor: theme.border, paddingTop: spacing.md }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: theme.primaryText, textTransform: 'uppercase' }}>
-                Answer
+                {t('flashcardView.answer')}
               </Text>
               <Text style={{ marginTop: spacing.xs, fontSize: 16, color: theme.text, textAlign: 'center' }}>
-                {answer || <Text style={{ fontStyle: 'italic', color: theme.textFaint }}>No answer set.</Text>}
+                {answer || <Text style={{ fontStyle: 'italic', color: theme.textFaint }}>{t('flashcardView.noAnswerSet')}</Text>}
               </Text>
               {card.explanation && (
                 <Text style={{ marginTop: spacing.sm, fontSize: 13, color: theme.textMuted, textAlign: 'center' }}>
@@ -124,22 +132,22 @@ export function DeckFlashcardView({
               )}
             </View>
           ) : (
-            <Text style={{ fontSize: 12, color: theme.textFaint }}>Tap the card to show the answer</Text>
+            <Text style={{ fontSize: 12, color: theme.textFaint }}>{t('flashcardView.tapToShow')}</Text>
           )}
         </Card>
       </Pressable>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xxl }}>
-        <Button title="← Back" variant="outline" onPress={() => go(-1)} disabled={total < 2} style={{ flex: 1 }} />
+        <Button title={t('flashcardView.back')} variant="outline" onPress={() => go(-1)} disabled={total < 2} style={{ flex: 1 }} />
         <View style={{ width: spacing.sm }} />
         <Button
-          title={revealed ? 'Hide answer' : 'Show answer'}
+          title={revealed ? t('flashcardView.hideAnswer') : t('flashcardView.showAnswer')}
           variant="outline"
           onPress={() => setRevealed((v) => !v)}
           style={{ flex: 1 }}
         />
         <View style={{ width: spacing.sm }} />
-        <Button title="Next →" variant="outline" onPress={() => go(1)} disabled={total < 2} style={{ flex: 1 }} />
+        <Button title={t('flashcardView.next')} variant="outline" onPress={() => go(1)} disabled={total < 2} style={{ flex: 1 }} />
       </View>
     </View>
   );

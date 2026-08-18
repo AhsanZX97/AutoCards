@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { Button, Field, Input } from '../../components/ui';
 import { GoogleButton } from './GoogleButton';
 import { OrDivider } from './OrDivider';
@@ -23,6 +24,7 @@ function returnTo(state: unknown): string {
 
 export function SignInPage() {
   const app = useApp();
+  const t = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const signIn = app.authStore((s) => s.signIn);
@@ -48,22 +50,22 @@ export function SignInPage() {
         <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
       )}
 
-      <GoogleButton next={returnTo(location.state)} label="Sign in with Google" />
+      <GoogleButton next={returnTo(location.state)} label={t('auth.signIn.google')} />
       <OrDivider />
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field label="Email">
+        <Field label={t('common.email')}>
           <Input
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             error={errorField === 'email' ? error ?? undefined : undefined}
           />
         </Field>
-        <Field label="Password">
+        <Field label={t('common.password')}>
           <Input
             type="password"
             required
@@ -79,18 +81,18 @@ export function SignInPage() {
             to="/forgot-password"
             className="text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-400"
           >
-            Forgot your password?
+            {t('auth.signIn.forgotPassword')}
           </Link>
         </div>
         <Button type="submit" className="w-full" loading={status === 'loading'}>
-          Sign in
+          {t('auth.signIn.submit')}
         </Button>
       </form>
 
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-        Don&apos;t have an account?{' '}
+        {t('auth.signIn.noAccount')}{' '}
         <Link to="/sign-up" className="font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
-          Sign up
+          {t('auth.signIn.signUpLink')}
         </Link>
       </p>
     </div>

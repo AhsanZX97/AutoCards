@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { useT } from '../../../src/lib/i18n';
 import { useTheme, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
 import { Button, Card, Chip, Field, Screen } from '../../../src/components';
@@ -13,6 +14,7 @@ type FilterMode = 'active' | 'archived';
 
 export default function DeckLibraryScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const decks = app.deckStore((s) => s.decks);
   const cardsByDeck = app.deckStore((s) => s.cardsByDeck);
@@ -34,27 +36,27 @@ export default function DeckLibraryScreen() {
 
   function handleDeckMenu(deck: (typeof decks)[number]) {
     Alert.alert(deck.title, undefined, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('mobileDeckLibrary.cancel'), style: 'cancel' },
       {
-        text: deck.archived ? 'Unarchive' : 'Archive',
+        text: deck.archived ? t('mobileDeckLibrary.unarchive') : t('mobileDeckLibrary.archive'),
         onPress: () => {
           archiveDeck(deck.id, !deck.archived);
-          toast({ variant: 'success', title: deck.archived ? 'Deck restored' : 'Deck archived' });
+          toast({ variant: 'success', title: deck.archived ? t('mobileDeckLibrary.deckRestored') : t('mobileDeckLibrary.deckArchived') });
         },
       },
       {
-        text: 'Delete',
+        text: t('mobileDeckLibrary.delete'),
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Delete deck', `Delete "${deck.title}"? This cannot be undone.`, [
-            { text: 'Cancel', style: 'cancel' },
+          Alert.alert(t('mobileDeckLibrary.deleteDeckTitle'), t('mobileDeckLibrary.confirmDelete', { title: deck.title }), [
+            { text: t('mobileDeckLibrary.cancel'), style: 'cancel' },
             {
-              text: 'Delete',
+              text: t('mobileDeckLibrary.delete'),
               style: 'destructive',
               onPress: () => {
                 deleteDeck(deck.id);
                 clearReminders(deck.id);
-                toast({ variant: 'success', title: 'Deck deleted' });
+                toast({ variant: 'success', title: t('mobileDeckLibrary.deckDeleted') });
               },
             },
           ]);
@@ -65,7 +67,7 @@ export default function DeckLibraryScreen() {
 
   async function handleImport() {
     if (!userId) {
-      toast({ variant: 'info', title: 'Sign in required', description: 'Import a deck after signing in.' });
+      toast({ variant: 'info', title: t('mobileDeckLibrary.signInRequiredTitle'), description: t('mobileDeckLibrary.signInRequiredBody') });
       return;
     }
     let result;
@@ -75,50 +77,54 @@ export default function DeckLibraryScreen() {
         copyToCacheDirectory: true,
       });
     } catch {
-      toast({ variant: 'error', title: 'Import failed', description: 'The document picker is unavailable.' });
+      toast({ variant: 'error', title: t('mobileDeckLibrary.importFailedTitle'), description: t('mobileDeckLibrary.pickerUnavailable') });
       return;
     }
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
     const payload = parseDeckExport(await readAssetText(asset));
     if (!payload) {
-      toast({ variant: 'error', title: 'Import failed', description: 'That file is not a valid deck.' });
+      toast({ variant: 'error', title: t('mobileDeckLibrary.importFailedTitle'), description: t('mobileDeckLibrary.invalidFile') });
       return;
     }
     if (payload.cards.length === 0 && payload.categories.length === 0) {
-      toast({ variant: 'error', title: 'Import failed', description: 'That deck file is empty.' });
+      toast({ variant: 'error', title: t('mobileDeckLibrary.importFailedTitle'), description: t('mobileDeckLibrary.emptyFile') });
       return;
     }
-    Alert.alert('Import deck', `${payload.title}\n${payload.cards.length} cards`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Import',
-        onPress: () => {
-          const deck = importDeck(payload, userId);
-          toast({ variant: 'success', title: 'Imported', description: `${deck.title} added to your decks.` });
-          router.push(`/(app)/decks/${deck.id}`);
+    Alert.alert(
+      t('mobileDeckLibrary.importDeckTitle'),
+      t('mobileDeckLibrary.importDeckMessage', { title: payload.title, count: payload.cards.length }),
+      [
+        { text: t('mobileDeckLibrary.cancel'), style: 'cancel' },
+        {
+          text: t('mobileDeckLibrary.importButton'),
+          onPress: () => {
+            const deck = importDeck(payload, userId);
+            toast({ variant: 'success', title: t('mobileDeckLibrary.importedTitle'), description: t('mobileDeckLibrary.importedBody', { title: deck.title }) });
+            router.push(`/(app)/decks/${deck.id}`);
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   return (
     <Screen>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: spacing.md }}>My Decks</Text>
-      <Field label="" placeholder="Search decks…" value={query} onChangeText={setQuery} />
+      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: spacing.md }}>{t('mobileDeckLibrary.title')}</Text>
+      <Field label="" placeholder={t('mobileDeckLibrary.searchPlaceholder')} value={query} onChangeText={setQuery} />
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
         <Button
-          title="Import"
+          title={t('mobileDeckLibrary.import')}
           variant="outline"
           onPress={handleImport}
           style={{ flexGrow: 1 }}
         />
-        <Button title="Create deck" onPress={() => router.push('/(app)/decks/new')} style={{ flexGrow: 2 }} />
+        <Button title={t('mobileDeckLibrary.createDeck')} onPress={() => router.push('/(app)/decks/new')} style={{ flexGrow: 2 }} />
       </View>
 
       <View style={{ flexDirection: 'row', marginBottom: spacing.md }}>
-        <Chip label="Active" active={filter === 'active'} onPress={() => setFilter('active')} />
-        <Chip label="Archived" active={filter === 'archived'} onPress={() => setFilter('archived')} />
+        <Chip label={t('mobileDeckLibrary.active')} active={filter === 'active'} onPress={() => setFilter('active')} />
+        <Chip label={t('mobileDeckLibrary.archived')} active={filter === 'archived'} onPress={() => setFilter('archived')} />
       </View>
 
       {filtered.length === 0 ? (
@@ -135,13 +141,13 @@ export default function DeckLibraryScreen() {
             }}
           >
             <Text style={{ fontSize: 28 }}>✨</Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textMuted }}>Create a new deck</Text>
-            <Button title="+ New Deck" onPress={() => router.push('/(app)/decks/new')} style={{ marginTop: spacing.xs }} />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textMuted }}>{t('mobileDeckLibrary.createNewDeck')}</Text>
+            <Button title={t('mobileDeckLibrary.newDeckButton')} onPress={() => router.push('/(app)/decks/new')} style={{ marginTop: spacing.xs }} />
           </View>
         ) : (
           <Card>
             <Text style={{ textAlign: 'center', color: theme.textMuted }}>
-              {filter === 'archived' ? 'Nothing archived yet.' : 'No decks found.'}
+              {filter === 'archived' ? t('mobileDeckLibrary.nothingArchived') : t('mobileDeckLibrary.noDecksFound')}
             </Text>
           </Card>
         )

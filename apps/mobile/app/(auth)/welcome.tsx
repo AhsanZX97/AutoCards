@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../src/components';
 import { spacing } from '../../src/lib/theme';
+import { useT } from '../../src/lib/i18n';
 
 /*
  * The landing screen for anyone signed out. It reuses the native splash
@@ -26,6 +27,7 @@ const SPLASH_BG = '#ffffff';
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={styles.root}>
@@ -34,8 +36,8 @@ export default function WelcomeScreen() {
       <Image source={require('../../assets/splash.png')} style={styles.art} resizeMode="contain" />
 
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.xl }]}>
-        <Button title="Create account" size="lg" onPress={() => router.push('/(auth)/sign-up')} />
-        <Button title="Sign in" variant="outline" size="lg" onPress={() => router.push('/(auth)/sign-in')} />
+        <Button title={t('auth.signUp.submit')} size="lg" onPress={() => router.push('/(auth)/sign-up')} />
+        <Button title={t('auth.signIn.submit')} variant="outline" size="lg" onPress={() => router.push('/(auth)/sign-in')} />
       </View>
     </View>
   );

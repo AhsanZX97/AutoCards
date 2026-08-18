@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useApp } from '../../src/lib/appContext';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Button, Field, Screen } from '../../src/components';
 
@@ -15,6 +16,7 @@ import { Button, Field, Screen } from '../../src/components';
  */
 export default function ForgotPasswordScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
 
   const [email, setEmail] = useState('');
@@ -43,7 +45,7 @@ export default function ForgotPasswordScreen() {
               textAlign: 'center',
             }}
           >
-            Check your email
+            {t('auth.forgotPassword.checkEmailTitle')}
           </Text>
           <Text
             style={{
@@ -54,9 +56,7 @@ export default function ForgotPasswordScreen() {
               lineHeight: 22,
             }}
           >
-            If there&apos;s an account for{' '}
-            <Text style={{ fontWeight: '700', color: theme.text }}>{email.trim()}</Text>, a link to
-            set a new password is on its way. It expires in an hour.
+            {t('auth.forgotPassword.checkEmailBody', { email: email.trim() })}
           </Text>
           <Text
             style={{
@@ -67,14 +67,14 @@ export default function ForgotPasswordScreen() {
               lineHeight: 20,
             }}
           >
-            Didn&apos;t arrive? Check your spam folder, or{' '}
+            {t('auth.forgotPassword.notArrived')}{' '}
             <Text style={{ color: theme.primaryText, fontWeight: '700' }} onPress={() => setSent(false)}>
-              try another address
+              {t('auth.forgotPassword.tryAnother')}
             </Text>
             .
           </Text>
           <Link href="/(auth)/sign-in" style={{ marginTop: spacing.xl }}>
-            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>Back to sign in</Text>
+            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>{t('auth.forgotPassword.backToSignIn')}</Text>
           </Link>
         </View>
       </Screen>
@@ -84,15 +84,15 @@ export default function ForgotPasswordScreen() {
   return (
     <Screen>
       <View style={{ marginBottom: spacing.xl, marginTop: spacing.xl }}>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text }}>Forgot your password?</Text>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text }}>{t('auth.forgotPassword.mobileTitle')}</Text>
         <Text style={{ fontSize: 15, color: theme.textMuted, marginTop: 4 }}>
-          Enter your email and we&apos;ll send you a link to set a new one.
+          {t('auth.forgotPassword.mobileSubtitle')}
         </Text>
       </View>
 
       <Field
-        label="Email"
-        placeholder="you@example.com"
+        label={t('common.email')}
+        placeholder={t('auth.emailPlaceholder')}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -101,7 +101,7 @@ export default function ForgotPasswordScreen() {
       />
 
       <Button
-        title="Send reset link"
+        title={t('auth.forgotPassword.submit')}
         onPress={onSubmit}
         loading={sending}
         disabled={!email.trim()}
@@ -109,9 +109,9 @@ export default function ForgotPasswordScreen() {
       />
 
       <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl }}>
-        <Text style={{ color: theme.textMuted }}>Remembered it? </Text>
+        <Text style={{ color: theme.textMuted }}>{t('auth.forgotPassword.remembered')} </Text>
         <Link href="/(auth)/sign-in">
-          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>Sign in</Text>
+          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>{t('auth.signIn.submit')}</Text>
         </Link>
       </View>
     </Screen>

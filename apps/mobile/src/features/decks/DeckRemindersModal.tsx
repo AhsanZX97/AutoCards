@@ -17,6 +17,7 @@ import {
   type Weekday,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { useTheme, radius, spacing } from '../../lib/theme';
 import { toast } from '../../lib/toastStore';
 import { requestNotificationPermission } from '../../lib/reminderNotifications';
@@ -29,6 +30,7 @@ import {
   TimeField,
   type SelectOption,
 } from '../../components';
+import type { Translator } from '@autocards/core';
 
 interface DeckRemindersModalProps {
   open: boolean;
@@ -42,14 +44,16 @@ interface DeckRemindersModalProps {
  * hints as the web's `DeckRemindersModal`, so a schedule set on one reads the
  * same on the other.
  */
-const CADENCE_OPTIONS: Array<{ kind: ReminderCadenceKind; label: string; hint: string }> = [
-  { kind: 'daily', label: 'Every day', hint: 'A steady habit — best for language and vocab decks.' },
-  { kind: 'weekdays', label: 'Weekdays', hint: 'Monday to Friday, nothing at the weekend.' },
-  { kind: 'weekly', label: 'Certain days', hint: 'Pick the days that suit your timetable.' },
-  { kind: 'monthly', label: 'Monthly', hint: 'A once-a-month sweep to keep old decks warm.' },
-  { kind: 'inactivity', label: 'If I fall behind', hint: 'Nothing while you keep up — a nudge when you stop.' },
-  { kind: 'once', label: 'Just once', hint: 'A single reminder, for an exam or a deadline.' },
-];
+function cadenceOptions(t: Translator): Array<{ kind: ReminderCadenceKind; label: string; hint: string }> {
+  return [
+    { kind: 'daily', label: t('reminders.cadence.daily'), hint: t('reminders.cadence.daily.hint') },
+    { kind: 'weekdays', label: t('reminders.cadence.weekdays'), hint: t('reminders.cadence.weekdays.hint') },
+    { kind: 'weekly', label: t('reminders.cadence.weekly'), hint: t('reminders.cadence.weekly.hint') },
+    { kind: 'monthly', label: t('reminders.cadence.monthly'), hint: t('reminders.cadence.monthly.hint') },
+    { kind: 'inactivity', label: t('reminders.cadence.inactivity'), hint: t('reminders.cadence.inactivity.hint') },
+    { kind: 'once', label: t('reminders.cadence.once'), hint: t('reminders.cadence.once.hint') },
+  ];
+}
 
 /** A starting shape for each cadence, so switching preset never needs a form reset. */
 function cadenceFor(kind: ReminderCadenceKind, current: ReminderCadence): ReminderCadence {
@@ -73,21 +77,31 @@ const DAY_OF_MONTH_OPTIONS: SelectOption[] = Array.from({ length: 31 }, (_, i) =
   label: `${i + 1}`,
 }));
 
-const INACTIVITY_OPTIONS: SelectOption[] = INACTIVITY_DAY_CHOICES.map((days) => ({
-  value: `${days}`,
-  label: `${days} days without studying`,
-}));
+function inactivityOptions(t: Translator): SelectOption[] {
+  return INACTIVITY_DAY_CHOICES.map((days) => ({
+    value: `${days}`,
+    label: t('mobileReminders.daysWithoutStudying', { days }),
+  }));
+}
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
 
 /** Today and the next eight weeks — the horizon a "just once" reminder is set on. */
-function onceDateOptions(now: Date): SelectOption[] {
+function onceDateOptions(t: Translator, now: Date): SelectOption[] {
   return Array.from({ length: 60 }, (_, offset) => {
     const day = new Date(now.getTime() + offset * 86_400_000);
     const value = toDateInput(day);
     const weekday = WEEKDAY_LABELS[WEEKDAYS[day.getDay()]!];
     const label =
-      offset === 0 ? `Today (${weekday})` : offset === 1 ? `Tomorrow (${weekday})` : `${weekday} ${day.getDate()} ${MONTHS[day.getMonth()]}`;
+      offset === 0
+        ? t('mobileReminders.today', { weekday })
+        : offset === 1
+          ? t('mobileReminders.tomorrow', { weekday })
+          : t('mobileReminders.dateLabel', {
+              weekday,
+              day: day.getDate(),
+              month: t(`mobileReminders.month.${MONTH_KEYS[day.getMonth()] ?? 'jan'}` as const),
+            });
     return { value, label };
   });
 }
@@ -101,6 +115,7 @@ function onceDateOptions(now: Date): SelectOption[] {
  */
 export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRemindersModalProps) {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const reminders = app.reminderStore((s) => s.remindersByDeck[deckId]);
   const addReminder = app.reminderStore((s) => s.addReminder);
@@ -138,7 +153,7 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
 
   function handleDelete(reminder: DeckReminder) {
     removeReminder(deckId, reminder.id);
-    toast({ variant: 'success', title: 'Reminder deleted' });
+    toast({ variant: 'success', title: t('mobileReminders.deleted') });
   }
 
   function handleSave() {
@@ -146,10 +161,10 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
     const reminder = { ...draft, timeZone: localTimeZone() };
     if (isNew) {
       addReminder(reminder);
-      toast({ variant: 'success', title: 'Reminder added', description: describeCadence(reminder) });
+      toast({ variant: 'success', title: t('mobileReminders.added'), description: describeCadence(reminder) });
     } else {
       updateReminder(reminder);
-      toast({ variant: 'success', title: 'Reminder updated', description: describeCadence(reminder) });
+      toast({ variant: 'success', title: t('mobileReminders.updated'), description: describeCadence(reminder) });
     }
     // Asked on save rather than on open: by now there is a schedule worth
     // being interrupted for, which is the only context in which the OS prompt
@@ -167,14 +182,14 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
     <Modal
       open={open}
       onClose={onClose}
-      title={draft ? (isNew ? 'New reminder' : 'Edit reminder') : 'Study reminders'}
+      title={draft ? (isNew ? t('mobileReminders.newTitle') : t('mobileReminders.editTitle')) : t('mobileReminders.listTitle')}
       description={deckTitle}
       footer={
         draft ? (
           <>
-            <Button title="Cancel" variant="ghost" onPress={() => setDraft(null)} style={{ flex: 1 }} />
+            <Button title={t('mobileReminders.cancel')} variant="ghost" onPress={() => setDraft(null)} style={{ flex: 1 }} />
             <Button
-              title={isNew ? 'Add reminder' : 'Save changes'}
+              title={isNew ? t('mobileReminders.addReminder') : t('mobileReminders.saveChanges')}
               onPress={handleSave}
               disabled={incomplete}
               style={{ flex: 1.5 }}
@@ -183,30 +198,29 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
         ) : (
           <>
             <Button
-              title="+ Add reminder"
+              title={t('mobileReminders.addReminderButton')}
               variant="outline"
               onPress={startAdding}
               disabled={isFull}
               style={{ flex: 1.5 }}
             />
-            <Button title="Done" onPress={onClose} style={{ flex: 1 }} />
+            <Button title={t('mobileReminders.done')} onPress={onClose} style={{ flex: 1 }} />
           </>
         )
       }
     >
       {draft ? (
-        <ReminderEditor draft={draft} onChange={setDraft} lastStudiedAt={lastStudiedAt} now={now} />
+        <ReminderEditor t={t} draft={draft} onChange={setDraft} lastStudiedAt={lastStudiedAt} now={now} />
       ) : saved.length === 0 ? (
         <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
           <Text style={{ fontSize: 30 }}>🔔</Text>
           <Text style={{ marginTop: spacing.md, fontSize: 15, fontWeight: '700', color: theme.text }}>
-            No reminders on this deck yet
+            {t('mobileReminders.emptyTitle')}
           </Text>
           <Text
             style={{ marginTop: 4, fontSize: 13, color: theme.textMuted, textAlign: 'center' }}
           >
-            Add one and your phone will nudge you when it&apos;s time to study — daily, on set days,
-            or just once before an exam.
+            {t('mobileReminders.emptyBody')}
           </Text>
         </View>
       ) : (
@@ -227,8 +241,8 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
                   {describeCadence(reminder)}
                 </Text>
                 <Text style={{ marginTop: 2, fontSize: 12, color: theme.textMuted }}>
-                  {next ? `Next ${formatNextReminder(next, now)}` : 'Already sent — nothing more to come'}
-                  {reminder.emailEnabled ? ' · notification and email' : ' · notification only'}
+                  {next ? t('mobileReminders.next', { when: formatNextReminder(next, now) }) : t('mobileReminders.alreadySent')}
+                  {reminder.emailEnabled ? t('mobileReminders.notificationAndEmail') : t('mobileReminders.notificationOnly')}
                 </Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.lg, marginTop: spacing.sm }}>
                   <Pressable
@@ -237,10 +251,10 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
                       setIsNew(false);
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.primaryText }}>Edit</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.primaryText }}>{t('mobileReminders.edit')}</Text>
                   </Pressable>
                   <Pressable onPress={() => handleDelete(reminder)}>
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.danger }}>Delete</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.danger }}>{t('mobileReminders.delete')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -248,8 +262,8 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
           })}
           <Text style={{ fontSize: 12, color: theme.textFaint }}>
             {isFull
-              ? `That's the limit of ${MAX_REMINDERS_PER_DECK} reminders on one deck.`
-              : `${saved.length} of ${MAX_REMINDERS_PER_DECK} reminders used.`}
+              ? t('mobileReminders.limitReached', { max: MAX_REMINDERS_PER_DECK })
+              : t('mobileReminders.usedOf', { used: saved.length, max: MAX_REMINDERS_PER_DECK })}
           </Text>
         </View>
       )}
@@ -258,11 +272,13 @@ export function DeckRemindersModal({ open, onClose, deckId, deckTitle }: DeckRem
 }
 
 function ReminderEditor({
+  t,
   draft,
   onChange,
   lastStudiedAt,
   now,
 }: {
+  t: Translator;
   draft: DeckReminder;
   onChange: (reminder: DeckReminder) => void;
   lastStudiedAt?: string;
@@ -270,7 +286,7 @@ function ReminderEditor({
 }) {
   const theme = useTheme();
   const next = nextReminderAt(draft, { now, lastStudiedAt });
-  const dateOptions = useMemo(() => onceDateOptions(now), [now.toDateString()]);
+  const dateOptions = useMemo(() => onceDateOptions(t, now), [t, now.toDateString()]);
 
   function patch(changes: Partial<DeckReminder>) {
     onChange({ ...draft, ...changes });
@@ -287,10 +303,10 @@ function ReminderEditor({
   return (
     <View style={{ paddingBottom: spacing.sm }}>
       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.sm }}>
-        How often
+        {t('mobileReminders.howOften')}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {CADENCE_OPTIONS.map((option) => (
+        {cadenceOptions(t).map((option) => (
           <Chip
             key={option.kind}
             label={option.label}
@@ -300,7 +316,7 @@ function ReminderEditor({
         ))}
       </View>
       <Text style={{ fontSize: 12, color: theme.textFaint, marginBottom: spacing.lg }}>
-        {CADENCE_OPTIONS.find((o) => o.kind === draft.cadence.kind)?.hint}
+        {cadenceOptions(t).find((o) => o.kind === draft.cadence.kind)?.hint}
       </Text>
 
       {/* At most one of these ever shows — the extra control the chosen cadence
@@ -308,7 +324,7 @@ function ReminderEditor({
       {draft.cadence.kind === 'weekly' && (
         <View style={{ marginBottom: spacing.md }}>
           <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.sm }}>
-            Which days
+            {t('mobileReminders.whichDays')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {WEEKDAYS.map((day) => (
@@ -325,8 +341,8 @@ function ReminderEditor({
 
       {draft.cadence.kind === 'monthly' && (
         <SelectField
-          label="Day of the month"
-          hint="29th–31st fall back"
+          label={t('mobileReminders.dayOfMonth')}
+          hint={t('mobileReminders.dayOfMonthHint')}
           value={`${draft.cadence.dayOfMonth}`}
           options={DAY_OF_MONTH_OPTIONS}
           onChange={(value) => patch({ cadence: { kind: 'monthly', dayOfMonth: Number(value) } })}
@@ -335,17 +351,17 @@ function ReminderEditor({
 
       {draft.cadence.kind === 'inactivity' && (
         <SelectField
-          label="Nudge me after"
-          hint="From your last session"
+          label={t('mobileReminders.nudgeAfter')}
+          hint={t('mobileReminders.nudgeAfterHint')}
           value={`${draft.cadence.afterDays}`}
-          options={INACTIVITY_OPTIONS}
+          options={inactivityOptions(t)}
           onChange={(value) => patch({ cadence: { kind: 'inactivity', afterDays: Number(value) } })}
         />
       )}
 
       {draft.cadence.kind === 'once' && (
         <SelectField
-          label="On this date"
+          label={t('mobileReminders.onThisDate')}
           value={draft.cadence.date}
           options={dateOptions}
           onChange={(value) => patch({ cadence: { kind: 'once', date: value } })}
@@ -353,15 +369,15 @@ function ReminderEditor({
       )}
 
       <TimeField
-        label="Time of day"
+        label={t('mobileReminders.timeOfDay')}
         hint={draft.timeZone || localTimeZone()}
         value={draft.timeOfDay}
         onChange={(value) => patch({ timeOfDay: value })}
       />
 
       <SwitchRow
-        label="Email me as well"
-        description="The notification always arrives on this phone. Turn this on to get an email too."
+        label={t('mobileReminders.emailMeToo')}
+        description={t('mobileReminders.emailMeTooDescription')}
         value={draft.emailEnabled}
         onValueChange={(value) => patch({ emailEnabled: value })}
       />
@@ -377,7 +393,7 @@ function ReminderEditor({
         }}
       >
         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>
-          {next ? `Next reminder ${formatNextReminder(next, now)}` : 'Pick at least one day'}
+          {next ? t('mobileReminders.nextReminder', { when: formatNextReminder(next, now) }) : t('mobileReminders.pickOneDay')}
         </Text>
         {next && (
           <Text style={{ marginTop: 2, fontSize: 12, color: theme.textMuted }}>{describeCadence(draft)}</Text>

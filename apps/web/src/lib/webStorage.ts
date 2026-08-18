@@ -1,5 +1,15 @@
-import type { StorageAdapter } from '@autocards/core';
+import { createTranslator, resolveLocale, type StorageAdapter } from '@autocards/core';
 import { toast } from '../components/ui/toastStore';
+
+/**
+ * This runs before the app object — and its settings store — exists, so it
+ * can't read the user's language preference. Falls back to the device
+ * language, same as the error boundary.
+ */
+function storageT() {
+  const deviceLocales = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language];
+  return createTranslator(resolveLocale('system', deviceLocales));
+}
 
 /**
  * `localStorage` is not always there, and not always writable.
@@ -22,19 +32,18 @@ let warned = false;
 function warnOnce(reason: 'unavailable' | 'full'): void {
   if (warned) return;
   warned = true;
+  const t = storageT();
   toast(
     reason === 'full'
       ? {
           variant: 'error',
-          title: 'This browser is out of storage space',
-          description:
-            'Auto Cards can’t save anything else locally. Your synced decks are safe — delete a deck you no longer study to make room.',
+          title: t('storage.fullTitle'),
+          description: t('storage.fullBody'),
         }
       : {
           variant: 'error',
-          title: 'This browser isn’t saving anything locally',
-          description:
-            'Private browsing or blocked site data. Signed in, your decks still sync — signed out, nothing on this device will be kept.',
+          title: t('storage.unavailableTitle'),
+          description: t('storage.unavailableBody'),
         },
   );
 }

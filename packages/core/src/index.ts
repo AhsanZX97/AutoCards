@@ -4,6 +4,7 @@ export * from './lib/random';
 export * from './lib/date';
 export * from './lib/text';
 export * from './lib/theme';
+export * from './i18n';
 export * from './lib/deckTransfer';
 export * from './lib/storage';
 export * from './domain';

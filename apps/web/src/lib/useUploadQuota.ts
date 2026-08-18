@@ -5,6 +5,7 @@ import {
   usageForPeriod,
   usagePeriod,
   type App,
+  type Translator,
   type UploadQuotaSnapshot,
 } from '@autocards/core';
 import { useApp } from './appContext';
@@ -99,8 +100,8 @@ export function useUploadQuota(): UploadQuota {
   };
 }
 
-/** "3 of 5" / "12 of unlimited", for the meter shown next to an upload box. */
-export function formatQuota(quota: UploadQuota): string {
-  if (quota.limit === Number.POSITIVE_INFINITY) return `${quota.used} used this month`;
-  return `${quota.remaining} of ${quota.limit} uploads left this month`;
+/** "3 of 5" / "12 used this month", for the meter shown next to an upload box. */
+export function formatQuota(t: Translator, quota: UploadQuota): string {
+  if (quota.limit === Number.POSITIVE_INFINITY) return t('quota.usedThisMonth', { used: quota.used });
+  return t('quota.remainingOfLimit', { remaining: quota.remaining, limit: quota.limit });
 }

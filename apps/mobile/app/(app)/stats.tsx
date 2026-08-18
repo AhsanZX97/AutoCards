@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { computeAchievements, computeOverallStats } from '@autocards/core';
+import { computeAchievements, computeOverallStats, type MessageKey } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
+import { useT } from '../../src/lib/i18n';
 import { ACCENT_HEX, BRAND_GRADIENT, useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
 import { Badge, Card, CheckIcon, IconTile, ProgressBar, Screen } from '../../src/components';
 import { ActivityHeatmap } from '../../src/features/stats/ActivityHeatmap';
 
 export default function StatsScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const history = app.studyStore((s) => s.history);
   const decks = app.deckStore((s) => s.decks);
@@ -19,9 +21,9 @@ export default function StatsScreen() {
 
   return (
     <Screen>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Statistics</Text>
+      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>{t('stats.title')}</Text>
       <Text style={{ fontSize: 14, color: theme.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-        Your learning overview
+        {t('mobileStats.subtitle')}
       </Text>
 
       <Card style={{ marginBottom: spacing.md, padding: 0, overflow: 'hidden' }}>
@@ -43,18 +45,18 @@ export default function StatsScreen() {
               >
                 <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>{stats.level.level}</Text>
               </LinearGradient>
-              <Text style={{ fontWeight: '700', color: theme.text }}>Level {stats.level.level}</Text>
+              <Text style={{ fontWeight: '700', color: theme.text }}>{t('stats.level', { level: stats.level.level })}</Text>
             </View>
             <Text style={{ color: theme.textFaint, fontSize: 12, fontWeight: '600' }}>
-              {stats.level.xpIntoLevel}/{stats.level.xpForNextLevel} XP
+              {t('stats.xpProgress', { into: stats.level.xpIntoLevel, needed: stats.level.xpForNextLevel })}
             </Text>
           </View>
           <ProgressBar value={stats.level.progress * 100} max={100} height={8} />
         </View>
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.border }}>
-          <StatPill label="Total XP" value={stats.totalXp} theme={theme} />
-          <StatPill label="Sessions" value={stats.totalSessions} theme={theme} divider />
-          <StatPill label="Minutes" value={stats.totalMinutes} theme={theme} divider />
+          <StatPill label={t('stats.totalXp')} value={stats.totalXp} theme={theme} />
+          <StatPill label={t('stats.sessions')} value={stats.totalSessions} theme={theme} divider />
+          <StatPill label={t('stats.minutes')} value={stats.totalMinutes} theme={theme} divider />
         </View>
       </Card>
 
@@ -64,7 +66,7 @@ export default function StatsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 28, fontWeight: '800', color: theme.text }}>{stats.streak.current}</Text>
             <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 2 }}>
-              day streak · <Text style={{ color: theme.text, fontWeight: '700' }}>best {stats.streak.longest}</Text>
+              {t('mobileStats.dayStreak')} <Text style={{ color: theme.text, fontWeight: '700' }}>{t('mobileStats.best', { count: stats.streak.longest })}</Text>
             </Text>
           </View>
           {studiedToday && (
@@ -78,7 +80,7 @@ export default function StatsScreen() {
                   letterSpacing: 0.5,
                 }}
               >
-                Today
+                {t('mobileStats.today')}
               </Text>
               <LinearGradient
                 colors={[...BRAND_GRADIENT]}
@@ -100,22 +102,22 @@ export default function StatsScreen() {
         </View>
         {stats.streak.atRisk && (
           <View style={{ marginTop: spacing.md }}>
-            <Badge label="Study today to keep it!" color={theme.warning} softColor={theme.warningSoft} />
+            <Badge label={t('stats.studyTodayToKeep')} color={theme.warning} softColor={theme.warningSoft} />
           </View>
         )}
       </Card>
 
-      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>Activity</Text>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>{t('stats.activity')}</Text>
       <Card style={{ marginBottom: spacing.md }}>
         <ActivityHeatmap activity={stats.activity} />
       </Card>
 
       <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>
-        Performance by deck
+        {t('stats.performanceByDeck')}
       </Text>
       <Card style={{ marginBottom: spacing.md }}>
         {stats.perDeck.length === 0 ? (
-          <Text style={{ color: theme.textFaint, textAlign: 'center' }}>No sessions yet.</Text>
+          <Text style={{ color: theme.textFaint, textAlign: 'center' }}>{t('mobileStats.noSessionsYet')}</Text>
         ) : (
           <View style={{ gap: spacing.md }}>
             {stats.perDeck.map((deckStat) => {
@@ -129,7 +131,10 @@ export default function StatsScreen() {
                       {deckStat.deckTitle}
                     </Text>
                     <Text style={{ fontSize: 11, color: theme.textFaint }}>
-                      {deckStat.sessions} session{deckStat.sessions === 1 ? '' : 's'} · {Math.round(deckStat.accuracy * 100)}%
+                      {t.plural('mobileStats.sessionsAndAccuracy', deckStat.sessions, {
+                        count: deckStat.sessions,
+                        accuracy: Math.round(deckStat.accuracy * 100),
+                      })}
                     </Text>
                   </View>
                   <Text style={{ color: accentColor, fontWeight: '700', fontSize: 13 }}>{deckStat.xp} XP</Text>
@@ -140,7 +145,7 @@ export default function StatsScreen() {
         )}
       </Card>
 
-      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>Achievements</Text>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: spacing.sm }}>{t('stats.achievements')}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {achievements.map((a) => (
           <Card
@@ -155,7 +160,7 @@ export default function StatsScreen() {
           >
             <IconTile icon={a.icon} color={theme.primary} size={40} fontSize={18} />
             <Text style={{ fontSize: 10, fontWeight: '700', color: theme.text, marginTop: spacing.xs, textAlign: 'center' }}>
-              {a.name}
+              {t(`achievement.${a.id}` as MessageKey)}
             </Text>
             {!a.unlocked && (
               <View style={{ alignSelf: 'stretch', marginTop: spacing.sm }}>

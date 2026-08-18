@@ -1,4 +1,5 @@
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { Button } from '../../components/ui';
 
 /** Google's mark, in its four colours. Their brand terms require it as-is. */
@@ -36,11 +37,13 @@ function GoogleMark() {
  * `next` is where to land afterwards, carried through the round trip in the
  * return URL because a redirect off-site loses the router's state object.
  */
-export function GoogleButton({ next = '/app', label = 'Continue with Google' }: {
+export function GoogleButton({ next = '/app', label }: {
   next?: string;
   label?: string;
 }) {
   const app = useApp();
+  const t = useT();
+  const resolvedLabel = label ?? t('auth.signIn.google');
   const signInWithGoogle = app.authStore((s) => s.signInWithGoogle);
   const status = app.authStore((s) => s.status);
 
@@ -56,7 +59,7 @@ export function GoogleButton({ next = '/app', label = 'Continue with Google' }: 
   return (
     <Button type="button" variant="outline" className="w-full" loading={status === 'loading'} onClick={start}>
       {status !== 'loading' && <GoogleMark />}
-      {label}
+      {resolvedLabel}
     </Button>
   );
 }

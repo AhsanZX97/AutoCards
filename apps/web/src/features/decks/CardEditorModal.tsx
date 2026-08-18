@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  CARD_TYPE_LABELS,
   CARD_TYPES,
   DIFFICULTIES,
   createId,
@@ -13,6 +12,7 @@ import { Button, Field, Input, Modal, Select, Switch, Textarea } from '../../com
 import { Chip } from '../../components/ui/Chip';
 import { toast } from '../../components/ui/toastStore';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 
 interface CardEditorModalProps {
   open: boolean;
@@ -28,6 +28,7 @@ function emptyChoice(): Choice {
 
 export function CardEditorModal({ open, onClose, onSave, initial, categories }: CardEditorModalProps) {
   const app = useApp();
+  const t = useT();
   // A card written when cloze still existed opens as the plain question and
   // answer it becomes, rather than as a type the picker can no longer show.
   const [draft, setDraft] = useState<CardDraft>(() => demoteRetiredCard(initial ?? blankDraft()));
@@ -67,7 +68,7 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
     } catch (error) {
       toast({
         variant: 'error',
-        title: error instanceof Error ? error.message : 'Could not generate a choice',
+        title: error instanceof Error ? error.message : t('cardEditor.suggestChoiceFailed'),
       });
     } finally {
       setSuggestingChoice(false);
@@ -84,41 +85,41 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? 'Edit card' : 'New card'}
+      title={initial ? t('cardEditor.editTitle') : t('cardEditor.newTitle')}
       size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('cardEditor.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={!isValid}>
-            Save card
+            {t('cardEditor.saveCard')}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
-        <Field label="Card type">
+        <Field label={t('cardEditor.cardType')}>
           <Select value={draft.type} onChange={(e) => update('type', e.target.value as CardDraft['type'])}>
             {CARD_TYPES.map((type) => (
               <option key={type} value={type}>
-                {CARD_TYPE_LABELS[type]}
+                {t(`cardType.${type}` as const)}
               </option>
             ))}
           </Select>
         </Field>
 
-        <Field label="Front">
-          <Textarea rows={2} value={draft.front} onChange={(e) => update('front', e.target.value)} placeholder="Question or prompt" />
+        <Field label={t('cardEditor.front')}>
+          <Textarea rows={2} value={draft.front} onChange={(e) => update('front', e.target.value)} placeholder={t('cardEditor.frontPlaceholder')} />
         </Field>
-        <Field label="Back">
-          <Textarea rows={2} value={draft.back} onChange={(e) => update('back', e.target.value)} placeholder="Answer" />
+        <Field label={t('cardEditor.back')}>
+          <Textarea rows={2} value={draft.back} onChange={(e) => update('back', e.target.value)} placeholder={t('cardEditor.backPlaceholder')} />
         </Field>
 
         {(draft.type === 'multiple-choice' || draft.type === 'true-false') && (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Choices</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('cardEditor.choices')}</p>
               {draft.type === 'multiple-choice' && (
                 <div className="flex items-center gap-3">
                   <button
@@ -126,10 +127,10 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
                     disabled={suggestingChoice}
                     className="text-xs font-semibold text-brand-700 hover:text-brand-600 disabled:opacity-50 dark:text-brand-400"
                   >
-                    {suggestingChoice ? 'Thinking…' : '+ AI choice'}
+                    {suggestingChoice ? t('cardEditor.thinking') : t('cardEditor.aiChoice')}
                   </button>
                   <button onClick={addChoice} className="text-xs font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-400">
-                    + Add choice
+                    {t('cardEditor.addChoice')}
                   </button>
                 </div>
               )}
@@ -147,7 +148,7 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
                     className="flex-1"
                     value={choice.text}
                     onChange={(e) => updateChoice(choice.id, { text: e.target.value })}
-                    placeholder="Choice text"
+                    placeholder={t('cardEditor.choiceTextPlaceholder')}
                     disabled={draft.type === 'true-false'}
                   />
                   {draft.type === 'multiple-choice' && (draft.choices?.length ?? 0) > 2 && (
@@ -162,28 +163,28 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
         )}
 
         {draft.type === 'type-in' && (
-          <Field label="Accepted answers" hint="Comma separated">
+          <Field label={t('cardEditor.acceptedAnswers')} hint={t('cardEditor.acceptedAnswersHint')}>
             <Input
               value={(draft.acceptedAnswers ?? []).join(', ')}
               onChange={(e) => update('acceptedAnswers', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-              placeholder="mitochondria, the mitochondria"
+              placeholder={t('cardEditor.acceptedAnswersPlaceholder')}
             />
           </Field>
         )}
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Difficulty">
+          <Field label={t('cardEditor.difficulty')}>
             <Select value={draft.difficulty} onChange={(e) => update('difficulty', e.target.value as CardDraft['difficulty'])}>
               {DIFFICULTIES.map((d) => (
                 <option key={d} value={d}>
-                  {d[0]?.toUpperCase() + d.slice(1)}
+                  {t(`difficulty.${d}` as const)}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Category">
+          <Field label={t('cardEditor.category')}>
             <Select value={draft.categoryId ?? ''} onChange={(e) => update('categoryId', e.target.value || undefined)}>
-              <option value="">No category</option>
+              <option value="">{t('cardEditor.noCategory')}</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.icon} {cat.name}
@@ -193,20 +194,20 @@ export function CardEditorModal({ open, onClose, onSave, initial, categories }: 
           </Field>
         </div>
 
-        <Field label="Hint" hint="optional">
+        <Field label={t('cardEditor.hint')} hint={t('common.optional')}>
           <Input value={draft.hint ?? ''} onChange={(e) => update('hint', e.target.value)} />
         </Field>
 
-        <Field label="Explanation" hint="optional">
+        <Field label={t('cardEditor.explanation')} hint={t('common.optional')}>
           <Textarea rows={2} value={draft.explanation ?? ''} onChange={(e) => update('explanation', e.target.value)} />
         </Field>
 
         <div className="flex items-center gap-6">
           <Chip active={draft.starred ?? false} onClick={() => update('starred', !draft.starred)}>
-            ⭐ Starred
+            {t('cardEditor.starred')}
           </Chip>
           <Chip active={draft.suspended ?? false} onClick={() => update('suspended', !draft.suspended)}>
-            ⏸ Suspended
+            {t('cardEditor.suspended')}
           </Chip>
         </div>
       </div>

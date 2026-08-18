@@ -1,54 +1,28 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { PLAN_LIMITS, type Plan } from '@autocards/core';
+import { PLAN_LIMITS, type Plan, type Translator } from '@autocards/core';
 import { BrandButton } from '../../components/ui';
+import { useT } from '../../lib/i18n';
 
-const FEATURES = [
-  {
-    icon: '⚡',
-    title: 'Instant Generation',
-    description: 'Upload slides, notes or a chapter and get a full deck in seconds. No formatting needed.',
-  },
-  {
-    icon: '🧠',
-    title: 'Adaptive Learning',
-    description: 'Our spaced-repetition engine surfaces cards right before you forget them.',
-  },
-  {
-    icon: '📊',
-    title: 'Progress Insights',
-    description: 'Track retention rates, streaks, and weak spots across every deck you own.',
-  },
-  {
-    icon: '🔗',
-    title: 'Share a deck',
-    description: 'Send anyone a link and they get their own copy to study. No accounts to juggle, no invites.',
-  },
-];
+function features(t: Translator) {
+  return [
+    { icon: '⚡', title: t('landing.features.instant.title'), description: t('landing.features.instant.description') },
+    { icon: '🧠', title: t('landing.features.adaptive.title'), description: t('landing.features.adaptive.description') },
+    { icon: '📊', title: t('landing.features.insights.title'), description: t('landing.features.insights.description') },
+    { icon: '🔗', title: t('landing.features.share.title'), description: t('landing.features.share.description') },
+  ];
+}
 
-const STEPS = [
-  {
-    step: '01',
-    title: 'Upload your material',
-    description:
-      'Drop in a PDF, a Word document, a slide deck or your notes. Add several at once and Auto Cards reads them together.',
-  },
-  {
-    step: '02',
-    title: 'AI builds your deck',
-    description:
-      'Our model extracts key concepts, generates questions, and organises them into a clean deck in seconds.',
-  },
-  {
-    step: '03',
-    title: 'Study and improve',
-    description:
-      'Rate each card and let the spaced-repetition engine schedule reviews so you retain everything long-term.',
-  },
-];
+function steps(t: Translator) {
+  return [
+    { step: '01', title: t('landing.steps.upload.title'), description: t('landing.steps.upload.description') },
+    { step: '02', title: t('landing.steps.build.title'), description: t('landing.steps.build.description') },
+    { step: '03', title: t('landing.steps.study.title'), description: t('landing.steps.study.description') },
+  ];
+}
 
-function formatLimit(value: number): string {
-  return value === Number.POSITIVE_INFINITY ? 'Unlimited' : value.toLocaleString();
+function formatLimit(t: Translator, value: number): string {
+  return value === Number.POSITIVE_INFINITY ? t('landing.pricing.unlimited') : value.toLocaleString();
 }
 
 /**
@@ -61,12 +35,12 @@ function formatLimit(value: number): string {
  * people away at these exact numbers, an inflated one here is a promise the
  * product visibly breaks, so there is only one place to change them.
  */
-function planFeatures(plan: Plan): string[] {
+function planFeatures(t: Translator, plan: Plan): string[] {
   const limits = PLAN_LIMITS[plan];
   return [
-    `${formatLimit(limits.monthlyUploads)} AI generations a month`,
-    `${formatLimit(limits.maxDecks)} decks`,
-    `${formatLimit(limits.maxPagesPerPdf)} pages per document`,
+    t('landing.pricing.generationsPerMonth', { count: formatLimit(t, limits.monthlyUploads) }),
+    t('landing.pricing.decksCount', { count: formatLimit(t, limits.maxDecks) }),
+    t('landing.pricing.pagesPerDocument', { count: formatLimit(t, limits.maxPagesPerPdf) }),
   ];
 }
 
@@ -77,43 +51,51 @@ function planFeatures(plan: Plan): string[] {
  * padding rather than as an upgrade. Still derived from `PLAN_LIMITS` for the
  * reason above — the numbers are not written twice.
  */
-function lifetimeFeatures(): string[] {
-  const pro = new Set(planFeatures('pro'));
-  return planFeatures('lifetime').filter((feature) => !pro.has(feature));
+function lifetimeFeatures(t: Translator): string[] {
+  const pro = new Set(planFeatures(t, 'pro'));
+  return planFeatures(t, 'lifetime').filter((feature) => !pro.has(feature));
 }
 
-const PLANS = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'Perfect for casual learners getting started.',
-    features: [...planFeatures('free'), 'Mobile app access'],
-    cta: 'Get started',
-    highlight: false,
-  },
-  {
-    name: 'Pro',
-    price: '$4',
-    period: 'per month',
-    description: 'For students who study seriously.',
-    features: [...planFeatures('pro'), 'Advanced analytics', 'PDF, Word & PowerPoint imports'],
-    cta: 'Get Pro',
-    highlight: true,
-  },
-  {
-    name: 'Lifetime',
-    price: '$39',
-    period: 'one-time',
-    description: 'Pay once and keep it. No renewals, no expiry.',
-    features: ['Everything in Pro', ...lifetimeFeatures(), 'Every future feature included'],
-    cta: 'Buy lifetime',
-    highlight: false,
-  },
-];
+function plans(t: Translator) {
+  return [
+    {
+      name: 'Free',
+      price: '$0',
+      period: t('landing.pricing.forever'),
+      description: t('landing.pricing.free.description'),
+      features: [...planFeatures(t, 'free'), t('landing.pricing.mobileAppAccess')],
+      cta: t('landing.pricing.getStarted'),
+      highlight: false,
+    },
+    {
+      name: 'Pro',
+      price: '$4',
+      period: t('landing.pricing.perMonth'),
+      description: t('landing.pricing.pro.description'),
+      features: [...planFeatures(t, 'pro'), t('landing.pricing.advancedAnalytics'), t('landing.pricing.fileImports')],
+      cta: t('landing.pricing.getPro'),
+      highlight: true,
+    },
+    {
+      name: 'Lifetime',
+      price: '$39',
+      period: t('landing.pricing.oneTime'),
+      description: t('landing.pricing.lifetime.description'),
+      features: [t('landing.pricing.everythingInPro'), ...lifetimeFeatures(t), t('landing.pricing.everyFutureFeature')],
+      cta: t('landing.pricing.buyLifetime'),
+      highlight: false,
+    },
+  ];
+}
 
-const REVIEW_GRADES = ['Again', 'Hard', 'Good', 'Easy'];
-const SUGGESTED_GRADE = 'Good';
+function reviewGrades(t: Translator) {
+  return [
+    t('landing.preview.grade.again'),
+    t('landing.preview.grade.hard'),
+    t('landing.preview.grade.good'),
+    t('landing.preview.grade.easy'),
+  ];
+}
 
 function ArrowRightIcon() {
   return (
@@ -157,7 +139,7 @@ function GooglePlayIcon() {
  * the page because "it's coming to phones" is worth saying, and a greyed badge
  * says it faster than a sentence.
  */
-function StoreBadge({ icon, store }: { icon: ReactNode; store: string }) {
+function StoreBadge({ icon, store, label }: { icon: ReactNode; store: string; label: string }) {
   return (
     <div
       aria-disabled="true"
@@ -165,7 +147,7 @@ function StoreBadge({ icon, store }: { icon: ReactNode; store: string }) {
     >
       {icon}
       <span className="text-left leading-tight">
-        <span className="block text-[10px] font-medium uppercase tracking-wide">Coming soon to</span>
+        <span className="block text-[10px] font-medium uppercase tracking-wide">{label}</span>
         <span className="block font-display text-sm font-semibold text-slate-500 dark:text-slate-400">{store}</span>
       </span>
     </div>
@@ -188,13 +170,14 @@ function CheckIcon({ highlight }: { highlight: boolean }) {
 }
 
 export function LandingPage() {
+  const t = useT();
   return (
     <>
       {/* Hero */}
       <section className="relative z-10 flex flex-col items-center px-6 pb-24 pt-20 text-center">
         <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-cyan-500/25 px-4 py-1.5 text-xs font-semibold tracking-wide text-cyan-600 brand-tint dark:text-cyan-400">
           <span className="h-1.5 w-1.5 rounded-full brand-gradient" />
-          AI-powered study, now in beta
+          {t('landing.betaBadge')}
         </div>
 
         <h1 className="mb-6 max-w-3xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
@@ -203,27 +186,26 @@ export function LandingPage() {
         </h1>
 
         <p className="mb-10 max-w-xl text-xl font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-2xl">
-          AI flashcards for you
+          {t('landing.tagline')}
         </p>
 
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <Link to="/sign-up">
             <BrandButton>
-              Create your first deck
+              {t('landing.createFirstDeck')}
               <ArrowRightIcon />
             </BrandButton>
           </Link>
           <a href="#how-it-works">
             <BrandButton variant="secondary">
               <QuestionIcon />
-              See how it works
+              {t('landing.seeHowItWorks')}
             </BrandButton>
           </a>
         </div>
 
         <p className="mt-8 text-xs font-medium tracking-wide text-slate-400 dark:text-slate-500">
-          Trusted by <span className="font-semibold text-slate-600 dark:text-slate-300">2,400+</span> students · No
-          credit card required
+          {t('landing.trustedBy', { count: (2_400).toLocaleString(t.locale) })}
         </p>
 
         {/*
@@ -244,28 +226,28 @@ export function LandingPage() {
                   <span className="text-xs font-bold text-white">AC</span>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Biology 101</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">24 cards · Generated from your notes</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('landing.preview.deckName')}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{t('landing.preview.deckMeta')}</p>
                 </div>
               </div>
               <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
-                87% retention
+                {t('landing.preview.retention', { percent: 87 })}
               </span>
             </div>
 
             <div className="mb-4 flex min-h-[120px] flex-col items-center justify-center rounded-xl border border-cyan-500/15 p-6 text-center brand-tint">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                Front
+                {t('landing.preview.front')}
               </p>
               <p className="font-display text-lg font-semibold text-slate-800 dark:text-slate-100">
-                What is the powerhouse of the cell?
+                {t('landing.preview.question')}
               </p>
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex gap-2">
-                {REVIEW_GRADES.map((label) => {
-                  const suggested = label === SUGGESTED_GRADE;
+                {reviewGrades(t).map((label, index) => {
+                  const suggested = index === 2; // "Good"
                   return (
                     <button
                       key={label}
@@ -281,7 +263,7 @@ export function LandingPage() {
                   );
                 })}
               </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Card 7 of 24</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">{t('landing.preview.cardOf', { current: 7, total: 24 })}</p>
             </div>
           </div>
         </div>
@@ -290,13 +272,13 @@ export function LandingPage() {
       {/* Features */}
       <section id="features" className="relative z-10 mx-auto max-w-6xl px-6 pb-28">
         <div className="mb-14 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">Why Auto Cards</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">{t('landing.features.eyebrow')}</p>
           <h2 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-4xl">
-            Built for how you actually revise
+            {t('landing.features.title')}
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((feature) => (
+          {features(t).map((feature) => (
             <div
               key={feature.title}
               className="rounded-2xl border border-slate-100 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:border-cyan-200/70 hover:shadow-lg hover:shadow-cyan-100/40 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-cyan-500/30 dark:hover:shadow-cyan-950/40"
@@ -316,13 +298,13 @@ export function LandingPage() {
       {/* How it works */}
       <section id="how-it-works" className="relative z-10 mx-auto max-w-5xl px-6 pb-28">
         <div className="mb-14 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">How it works</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">{t('landing.steps.eyebrow')}</p>
           <h2 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-4xl">
-            Three steps to mastery
+            {t('landing.steps.title')}
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-          {STEPS.map((item) => (
+          {steps(t).map((item) => (
             <div key={item.step} className="flex flex-col gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white brand-gradient">
@@ -344,15 +326,15 @@ export function LandingPage() {
       {/* Pricing */}
       <section id="pricing" className="relative z-10 mx-auto max-w-5xl px-6 pb-28">
         <div className="mb-14 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">Pricing</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">{t('landing.pricing.eyebrow')}</p>
           <h2 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-4xl">
-            Simple, transparent pricing
+            {t('landing.pricing.title')}
           </h2>
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Start free. Upgrade when you need more.</p>
+          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('landing.pricing.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => (
+          {plans(t).map((plan) => (
             <div
               key={plan.name}
               className={
@@ -363,7 +345,7 @@ export function LandingPage() {
             >
               {plan.highlight && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-xs font-bold text-white brand-gradient">
-                  Most popular
+                  {t('landing.pricing.mostPopular')}
                 </div>
               )}
               <div className="mb-6">
@@ -398,10 +380,10 @@ export function LandingPage() {
 
       {/* Mobile apps — temporarily parked here, see the note in the hero. */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 pb-28 text-center">
-        <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">Auto Cards is coming to your phone</p>
+        <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">{t('landing.mobile.comingSoon')}</p>
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <StoreBadge icon={<AppleIcon />} store="App Store" />
-          <StoreBadge icon={<GooglePlayIcon />} store="Google Play" />
+          <StoreBadge icon={<AppleIcon />} store={t('landing.mobile.appStore')} label={t('landing.mobile.badgeLabel')} />
+          <StoreBadge icon={<GooglePlayIcon />} store={t('landing.mobile.googlePlay')} label={t('landing.mobile.badgeLabel')} />
         </div>
       </section>
     </>

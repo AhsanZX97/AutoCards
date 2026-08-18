@@ -1,18 +1,19 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { BrandButton, ThemeToggle, Wordmark } from '../ui';
 import { DottedSpotlight } from './DottedSpotlight';
 
-const NAV_LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#how-it-works', label: 'How it works' },
-];
-
 export function MarketingLayout({ children }: { children: ReactNode }) {
   const app = useApp();
+  const t = useT();
   const isAuthed = app.authStore((s) => s.status === 'authenticated');
+  const NAV_LINKS = [
+    { href: '#features', label: t('nav.marketing.features') },
+    { href: '#pricing', label: t('nav.marketing.pricing') },
+    { href: '#how-it-works', label: t('nav.marketing.howItWorks') },
+  ];
 
   return (
     <DottedSpotlight>
@@ -37,7 +38,7 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
           <ThemeToggle />
           {isAuthed ? (
             <Link to="/app">
-              <BrandButton shape="pillSm">Go to app</BrandButton>
+              <BrandButton shape="pillSm">{t('nav.marketing.goToApp')}</BrandButton>
             </Link>
           ) : (
             <>
@@ -45,10 +46,10 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
                 to="/sign-in"
                 className="px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
               >
-                Sign in
+                {t('nav.marketing.signIn')}
               </Link>
               <Link to="/sign-up">
-                <BrandButton shape="pillSm">Get started free</BrandButton>
+                <BrandButton shape="pillSm">{t('nav.marketing.getStarted')}</BrandButton>
               </Link>
             </>
           )}
@@ -60,16 +61,16 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       <footer className="relative z-10 mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 border-t border-slate-100 px-8 py-8 dark:border-slate-800 sm:flex-row">
         <Wordmark className="text-sm" tailClassName="text-slate-500 dark:text-slate-400" />
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          © {new Date().getFullYear()} Auto Cards. All rights reserved.
+          {t('nav.marketing.allRightsReserved', { year: new Date().getFullYear() })}
         </p>
         <div className="flex gap-5 text-xs text-slate-400 dark:text-slate-500">
-          <Link to="/privacy" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Privacy</Link>
-          <Link to="/terms" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">Terms</Link>
+          <Link to="/privacy" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">{t('nav.marketing.privacy')}</Link>
+          <Link to="/terms" className="transition-colors hover:text-slate-600 dark:hover:text-slate-300">{t('nav.marketing.terms')}</Link>
           <a
             href="mailto:autocardssupport@gmail.com"
             className="transition-colors hover:text-slate-600 dark:hover:text-slate-300"
           >
-            Contact
+            {t('nav.marketing.contact')}
           </a>
         </div>
       </footer>

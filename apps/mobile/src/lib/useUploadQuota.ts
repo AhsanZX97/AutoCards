@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import {
   PLAN_LIMITS,
-  formatQuota as formatQuotaMessage,
   remainingUploads,
   usageForPeriod,
   usagePeriod,
   type App,
+  type Translator,
   type UploadQuotaSnapshot,
 } from '@autocards/core';
 import { useApp } from './appContext';
@@ -70,6 +70,7 @@ export function useUploadQuota(): UploadQuota {
 }
 
 /** "3 of 5 uploads left this month" / "12 used this month". */
-export function formatQuota(quota: UploadQuota): string {
-  return formatQuotaMessage(quota.remaining, quota.limit, quota.used);
+export function formatQuota(t: Translator, quota: UploadQuota): string {
+  if (quota.limit === Number.POSITIVE_INFINITY) return t('quota.usedThisMonth', { used: quota.used });
+  return t('quota.remainingOfLimit', { remaining: quota.remaining, limit: quota.limit });
 }

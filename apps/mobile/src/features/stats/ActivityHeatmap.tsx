@@ -1,6 +1,7 @@
 import { ScrollView, Text, View } from 'react-native';
 import type { DayActivity } from '@autocards/core';
 import { useResolvedScheme, useTheme, spacing } from '../../lib/theme';
+import { useT } from '../../lib/i18n';
 
 interface ActivityHeatmapProps {
   activity: DayActivity[];
@@ -23,6 +24,7 @@ const GAP = 3;
 
 export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {
   const theme = useTheme();
+  const t = useT();
   const scheme = useResolvedScheme();
   const levels = scheme === 'dark' ? LEVEL_DARK : LEVEL_LIGHT;
   const size = compact ? 10 : 12;
@@ -56,11 +58,11 @@ export function ActivityHeatmap({ activity, compact }: ActivityHeatmapProps) {
       </ScrollView>
       {!compact && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: GAP, marginTop: spacing.md }}>
-          <Text style={{ fontSize: 11, color: theme.textFaint }}>Less</Text>
+          <Text style={{ fontSize: 11, color: theme.textFaint }}>{t('stats.heatmap.less')}</Text>
           {levels.map((color) => (
             <View key={color} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color }} />
           ))}
-          <Text style={{ fontSize: 11, color: theme.textFaint }}>More</Text>
+          <Text style={{ fontSize: 11, color: theme.textFaint }}>{t('stats.heatmap.more')}</Text>
         </View>
       )}
     </View>

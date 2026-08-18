@@ -6,21 +6,30 @@ import {
   DIFFICULTIES,
   PRIORITIES,
   buildDeckExport,
-  cardTypeLabel,
   computeDeckStats,
   describeCadence,
   draftFromCard,
   hasCloze,
   isReminderActive,
+  isRetiredCardType,
   parseCloze,
   shareUrlForDeck,
   type CardDraft,
+  type CardType,
   type Difficulty,
   type Flashcard,
+  type Translator,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { useT } from '../../../src/lib/i18n';
 import { useTheme, useDifficultyColors, usePriorityColors, BRAND_GRADIENT, cardShadow, glowShadow, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
+
+/** Label for a type read back off a stored card, retired ones included — see `cardTypeLabel` in core. */
+function cardTypeLabelT(t: Translator, type: string): string {
+  const key = (isRetiredCardType(type) ? 'basic' : type) as CardType;
+  return t(`cardType.${key}` as const);
+}
 import {
   BackIcon,
   Badge,
@@ -51,6 +60,7 @@ const UNCATEGORIZED = '__uncategorized__';
 export default function DeckDetailScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const difficultyColors = useDifficultyColors();
   const priorityColors = usePriorityColors();
@@ -94,10 +104,10 @@ export default function DeckDetailScreen() {
   // rather than saved ones.
   const reminderStatus = useMemo(() => {
     const live = (reminders ?? EMPTY_ARRAY).filter((reminder) => isReminderActive(reminder));
-    if (live.length === 0) return { label: 'Study reminders', dot: false };
-    if (live.length === 1) return { label: `Reminder — ${describeCadence(live[0]!)}`, dot: true };
-    return { label: `${live.length} reminders set`, dot: true };
-  }, [reminders]);
+    if (live.length === 0) return { label: t('deckDetail.studyReminders'), dot: false };
+    if (live.length === 1) return { label: t('deckDetail.reminderNamed', { cadence: describeCadence(live[0]!) }), dot: true };
+    return { label: t.plural('deckDetail.remindersSet', live.length, { count: live.length }), dot: true };
+  }, [reminders, t]);
 
   // `cards` is stored in deck order, so a card's index is its place in the deck.
   const indexById = useMemo(() => new Map(cards.map((card, index) => [card.id, index])), [cards]);
@@ -135,7 +145,7 @@ export default function DeckDetailScreen() {
   if (!deck || !deckId) {
     return (
       <Screen>
-        <Text style={{ color: theme.textMuted }}>Deck not found.</Text>
+        <Text style={{ color: theme.textMuted }}>{t('deckDetail.notFound')}</Text>
       </Screen>
     );
   }
@@ -154,10 +164,10 @@ export default function DeckDetailScreen() {
   function handleSaveCard(draft: CardDraft) {
     if (editingCard) {
       updateCard(deckId!, editingCard.id, draft);
-      toast({ variant: 'success', title: 'Card updated' });
+      toast({ variant: 'success', title: t('deckDetail.cardUpdated') });
     } else {
       addCard(deckId!, draft);
-      toast({ variant: 'success', title: 'Card added' });
+      toast({ variant: 'success', title: t('deckDetail.cardAdded') });
     }
     setEditorOpen(false);
   }
@@ -193,13 +203,13 @@ export default function DeckDetailScreen() {
     if (categoryFilter && !keptIds.has(categoryFilter)) setCategoryFilter(null);
 
     setDeckEditorOpen(false);
-    toast({ variant: 'success', title: 'Deck updated' });
+    toast({ variant: 'success', title: t('deckDetail.deckUpdated') });
   }
 
   function confirmDelete(card: Flashcard) {
-    Alert.alert('Delete card', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteCard(deckId!, card.id) },
+    Alert.alert(t('cardRow.delete'), t('mobileDeckDetail.confirmDeleteCard'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('cardRow.delete'), style: 'destructive', onPress: () => deleteCard(deckId!, card.id) },
     ]);
   }
 
@@ -207,24 +217,28 @@ export default function DeckDetailScreen() {
     const next = !currentDeck.archived;
     archiveDeck(deckId!, next);
     setDeckEditorOpen(false);
-    toast({ variant: 'success', title: next ? 'Deck archived' : 'Deck restored' });
+    toast({ variant: 'success', title: next ? t('deckDetail.deckArchived') : t('deckDetail.deckRestored') });
   }
 
   function handleDeleteDeck() {
-    Alert.alert('Delete deck', `Delete "${currentDeck.title}" and all ${cards.length} of its cards? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          deleteDeck(deckId!);
-          clearReminders(deckId!);
-          setDeckEditorOpen(false);
-          toast({ variant: 'success', title: 'Deck deleted' });
-          router.back();
+    Alert.alert(
+      t('deckEditor.deleteDeck'),
+      t('deckDetail.confirmDeleteDeck', { title: currentDeck.title, count: cards.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('cardRow.delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteDeck(deckId!);
+            clearReminders(deckId!);
+            setDeckEditorOpen(false);
+            toast({ variant: 'success', title: t('deckDetail.deckDeleted') });
+            router.back();
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   function clearFilters() {
@@ -243,11 +257,12 @@ export default function DeckDetailScreen() {
     const payload = buildDeckExport(currentDeck, cards);
     try {
       await Share.share({
-        title: `${payload.title} — Auto Cards`,
-        message: `Study "${payload.title}" (${payload.cards.length} cards) on Auto Cards: ${shareUrlForDeck(
-          payload,
-          'https://autocards.study/app/decks',
-        )}`,
+        title: t('mobileDeckDetail.shareTitle', { title: payload.title }),
+        message: t('mobileDeckDetail.shareMessage', {
+          title: payload.title,
+          count: payload.cards.length,
+          url: shareUrlForDeck(payload, 'https://autocards.study/app/decks'),
+        }),
       });
     } catch {
       // User dismissed the share sheet.
@@ -257,15 +272,15 @@ export default function DeckDetailScreen() {
   const emptyState = (
     <Card>
       <Text style={{ textAlign: 'center', color: theme.textMuted }}>
-        {cards.length === 0 ? 'No cards yet. Add your first one.' : 'No cards match your filters.'}
+        {cards.length === 0 ? t('deckDetail.emptyNoCards') : t('deckDetail.emptyNoMatches')}
       </Text>
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md }}>
         {cards.length > 0 ? (
-          <Button title="Clear filters" variant="outline" size="sm" onPress={clearFilters} />
+          <Button title={t('deckDetail.clearFilters')} variant="outline" size="sm" onPress={clearFilters} />
         ) : (
           <>
-            <Button title="✍️ Write one" variant="outline" size="sm" onPress={openNewCard} />
-            <Button title="📄 Generate" size="sm" onPress={() => setGenerateOpen(true)} />
+            <Button title={t('deckDetail.writeOne')} variant="outline" size="sm" onPress={openNewCard} />
+            <Button title={t('mobileDeckDetail.generateShort')} size="sm" onPress={() => setGenerateOpen(true)} />
           </>
         )}
       </View>
@@ -275,7 +290,7 @@ export default function DeckDetailScreen() {
   return (
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
-        <IconButton accessibilityLabel="Back" onPress={() => router.back()}>
+        <IconButton accessibilityLabel={t('mobileDeckDetail.back')} onPress={() => router.back()}>
           <BackIcon color={theme.text} />
         </IconButton>
         <View style={{ flex: 1 }}>
@@ -284,14 +299,14 @@ export default function DeckDetailScreen() {
             <Text style={{ fontSize: 17, fontWeight: '800', color: theme.text }} numberOfLines={1}>
               {deck.title}
             </Text>
-            {deck.archived && <Badge label="Archived" color={theme.warning} softColor={theme.warningSoft} />}
+            {deck.archived && <Badge label={t('deckDetail.archived')} color={theme.warning} softColor={theme.warningSoft} />}
           </View>
           <Text style={{ fontSize: 12, color: theme.textFaint, fontWeight: '600' }} numberOfLines={1}>
-            {deck.description || `${stats.total} card${stats.total === 1 ? '' : 's'}`}
+            {deck.description || t.plural('mobileDeckDetail.cardCount', stats.total, { count: stats.total })}
           </Text>
         </View>
         <IconButton
-          accessibilityLabel="Deck actions"
+          accessibilityLabel={t('mobileDeckDetail.deckActions')}
           onPress={() => setActionsOpen(true)}
           dotColor={reminderStatus.dot ? theme.success : undefined}
         >
@@ -303,17 +318,17 @@ export default function DeckDetailScreen() {
         <View style={{ padding: spacing.lg, paddingBottom: spacing.md }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textFaint, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Mastery
+              {t('mobileDeckDetail.mastery')}
             </Text>
             <Text style={{ fontSize: 14, fontWeight: '800', color: theme.primaryText }}>{stats.averageMastery}%</Text>
           </View>
           <ProgressBar value={stats.averageMastery} max={100} height={8} />
         </View>
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.border }}>
-          <StatPill label="Cards" value={stats.total} theme={theme} borderRight />
-          <StatPill label="New" value={stats.new} color={theme.primary} theme={theme} borderRight />
-          <StatPill label="Learning" value={stats.learning} color={theme.warning} theme={theme} borderRight />
-          <StatPill label="Mastered" value={stats.mastered} color={theme.success} theme={theme} />
+          <StatPill label={t('deckDetail.stat.cards')} value={stats.total} theme={theme} borderRight />
+          <StatPill label={t('deckDetail.stat.new')} value={stats.new} color={theme.primary} theme={theme} borderRight />
+          <StatPill label={t('deckDetail.stat.learning')} value={stats.learning} color={theme.warning} theme={theme} borderRight />
+          <StatPill label={t('deckDetail.stat.mastered')} value={stats.mastered} color={theme.success} theme={theme} />
         </View>
       </Card>
 
@@ -342,7 +357,7 @@ export default function DeckDetailScreen() {
           style={StyleSheet.absoluteFill}
         />
         <PlayIcon color="#ffffff" size={16} />
-        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>Study Now</Text>
+        <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14 }}>{t('mobileDeckDetail.studyNow')}</Text>
       </Pressable>
 
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
@@ -361,14 +376,14 @@ export default function DeckDetailScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search cards…"
+            placeholder={t('deckDetail.searchCards')}
             placeholderTextColor={theme.textFaint}
             style={{ flex: 1, paddingVertical: 12, fontSize: 14, color: theme.text }}
           />
         </View>
         <Pressable
           onPress={() => setFiltersOpen((v) => !v)}
-          accessibilityLabel="Toggle filters"
+          accessibilityLabel={t('mobileDeckDetail.toggleFilters')}
           style={({ pressed }) => [
             {
               width: 44,
@@ -393,7 +408,7 @@ export default function DeckDetailScreen() {
           style={{ marginBottom: spacing.sm }}
           contentContainerStyle={{ flexDirection: 'row' }}
         >
-          <Chip label={`All categories (${cards.length})`} active={categoryFilter === null} onPress={() => setCategoryFilter(null)} />
+          <Chip label={t('mobileDeckDetail.allCategoriesCount', { count: cards.length })} active={categoryFilter === null} onPress={() => setCategoryFilter(null)} />
           {deck.categories.map((cat) => (
             <Chip
               key={cat.id}
@@ -404,7 +419,7 @@ export default function DeckDetailScreen() {
           ))}
           {categoryCounts.uncategorized > 0 && (
             <Chip
-              label={`Uncategorized (${categoryCounts.uncategorized})`}
+              label={t('mobileDeckDetail.uncategorizedCount', { count: categoryCounts.uncategorized })}
               active={categoryFilter === UNCATEGORIZED}
               onPress={() => setCategoryFilter(UNCATEGORIZED)}
             />
@@ -424,12 +439,12 @@ export default function DeckDetailScreen() {
               marginBottom: spacing.sm,
             }}
           >
-            Difficulty
+            {t('deckDetail.filterByDifficulty')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.sm }}>
-            <Chip label="Any" active={difficultyFilter === 'all'} onPress={() => setDifficultyFilter('all')} />
+            <Chip label={t('mobileDeckDetail.any')} active={difficultyFilter === 'all'} onPress={() => setDifficultyFilter('all')} />
             {DIFFICULTIES.map((d) => (
-              <Chip key={d} label={d[0]!.toUpperCase() + d.slice(1)} active={difficultyFilter === d} onPress={() => setDifficultyFilter(d)} />
+              <Chip key={d} label={t(`difficulty.${d}` as const)} active={difficultyFilter === d} onPress={() => setDifficultyFilter(d)} />
             ))}
           </View>
           <Text
@@ -442,29 +457,29 @@ export default function DeckDetailScreen() {
               marginBottom: spacing.sm,
             }}
           >
-            Other
+            {t('mobileDeckDetail.other')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Chip label="⭐ Starred" active={starredOnly} onPress={() => setStarredOnly((v) => !v)} />
-            <Chip label="⏸ Suspended" active={suspendedOnly} onPress={() => setSuspendedOnly((v) => !v)} />
+            <Chip label={t('deckDetail.starred')} active={starredOnly} onPress={() => setStarredOnly((v) => !v)} />
+            <Chip label={t('deckDetail.suspended')} active={suspendedOnly} onPress={() => setSuspendedOnly((v) => !v)} />
           </View>
         </Card>
       )}
 
       {isFiltered && (
         <Pressable onPress={clearFilters} style={{ marginBottom: spacing.sm }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryText }}>Clear filters</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryText }}>{t('deckDetail.clearFilters')}</Text>
         </Pressable>
       )}
 
       <View style={{ flexDirection: 'row', marginBottom: spacing.md }}>
-        <Chip label="☰ List" active={view === 'list'} onPress={() => setView('list')} />
-        <Chip label="🃏 Flashcards" active={view === 'flashcards'} onPress={() => setView('flashcards')} />
+        <Chip label={t('deckDetail.viewList')} active={view === 'list'} onPress={() => setView('list')} />
+        <Chip label={t('deckDetail.viewFlashcards')} active={view === 'flashcards'} onPress={() => setView('flashcards')} />
       </View>
 
       {isFiltered && cards.length > 0 && (
         <Text style={{ fontSize: 12, color: theme.textFaint, marginBottom: spacing.sm }}>
-          Showing {filteredCards.length} of {cards.length} cards
+          {t('deckDetail.showingOf', { shown: filteredCards.length, total: cards.length })}
         </Text>
       )}
 
@@ -477,6 +492,7 @@ export default function DeckDetailScreen() {
           {filteredCards.map((card) => (
             <CardRow
               key={card.id}
+              t={t}
               card={card}
               position={(indexById.get(card.id) ?? 0) + 1}
               total={cards.length}
@@ -514,10 +530,10 @@ export default function DeckDetailScreen() {
         deckTitle={deck.title}
       />
 
-      <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Deck actions">
+      <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title={t('mobileDeckDetail.deckActions')}>
         <DeckActionRow
           icon={<IconTile icon="➕" color={theme.primary} size={36} fontSize={16} />}
-          label="Add card"
+          label={t('mobileDeckDetail.addCard')}
           onPress={() => {
             setActionsOpen(false);
             handleAddCard();
@@ -530,7 +546,7 @@ export default function DeckDetailScreen() {
               <ShareIcon color={theme.text} size={16} />
             </IconTile>
           }
-          label="Share deck"
+          label={t('deckDetail.shareDeck')}
           onPress={() => {
             setActionsOpen(false);
             void handleShare();
@@ -548,7 +564,7 @@ export default function DeckDetailScreen() {
         <View style={{ height: 1, backgroundColor: theme.border }} />
         <DeckActionRow
           icon={<IconTile icon="✏️" color={theme.primaryText} size={36} fontSize={16} />}
-          label="Edit deck"
+          label={t('deckDetail.editDeck')}
           onPress={() => {
             setActionsOpen(false);
             setDeckEditorOpen(true);
@@ -556,10 +572,10 @@ export default function DeckDetailScreen() {
         />
       </Modal>
 
-      <Modal open={addCardOpen} onClose={() => setAddCardOpen(false)} title="Add card">
+      <Modal open={addCardOpen} onClose={() => setAddCardOpen(false)} title={t('mobileDeckDetail.addCard')}>
         <DeckActionRow
           icon={<IconTile icon="✍️" color={theme.primaryText} size={36} fontSize={16} />}
-          label="Write one myself"
+          label={t('addCardMenu.writeOne')}
           onPress={() => {
             setAddCardOpen(false);
             openNewCard();
@@ -568,7 +584,7 @@ export default function DeckDetailScreen() {
         <View style={{ height: 1, backgroundColor: theme.border }} />
         <DeckActionRow
           icon={<IconTile icon="📄" color={theme.primary} size={36} fontSize={16} />}
-          label="Generate from a document"
+          label={t('addCardMenu.generateFromDocument')}
           onPress={() => {
             setAddCardOpen(false);
             setGenerateOpen(true);
@@ -628,6 +644,7 @@ function StatPill({
 }
 
 function CardRow({
+  t,
   card,
   position,
   total,
@@ -638,6 +655,7 @@ function CardRow({
   onToggleSuspend,
   onCyclePriority,
 }: {
+  t: Translator;
   card: Flashcard;
   /** 1-based place in the deck, which is what the number box shows and takes. */
   position: number;
@@ -677,7 +695,7 @@ function CardRow({
             onChangeText={setPositionInput}
             onEndEditing={commitPosition}
             keyboardType="number-pad"
-            accessibilityLabel="Card number"
+            accessibilityLabel={t('mobileDeckDetail.cardNumber')}
             style={{
               width: 34,
               textAlign: 'center',
@@ -702,20 +720,20 @@ function CardRow({
             {displayFront}
           </Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-            <Badge label={cardTypeLabel(card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
+            <Badge label={cardTypeLabelT(t, card.type)} color={theme.textMuted} softColor={theme.surfaceAlt} />
             <Badge
-              label={card.difficulty}
+              label={t(`difficulty.${card.difficulty}` as const)}
               color={difficultyColors[card.difficulty]}
               softColor={`${difficultyColors[card.difficulty]}22`}
             />
             <Pressable onPress={onCyclePriority}>
               <Badge
-                label={card.priority}
+                label={t(`priority.${card.priority}` as const)}
                 color={priorityColors[card.priority]}
                 softColor={`${priorityColors[card.priority]}22`}
               />
             </Pressable>
-            {card.suspended && <Badge label="Suspended" color={theme.warning} softColor={theme.warningSoft} />}
+            {card.suspended && <Badge label={t('cardRow.suspended')} color={theme.warning} softColor={theme.warningSoft} />}
           </View>
           <View style={{ marginTop: spacing.sm }}>
             <ProgressBar value={card.mastery} max={100} />
@@ -733,10 +751,10 @@ function CardRow({
               }}
             >
               <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primaryText, textTransform: 'uppercase' }}>
-                Answer
+                {t('cardRow.answer')}
               </Text>
               <Text style={{ marginTop: 4, fontSize: 13, color: theme.text }}>
-                {displayBack || 'No answer set.'}
+                {displayBack || t('cardRow.noAnswerSet')}
               </Text>
               {card.explanation && (
                 <Text style={{ marginTop: 6, fontSize: 12, color: theme.textMuted }}>{card.explanation}</Text>
@@ -748,14 +766,14 @@ function CardRow({
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, marginTop: spacing.sm }}>
         <Pressable onPress={onToggleSuspend}>
           <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '600' }}>
-            {card.suspended ? 'Resume' : 'Suspend'}
+            {card.suspended ? t('cardRow.resume') : t('cardRow.suspend')}
           </Text>
         </Pressable>
         <Pressable onPress={onEdit}>
-          <Text style={{ color: theme.primaryText, fontSize: 12, fontWeight: '600' }}>Edit</Text>
+          <Text style={{ color: theme.primaryText, fontSize: 12, fontWeight: '600' }}>{t('cardRow.edit')}</Text>
         </Pressable>
         <Pressable onPress={onDelete}>
-          <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>Delete</Text>
+          <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '600' }}>{t('cardRow.delete')}</Text>
         </Pressable>
       </View>
     </Card>

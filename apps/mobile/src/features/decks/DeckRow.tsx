@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import type { Deck, DeckStats } from '@autocards/core';
 import { useTheme, ACCENT_HEX, cardShadow, radius, spacing } from '../../lib/theme';
+import { useT } from '../../lib/i18n';
 import { Badge, IconTile, ProgressBar } from '../../components';
 
 interface DeckRowProps {
@@ -13,6 +14,7 @@ interface DeckRowProps {
 
 export function DeckRow({ deck, stats, onPress, onMenu }: DeckRowProps) {
   const theme = useTheme();
+  const t = useT();
   const accentColor = ACCENT_HEX[deck.accent];
 
   return (
@@ -39,7 +41,7 @@ export function DeckRow({ deck, stats, onPress, onMenu }: DeckRowProps) {
           <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }} numberOfLines={1}>
             {deck.title}
           </Text>
-          {deck.archived && <Badge label="Archived" color={theme.warning} softColor={theme.warningSoft} />}
+          {deck.archived && <Badge label={t('deckDetail.archived')} color={theme.warning} softColor={theme.warningSoft} />}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 }}>
           <View style={{ flex: 1 }}>
@@ -49,7 +51,7 @@ export function DeckRow({ deck, stats, onPress, onMenu }: DeckRowProps) {
         </View>
       </View>
       {onMenu && (
-        <Pressable onPress={onMenu} accessibilityLabel="Deck options" hitSlop={8} style={{ padding: spacing.xs }}>
+        <Pressable onPress={onMenu} accessibilityLabel={t('deckLibrary.deckOptions')} hitSlop={8} style={{ padding: spacing.xs }}>
           <Text style={{ fontSize: 18, color: theme.textFaint }}>⋯</Text>
         </Pressable>
       )}

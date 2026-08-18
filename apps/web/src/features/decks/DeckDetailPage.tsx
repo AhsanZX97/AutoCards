@@ -5,7 +5,6 @@ import {
   LEARNING_THRESHOLD,
   MASTERED_THRESHOLD,
   PRIORITIES,
-  cardTypeLabel,
   computeDeckStats,
   describeCadence,
   hasCloze,
@@ -16,10 +15,13 @@ import {
   type Flashcard,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
+import type { Translator } from '@autocards/core';
+import { cardTypeLabelT } from '../../lib/cardTypeLabel';
 import { useTour } from '../../lib/useTour';
 import { Badge, Button, Card, CardBody, Chip, InfoButton, Input, Modal, Progress, Select } from '../../components/ui';
 import { TourOverlay } from '../../components/tour';
-import { DECK_TOUR_STEPS } from './deckTourSteps';
+import { deckTourSteps } from './deckTourSteps';
 import { DIFFICULTY_BADGE, PRIORITY_BADGE } from '../../lib/badges';
 import { accentOf } from '../../lib/accent';
 import { AddCardMenu } from './AddCardMenu';
@@ -41,6 +43,7 @@ export function DeckDetailPage() {
   const { deckId } = useParams<{ deckId: string }>();
   const navigate = useNavigate();
   const app = useApp();
+  const t = useT();
 
   const deck = app.deckStore((s) => (deckId ? s.getDeck(deckId) : undefined));
   const cards = app.deckStore((s) => (deckId ? s.cardsByDeck[deckId] ?? EMPTY_ARRAY : EMPTY_ARRAY));
@@ -81,12 +84,14 @@ export function DeckDetailPage() {
   const reminderStatus = useMemo(() => {
     const now = new Date();
     const live = (reminders ?? []).filter((reminder) => isReminderActive(reminder, now));
-    if (live.length === 0) return { label: 'Study reminders', dot: false };
+    if (live.length === 0) return { label: t('deckDetail.studyReminders'), dot: false };
     // One reminder can be named outright; past that a count is all that fits.
     const label =
-      live.length === 1 ? `Reminder — ${describeCadence(live[0]!)}` : `${live.length} reminders set`;
+      live.length === 1
+        ? t('deckDetail.reminderNamed', { cadence: describeCadence(live[0]!) })
+        : t.plural('deckDetail.remindersSet', live.length, { count: live.length });
     return { label, dot: true };
-  }, [reminders]);
+  }, [reminders, t]);
   const quota = useUploadQuota();
   // Runs once, the first time anyone opens a deck. Held off until the deck has
   // loaded so the first step never lands on the "Deck not found" card.
@@ -133,9 +138,9 @@ export function DeckDetailPage() {
     return (
       <Card>
         <CardBody className="py-16 text-center">
-          <p className="text-slate-500 dark:text-slate-400">Deck not found.</p>
+          <p className="text-slate-500 dark:text-slate-400">{t('deckDetail.notFound')}</p>
           <Link to="/app/decks" className="mt-3 inline-block text-sm font-medium text-brand-700 dark:text-brand-400">
-            Back to decks
+            {t('deckDetail.backToDecks')}
           </Link>
         </CardBody>
       </Card>
@@ -157,10 +162,10 @@ export function DeckDetailPage() {
   function handleSaveCard(draft: CardDraft) {
     if (editingCard) {
       updateCard(deckId!, editingCard.id, draft);
-      toast({ variant: 'success', title: 'Card updated' });
+      toast({ variant: 'success', title: t('deckDetail.cardUpdated') });
     } else {
       addCard(deckId!, draft);
-      toast({ variant: 'success', title: 'Card added' });
+      toast({ variant: 'success', title: t('deckDetail.cardAdded') });
     }
     setEditorOpen(false);
   }
@@ -201,11 +206,11 @@ export function DeckDetailPage() {
     if (categoryFilter && !keptIds.has(categoryFilter)) setCategoryFilter(null);
 
     setDeckEditorOpen(false);
-    toast({ variant: 'success', title: 'Deck updated' });
+    toast({ variant: 'success', title: t('deckDetail.deckUpdated') });
   }
 
   function handleDelete(card: Flashcard) {
-    if (confirm('Delete this card?')) {
+    if (confirm(t('deckDetail.confirmDeleteCard'))) {
       deleteCard(deckId!, card.id);
     }
   }
@@ -214,16 +219,16 @@ export function DeckDetailPage() {
     const next = !deck!.archived;
     archiveDeck(deckId!, next);
     setDeckEditorOpen(false);
-    toast({ variant: 'success', title: next ? 'Deck archived' : 'Deck restored' });
+    toast({ variant: 'success', title: next ? t('deckDetail.deckArchived') : t('deckDetail.deckRestored') });
   }
 
   function handleDeleteDeck() {
-    if (!confirm(`Delete "${deck!.title}" and all ${cards.length} of its cards? This cannot be undone.`)) return;
+    if (!confirm(t('deckDetail.confirmDeleteDeck', { title: deck!.title, count: cards.length }))) return;
     deleteDeck(deckId!);
     // Otherwise the schedule outlives the deck and mails about cards that are gone.
     clearReminders(deckId!);
     setDeckEditorOpen(false);
-    toast({ variant: 'success', title: 'Deck deleted' });
+    toast({ variant: 'success', title: t('deckDetail.deckDeleted') });
     navigate('/app/decks');
   }
 
@@ -249,19 +254,19 @@ export function DeckDetailPage() {
     <Card>
       <CardBody className="py-14 text-center">
         <p className="text-slate-500 dark:text-slate-400">
-          {cards.length === 0 ? 'No cards yet. Add your first one.' : 'No cards match your filters.'}
+          {cards.length === 0 ? t('deckDetail.emptyNoCards') : t('deckDetail.emptyNoMatches')}
         </p>
         {cards.length > 0 ? (
           <Button size="sm" variant="outline" className="mt-4" onClick={clearFilters}>
-            Clear filters
+            {t('deckDetail.clearFilters')}
           </Button>
         ) : (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button size="sm" variant="outline" onClick={openNewCard}>
-              ✍️ Write one
+              {t('deckDetail.writeOne')}
             </Button>
             <Button size="sm" onClick={() => setGenerateOpen(true)}>
-              📄 Generate from a document
+              {t('deckDetail.generateFromDocument')}
             </Button>
           </div>
         )}
@@ -279,7 +284,7 @@ export function DeckDetailPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{deck.title}</h1>
-              {deck.archived && <Badge variant="warning">Archived</Badge>}
+              {deck.archived && <Badge variant="warning">{t('deckDetail.archived')}</Badge>}
             </div>
             <p className="mt-1 max-w-xl text-sm text-slate-500 dark:text-slate-400">{deck.description}</p>
             {deck.tags.length > 0 && (
@@ -299,8 +304,8 @@ export function DeckDetailPage() {
             size="icon"
             data-tour="deck-edit"
             onClick={() => setDeckEditorOpen(true)}
-            aria-label="Edit deck"
-            title="Edit deck"
+            aria-label={t('deckDetail.editDeck')}
+            title={t('deckDetail.editDeck')}
           >
             <PencilIcon />
           </Button>
@@ -308,15 +313,15 @@ export function DeckDetailPage() {
             <AddCardMenu
               onWriteCard={openNewCard}
               onGenerateFromPdf={() => setGenerateOpen(true)}
-              quotaLabel={formatQuota(quota)}
+              quotaLabel={formatQuota(t, quota)}
             />
           </div>
           <Button
             variant="outline"
             size="icon"
             onClick={() => setShareOpen(true)}
-            aria-label="Share deck"
-            title="Share deck"
+            aria-label={t('deckDetail.shareDeck')}
+            title={t('deckDetail.shareDeck')}
           >
             <ShareIcon />
           </Button>
@@ -336,22 +341,22 @@ export function DeckDetailPage() {
             )}
           </Button>
           <Button data-tour="deck-study" onClick={() => navigate(`/app/study/${deckId}`)} disabled={stats.total === 0}>
-            Study now
+            {t('deckDetail.studyNow')}
           </Button>
         </div>
       </div>
 
       <div>
         <div className="mb-2 flex items-center gap-1.5">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Progress</p>
-          <InfoButton label="What do these numbers mean?" onClick={() => setStatsHelpOpen(true)} />
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('deckDetail.progress')}</p>
+          <InfoButton label={t('deckDetail.progressHelp')} onClick={() => setStatsHelpOpen(true)} />
         </div>
         <div data-tour="deck-progress" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <MiniStat label="Cards" value={stats.total} />
-          <MiniStat label="New" value={stats.new} />
-          <MiniStat label="Learning" value={stats.learning} />
-          <MiniStat label="Mastered" value={stats.mastered} />
-          <MiniStat label="Avg mastery" value={`${stats.averageMastery}%`} />
+          <MiniStat label={t('deckDetail.stat.cards')} value={stats.total} />
+          <MiniStat label={t('deckDetail.stat.new')} value={stats.new} />
+          <MiniStat label={t('deckDetail.stat.learning')} value={stats.learning} />
+          <MiniStat label={t('deckDetail.stat.mastered')} value={stats.mastered} />
+          <MiniStat label={t('deckDetail.stat.avgMastery')} value={`${stats.averageMastery}%`} />
         </div>
       </div>
 
@@ -365,7 +370,7 @@ export function DeckDetailPage() {
                 : 'border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300'
             }`}
           >
-            All categories <CountPill>{cards.length}</CountPill>
+            {t('deckDetail.allCategories')} <CountPill>{cards.length}</CountPill>
           </button>
           {deck.categories.map((cat) => {
             const catAccent = accentOf(cat.accent);
@@ -392,7 +397,7 @@ export function DeckDetailPage() {
                   : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400'
               }`}
             >
-              Uncategorized <CountPill>{categoryCounts.uncategorized}</CountPill>
+              {t('deckDetail.uncategorized')} <CountPill>{categoryCounts.uncategorized}</CountPill>
             </button>
           )}
         </div>
@@ -404,30 +409,30 @@ export function DeckDetailPage() {
               them without also lighting up the view switcher beside them. */}
           <div data-tour="deck-filters" className="flex flex-1 flex-wrap items-center gap-2">
             <div className="w-full max-w-xs">
-              <Input placeholder="Search cards…" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <Input placeholder={t('deckDetail.searchCards')} value={query} onChange={(e) => setQuery(e.target.value)} />
             </div>
             <Select
               className="w-auto"
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | 'all')}
-              aria-label="Filter by difficulty"
+              aria-label={t('deckDetail.filterByDifficulty')}
             >
-              <option value="all">Any difficulty</option>
+              <option value="all">{t('deckDetail.anyDifficulty')}</option>
               {DIFFICULTIES.map((d) => (
                 <option key={d} value={d}>
-                  {d[0]?.toUpperCase() + d.slice(1)}
+                  {t(`difficulty.${d}` as const)}
                 </option>
               ))}
             </Select>
             <Chip active={starredOnly} onClick={() => setStarredOnly((v) => !v)}>
-              ⭐ Starred
+              {t('deckDetail.starred')}
             </Chip>
             <Chip active={suspendedOnly} onClick={() => setSuspendedOnly((v) => !v)}>
-              ⏸ Suspended
+              {t('deckDetail.suspended')}
             </Chip>
             {isFiltered && (
               <Button size="sm" variant="ghost" onClick={clearFilters}>
-                Clear filters
+                {t('deckDetail.clearFilters')}
               </Button>
             )}
           </div>
@@ -436,30 +441,26 @@ export function DeckDetailPage() {
             className="ml-auto flex items-center gap-1 rounded-xl border border-slate-200 p-1 dark:border-slate-800"
           >
             <ViewTab active={view === 'list'} onClick={() => setView('list')}>
-              ☰ List
+              {t('deckDetail.viewList')}
             </ViewTab>
             <ViewTab active={view === 'flashcards'} onClick={() => setView('flashcards')}>
-              🃏 Flashcards
+              {t('deckDetail.viewFlashcards')}
             </ViewTab>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {isFiltered && cards.length > 0 && (
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Showing {filteredCards.length} of {cards.length} cards
+              {t('deckDetail.showingOf', { shown: filteredCards.length, total: cards.length })}
             </p>
           )}
           {view === 'flashcards'
             ? filteredCards.length > 0 && (
-                <p className="text-xs text-slate-400">
-                  Click the card to reveal the answer. ← → to move between cards, space to flip.
-                </p>
+                <p className="text-xs text-slate-400">{t('deckDetail.flashcardHint')}</p>
               )
             : cards.length > 1 && (
                 <p className="text-xs text-slate-400">
-                  {isFiltered
-                    ? 'Clear the search and filters to drag cards. The number box still moves a card anywhere.'
-                    : 'Drag the ⠿ grip to reorder, or type a card’s new number.'}
+                  {isFiltered ? t('deckDetail.dragHintFiltered') : t('deckDetail.dragHint')}
                 </p>
               )}
         </div>
@@ -477,6 +478,7 @@ export function DeckDetailPage() {
           {filteredCards.map((card) => (
             <CardRow
               key={card.id}
+              t={t}
               card={card}
               position={(indexById.get(card.id) ?? 0) + 1}
               total={cards.length}
@@ -501,7 +503,7 @@ export function DeckDetailPage() {
         </div>
       )}
 
-      <TourOverlay open={tour.open} steps={DECK_TOUR_STEPS} onFinish={tour.finish} />
+      <TourOverlay open={tour.open} steps={deckTourSteps(t)} onFinish={tour.finish} />
 
       <CardEditorModal
         open={editorOpen}
@@ -535,27 +537,21 @@ export function DeckDetailPage() {
       <Modal
         open={statsHelpOpen}
         onClose={() => setStatsHelpOpen(false)}
-        title="How progress is measured"
-        description="All of it comes from how often you answer each card correctly."
+        title={t('deckDetail.statsHelpTitle')}
+        description={t('deckDetail.statsHelpSubtitle')}
         size="md"
-        footer={<Button onClick={() => setStatsHelpOpen(false)}>Got it</Button>}
+        footer={<Button onClick={() => setStatsHelpOpen(false)}>{t('deckDetail.gotIt')}</Button>}
       >
         <dl className="space-y-3.5 text-sm">
-          <StatHelp term="Mastery">
-            The share of times you have answered a card right, so 8 correct out of 10 tries is 80%. A brand new card
-            starts at 0% because it has no answers behind it yet.
+          <StatHelp term={t('deckDetail.help.mastery')}>{t('deckDetail.help.masteryBody')}</StatHelp>
+          <StatHelp term={t('deckDetail.help.new')}>{t('deckDetail.help.newBody')}</StatHelp>
+          <StatHelp term={t('deckDetail.help.learning')}>
+            {t('deckDetail.help.learningBody', { threshold: LEARNING_THRESHOLD })}
           </StatHelp>
-          <StatHelp term="New">You have not studied these cards even once.</StatHelp>
-          <StatHelp term="Learning">
-            Cards you are still getting wrong more often than you get them right: under {LEARNING_THRESHOLD}% mastery.
+          <StatHelp term={t('deckDetail.help.mastered')}>
+            {t('deckDetail.help.masteredBody', { threshold: MASTERED_THRESHOLD })}
           </StatHelp>
-          <StatHelp term="Mastered">
-            Cards you almost always get right: {MASTERED_THRESHOLD}% mastery or better. You can skip these in a
-            session from the study screen.
-          </StatHelp>
-          <StatHelp term="Avg mastery">
-            The average across every card in the deck, leaving out any you have paused.
-          </StatHelp>
+          <StatHelp term={t('deckDetail.help.avgMastery')}>{t('deckDetail.help.avgMasteryBody')}</StatHelp>
         </dl>
       </Modal>
     </div>
@@ -673,6 +669,7 @@ function MiniStat({ label, value, highlight }: { label: string; value: string | 
 }
 
 function CardRow({
+  t,
   card,
   position,
   total,
@@ -690,6 +687,7 @@ function CardRow({
   onToggleSuspend,
   onCyclePriority,
 }: {
+  t: Translator;
   card: Flashcard;
   /** 1-based place in the deck, which is what the number box shows and takes. */
   position: number;
@@ -763,8 +761,8 @@ function CardRow({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              aria-label="Drag to reorder"
-              title={reorderable ? 'Drag to reorder' : 'Clear the search and filter to drag cards'}
+              aria-label={t('cardRow.dragToReorder')}
+              title={reorderable ? t('cardRow.dragToReorder') : t('cardRow.dragDisabledHint')}
               disabled={!reorderable}
               onMouseDown={() => setGripHeld(true)}
               onMouseUp={() => setGripHeld(false)}
@@ -776,8 +774,8 @@ function CardRow({
               type="number"
               min={1}
               max={total}
-              aria-label="Card number"
-              title="Type a number to move this card there"
+              aria-label={t('cardRow.cardNumber')}
+              title={t('cardRow.moveHint')}
               value={positionInput}
               onChange={(e) => setPositionInput(e.target.value)}
               onBlur={commitPosition}
@@ -788,7 +786,7 @@ function CardRow({
               className="w-12 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-center text-xs font-semibold text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:text-slate-400"
             />
           </div>
-          <button onClick={onToggleStar} className="text-lg" aria-label="Toggle star">
+          <button onClick={onToggleStar} className="text-lg" aria-label={t('cardRow.toggleStar')}>
             {card.starred ? '⭐' : '☆'}
           </button>
           <div className="min-w-0 flex-1">
@@ -796,7 +794,7 @@ function CardRow({
               type="button"
               onClick={() => setAnswerShown((v) => !v)}
               aria-expanded={answerShown}
-              title={answerShown ? 'Hide answer' : 'Show answer'}
+              title={answerShown ? t('cardRow.hideAnswer') : t('cardRow.showAnswer')}
               className="w-full text-left"
             >
               <p
@@ -809,48 +807,48 @@ function CardRow({
               </p>
             </button>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="neutral">{cardTypeLabel(card.type)}</Badge>
+              <Badge variant="neutral">{cardTypeLabelT(t, card.type)}</Badge>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
-                {DIFFICULTY_BADGE[card.difficulty].label}
+                {t(`difficulty.${card.difficulty}` as const)}
               </span>
               {/* Priority is a triage call made while looking over a deck, so it
                   is set here rather than buried in the card editor. */}
               <button
                 type="button"
                 onClick={onCyclePriority}
-                title="Click to change priority. It decides which cards come up first."
+                title={t('cardRow.priorityHint')}
                 className={cn(
                   'rounded-full px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-75',
                   PRIORITY_BADGE[card.priority].classes,
                 )}
               >
-                {PRIORITY_BADGE[card.priority].label}
+                {t(`priority.${card.priority}` as const)}
               </button>
-              {card.suspended && <Badge variant="warning">Suspended</Badge>}
+              {card.suspended && <Badge variant="warning">{t('cardRow.suspended')}</Badge>}
             </div>
           </div>
           <div className="hidden w-32 shrink-0 sm:block">
             <Progress value={card.mastery} max={100} />
-            <p className="mt-1 text-center text-xs text-slate-400">{card.mastery}% mastery</p>
+            <p className="mt-1 text-center text-xs text-slate-400">{t('cardRow.masteryPercent', { percent: card.mastery })}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Button size="sm" variant="ghost" onClick={onToggleSuspend}>
-              {card.suspended ? 'Resume' : 'Suspend'}
+              {card.suspended ? t('cardRow.resume') : t('cardRow.suspend')}
             </Button>
             <Button size="sm" variant="ghost" onClick={onEdit}>
-              Edit
+              {t('cardRow.edit')}
             </Button>
             <Button size="sm" variant="ghost" onClick={onDelete} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10">
-              Delete
+              {t('cardRow.delete')}
             </Button>
           </div>
         </div>
 
         {answerShown && (
           <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-500/30 dark:bg-brand-500/10">
-            <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">Answer</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{t('cardRow.answer')}</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-              {displayBack || <span className="italic text-slate-400">No answer set.</span>}
+              {displayBack || <span className="italic text-slate-400">{t('cardRow.noAnswerSet')}</span>}
             </p>
             {card.explanation && (
               <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-500 dark:text-slate-400">

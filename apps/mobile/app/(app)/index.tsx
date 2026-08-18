@@ -11,12 +11,14 @@ import {
   type SessionSummary,
 } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, radius, spacing, type Theme } from '../../src/lib/theme';
 import { Badge, Card, GradientPanel, IconTile, Screen } from '../../src/components';
 import { DeckRow } from '../../src/features/decks/DeckRow';
 
 export default function DashboardScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const user = app.authStore((s) => s.session?.user);
   const allDecks = app.deckStore((s) => s.decks);
@@ -32,7 +34,7 @@ export default function DashboardScreen() {
   );
   /* History outlives the decks it came from, so rows for a deleted deck stay flat text. */
   const existingDeckIds = useMemo(() => new Set(allDecks.map((d) => d.id)), [allDecks]);
-  const firstName = user?.username ?? 'there';
+  const firstName = user?.username ?? t('dashboard.guestName');
 
   /* The soonest reminder still ahead, across every deck — same math the
      device's local notifications use, so the two never disagree. */
@@ -64,24 +66,26 @@ export default function DashboardScreen() {
 
   return (
     <Screen>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>Welcome back, {firstName} 👋</Text>
+      <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text }}>{t('dashboard.welcome', { name: firstName })}</Text>
       <Text style={{ fontSize: 14, color: theme.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-        {activeDecks.length > 0 ? `${activeDecks.length} deck${activeDecks.length === 1 ? '' : 's'} ready to study.` : 'Create your first deck to get started.'}
+        {activeDecks.length > 0
+          ? t.plural('dashboard.decksReady', activeDecks.length, { count: activeDecks.length })
+          : t('dashboard.noDecksYetPrompt')}
       </Text>
 
       <GradientPanel>
         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-          {nextReminder ? 'Next Reminder' : activeDecks.length > 0 ? "Today's Goal" : 'Get started'}
+          {nextReminder ? t('mobileDashboard.nextReminder') : activeDecks.length > 0 ? t('mobileDashboard.todaysGoal') : t('mobileDashboard.getStarted')}
         </Text>
         <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: 4 }}>
-          {nextReminder ? nextReminder.deckTitle : activeDecks.length > 0 ? 'Keep your streak!' : 'Create your first deck'}
+          {nextReminder ? nextReminder.deckTitle : activeDecks.length > 0 ? t('mobileDashboard.keepStreak') : t('mobileDashboard.createFirstDeck')}
         </Text>
         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4 }}>
           {nextReminder
-            ? `Reminder ${formatNextReminder(nextReminder.at)}`
+            ? t('mobileDashboard.reminderAt', { when: formatNextReminder(nextReminder.at) })
             : activeDecks.length > 0
-              ? 'Review at least 1 deck today'
-              : 'Upload a document to generate flashcards'}
+              ? t('mobileDashboard.reviewOneDeck')
+              : t('mobileDashboard.uploadToGenerate')}
         </Text>
         <Pressable
           onPress={() =>
@@ -98,24 +102,24 @@ export default function DashboardScreen() {
           })}
         >
           <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>
-            {nextDeckToStudy ? 'Start Studying →' : 'Create deck →'}
+            {nextDeckToStudy ? t('mobileDashboard.startStudying') : t('mobileDashboard.createDeckArrow')}
           </Text>
         </Pressable>
       </GradientPanel>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
-        <StatTile icon="🔥" label="Streak" value={String(stats.streak.current)} color={theme.warning} />
-        <StatTile icon="⭐" label="Level" value={String(stats.level.level)} color={theme.warning} />
-        <StatTile icon="🎯" label="Accuracy" value={`${Math.round(stats.accuracy * 100)}%`} color={theme.danger} />
-        <StatTile icon="📚" label="Decks" value={String(activeDecks.length)} color={theme.primary} />
+        <StatTile icon="🔥" label={t('mobileDashboard.streak')} value={String(stats.streak.current)} color={theme.warning} />
+        <StatTile icon="⭐" label={t('mobileDashboard.level')} value={String(stats.level.level)} color={theme.warning} />
+        <StatTile icon="🎯" label={t('mobileDashboard.accuracy')} value={`${Math.round(stats.accuracy * 100)}%`} color={theme.danger} />
+        <StatTile icon="📚" label={t('mobileDashboard.decks')} value={String(activeDecks.length)} color={theme.primary} />
       </View>
 
       <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, marginTop: spacing.xl, marginBottom: spacing.md }}>
-        Your decks
+        {t('mobileDashboard.yourDecks')}
       </Text>
       {deckSummaries.length === 0 ? (
         <Card>
-          <Text style={{ textAlign: 'center', color: theme.textMuted }}>No decks yet — create your first one.</Text>
+          <Text style={{ textAlign: 'center', color: theme.textMuted }}>{t('mobileDashboard.noDecksYet')}</Text>
         </Card>
       ) : (
         <View style={{ gap: spacing.sm }}>
@@ -130,7 +134,7 @@ export default function DashboardScreen() {
           <Text
             style={{ fontSize: 18, fontWeight: '700', color: theme.text, marginTop: spacing.xl, marginBottom: spacing.md }}
           >
-            Recent sessions
+            {t('mobileDashboard.recentSessions')}
           </Text>
           <Card>
             {history.slice(0, 5).map((session) => (
@@ -138,6 +142,7 @@ export default function DashboardScreen() {
                 key={session.id}
                 session={session}
                 theme={theme}
+                t={t}
                 onPress={
                   existingDeckIds.has(session.deckId)
                     ? () => router.push(`/(app)/decks/${session.deckId}`)
@@ -155,10 +160,12 @@ export default function DashboardScreen() {
 function SessionRow({
   session,
   theme,
+  t,
   onPress,
 }: {
   session: SessionSummary;
   theme: Theme;
+  t: ReturnType<typeof useT>;
   onPress?: () => void;
 }) {
   const grade =
@@ -178,7 +185,7 @@ function SessionRow({
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Text style={{ fontSize: 12, color: theme.textMuted }}>
-          {session.correct}/{session.answered} correct
+          {t('mobileDashboard.correctOf', { correct: session.correct, answered: session.answered })}
         </Text>
         <Badge label={session.letter} color={grade.color} softColor={grade.soft} />
       </View>
@@ -198,7 +205,7 @@ function SessionRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${session.deckTitle}`}
+      accessibilityLabel={t('mobileDashboard.openDeck', { deckTitle: session.deckTitle })}
       style={({ pressed }) => ({
         ...layout,
         marginHorizontal: -spacing.sm,

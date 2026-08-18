@@ -3,11 +3,13 @@ import { Image, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useApp } from '../../src/lib/appContext';
 import { useGoogleSignIn } from '../../src/lib/useGoogleSignIn';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Button, Field, GoogleButton, OrDivider, Screen } from '../../src/components';
 
 export default function SignInScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const signIn = app.authStore((s) => s.signIn);
   const status = app.authStore((s) => s.status);
@@ -27,18 +29,18 @@ export default function SignInScreen() {
     <Screen>
       <View style={{ marginBottom: spacing.xl, marginTop: spacing.xl }}>
         <Image source={require('../../assets/favicon.png')} style={{ width: 40, height: 40, borderRadius: 10 }} />
-        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: spacing.md }}>Welcome back</Text>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: spacing.md }}>{t('auth.signIn.title')}</Text>
         <Text style={{ fontSize: 15, color: theme.textMuted, marginTop: 4 }}>
-          Sign in to keep studying where you left off.
+          {t('auth.signIn.subtitle')}
         </Text>
       </View>
 
-      <GoogleButton title="Sign in with Google" onPress={() => void google.start()} loading={google.loading} />
+      <GoogleButton title={t('auth.signIn.google')} onPress={() => void google.start()} loading={google.loading} />
       <OrDivider />
 
       <Field
-        label="Email"
-        placeholder="you@example.com"
+        label={t('common.email')}
+        placeholder={t('auth.emailPlaceholder')}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
@@ -46,7 +48,7 @@ export default function SignInScreen() {
         error={errorField === 'email' ? error ?? undefined : undefined}
       />
       <Field
-        label="Password"
+        label={t('common.password')}
         placeholder="••••••••"
         secureTextEntry
         value={password}
@@ -57,16 +59,16 @@ export default function SignInScreen() {
 
       <View style={{ alignItems: 'flex-end', marginBottom: spacing.md }}>
         <Link href="/(auth)/forgot-password">
-          <Text style={{ color: theme.primaryText, fontWeight: '600', fontSize: 14 }}>Forgot your password?</Text>
+          <Text style={{ color: theme.primaryText, fontWeight: '600', fontSize: 14 }}>{t('auth.signIn.forgotPassword')}</Text>
         </Link>
       </View>
 
-      <Button title="Sign in" onPress={onSubmit} loading={status === 'loading'} style={{ marginTop: spacing.sm }} />
+      <Button title={t('auth.signIn.submit')} onPress={onSubmit} loading={status === 'loading'} style={{ marginTop: spacing.sm }} />
 
       <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl }}>
-        <Text style={{ color: theme.textMuted }}>Don&apos;t have an account? </Text>
+        <Text style={{ color: theme.textMuted }}>{t('auth.signIn.noAccount')} </Text>
         <Link href="/(auth)/sign-up">
-          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>Sign up</Text>
+          <Text style={{ color: theme.primaryText, fontWeight: '700' }}>{t('auth.signIn.signUpLink')}</Text>
         </Link>
       </View>
     </Screen>

@@ -1,5 +1,6 @@
 import { useThemeToggle } from '../../lib/useTheme';
 import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n';
 
 function SunIcon() {
   return (
@@ -30,15 +31,17 @@ function MoonIcon() {
 
 /** Flips between light and dark, persisting the choice to the settings store. */
 export function ThemeToggle({ className }: { className?: string }) {
+  const t = useT();
   const { resolved, toggle } = useThemeToggle();
   const nextTheme = resolved === 'dark' ? 'light' : 'dark';
+  const label = t('theme.switchTo', { theme: t(`settings.appearance.theme.${nextTheme}` as const).toLowerCase() });
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={`Switch to ${nextTheme} mode`}
-      title={`Switch to ${nextTheme} mode`}
+      aria-label={label}
+      title={label}
       className={cn(
         'inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-500 backdrop-blur-sm transition-all hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-950',
         className,

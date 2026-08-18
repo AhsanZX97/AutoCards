@@ -11,6 +11,7 @@ import {
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { useT } from '../../../src/lib/i18n';
 import { useTheme, useDifficultyColors, radius, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
 import { EMPTY_ARRAY } from '../../../src/lib/empty';
@@ -21,22 +22,17 @@ const GRADE_COLOR: Record<Grade, string> = {
   good: '#059669',
   easy: '#0ea5e9',
 };
-const GRADE_LABEL: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' };
 
 interface GradeButton {
   grade: Grade;
-  label: string;
 }
 
-const FOUR_POINT_BUTTONS: GradeButton[] = GRADES.map((grade) => ({ grade, label: GRADE_LABEL[grade] }));
+const FOUR_POINT_BUTTONS: GradeButton[] = GRADES.map((grade) => ({ grade }));
 
 /** Exam forces the binary scale: the learner marks themselves right or wrong,
  *  with no shades in between. `again` and `good` are the two grades the
  *  scheduler already treats as fail and pass. */
-const BINARY_BUTTONS: GradeButton[] = [
-  { grade: 'again', label: 'Incorrect' },
-  { grade: 'good', label: 'Correct' },
-];
+const BINARY_BUTTONS: GradeButton[] = [{ grade: 'again' }, { grade: 'good' }];
 
 /** Seconds left at which the countdown bar turns red, matching web. */
 const TIMER_WARNING_SECONDS = 5;
@@ -44,6 +40,7 @@ const TIMER_WARNING_SECONDS = 5;
 export default function StudyRunnerScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const difficultyColors = useDifficultyColors();
 
@@ -134,7 +131,7 @@ export default function StudyRunnerScreen() {
   if (!session || session.deckId !== deckId) {
     return (
       <Screen scroll={false}>
-        <Text style={{ color: theme.textMuted }}>No active session.</Text>
+        <Text style={{ color: theme.textMuted }}>{t('mobileRunner.noActiveSession')}</Text>
       </Screen>
     );
   }
@@ -144,6 +141,7 @@ export default function StudyRunnerScreen() {
   if (!currentCard) {
     return (
       <MissingCard
+        t={t}
         onEnd={() => {
           pauseAndAbandon();
           router.replace(`/(app)/decks/${deckId}`);
@@ -178,10 +176,10 @@ export default function StudyRunnerScreen() {
   }
 
   function handleExit() {
-    Alert.alert('End session?', 'Your progress on answered cards will be saved.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('mobileRunner.endSessionTitle'), t('mobileRunner.endSessionBody'), [
+      { text: t('mobileRunner.cancel'), style: 'cancel' },
       {
-        text: 'End session',
+        text: t('mobileRunner.endSession'),
         style: 'destructive',
         onPress: () => {
           pauseAndAbandon();
@@ -195,7 +193,10 @@ export default function StudyRunnerScreen() {
   const promptText = getPromptText(currentCard, session.settings.reversed);
   const answerText = getAnswerText(currentCard, session.settings.reversed);
   const hint = currentCard.hint;
-  const gradeButtons = session.settings.gradingScale === 'binary' ? BINARY_BUTTONS : FOUR_POINT_BUTTONS;
+  const isBinary = session.settings.gradingScale === 'binary';
+  const gradeButtons = isBinary ? BINARY_BUTTONS : FOUR_POINT_BUTTONS;
+  const gradeLabel = (grade: Grade) =>
+    isBinary ? t(grade === 'again' ? 'runner.incorrect' : 'runner.correct') : t(`grade.${grade}` as const);
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -231,7 +232,7 @@ export default function StudyRunnerScreen() {
       {!isAutoGraded ? (
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
           <Badge
-            label={currentCard.difficulty}
+            label={t(`difficulty.${currentCard.difficulty}` as const)}
             color={difficultyColors[currentCard.difficulty]}
             softColor={`${difficultyColors[currentCard.difficulty]}22`}
           />
@@ -243,7 +244,7 @@ export default function StudyRunnerScreen() {
             <View style={{ alignItems: 'center', marginTop: spacing.xl, width: '100%' }}>
               {hint && !hintRevealed && (
                 <Pressable onPress={() => setHintRevealed(true)} style={{ marginBottom: spacing.md }}>
-                  <Text style={{ color: theme.textMuted, fontSize: 13 }}>💡 Show hint</Text>
+                  <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t('runner.showHint')}</Text>
                 </Pressable>
               )}
               {hintRevealed && hint && (
@@ -251,7 +252,7 @@ export default function StudyRunnerScreen() {
                   {hint}
                 </Text>
               )}
-              <Button title="Show answer" onPress={() => setFlipped(true)} style={{ width: '100%' }} />
+              <Button title={t('runner.showAnswer')} onPress={() => setFlipped(true)} style={{ width: '100%' }} />
             </View>
           ) : (
             <View style={{ width: '100%', marginTop: spacing.xl }}>
@@ -261,7 +262,7 @@ export default function StudyRunnerScreen() {
                 </Text>
               )}
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                {gradeButtons.map(({ grade, label }) => (
+                {gradeButtons.map(({ grade }) => (
                   <Pressable
                     key={grade}
                     onPress={() => handleSelfGrade(grade)}
@@ -273,7 +274,7 @@ export default function StudyRunnerScreen() {
                       backgroundColor: GRADE_COLOR[grade],
                     }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{label}</Text>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{gradeLabel(grade)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -288,7 +289,7 @@ export default function StudyRunnerScreen() {
 
           {hint && !hintRevealed && !revealed && (
             <Pressable onPress={() => setHintRevealed(true)} style={{ marginTop: spacing.md }}>
-              <Text style={{ color: theme.textMuted, fontSize: 13 }}>💡 Show hint</Text>
+              <Text style={{ color: theme.textMuted, fontSize: 13 }}>{t('runner.showHint')}</Text>
             </Pressable>
           )}
           {hintRevealed && hint && (
@@ -336,7 +337,7 @@ export default function StudyRunnerScreen() {
                 value={typedResponse}
                 onChangeText={setTypedResponse}
                 onSubmitEditing={handleTypeInSubmit}
-                placeholder="Type your answer…"
+                placeholder={t('runner.typePlaceholder')}
                 placeholderTextColor={theme.textFaint}
                 style={{
                   borderWidth: 1,
@@ -352,11 +353,11 @@ export default function StudyRunnerScreen() {
                   right — otherwise the learner retypes the same near-miss. */}
               {revealed && !revealed.correct && (
                 <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' }}>
-                  Accepted: {(currentCard.acceptedAnswers ?? [currentCard.back]).join(', ')}
+                  {t('runner.accepted', { answers: (currentCard.acceptedAnswers ?? [currentCard.back]).join(', ') })}
                 </Text>
               )}
               {revealed === null && (
-                <Button title="Submit" onPress={handleTypeInSubmit} disabled={!typedResponse.trim()} style={{ marginTop: spacing.md }} />
+                <Button title={t('runner.submit')} onPress={handleTypeInSubmit} disabled={!typedResponse.trim()} style={{ marginTop: spacing.md }} />
               )}
             </View>
           )}
@@ -364,7 +365,7 @@ export default function StudyRunnerScreen() {
           {revealed && (
             <View style={{ width: '100%', marginTop: spacing.lg, alignItems: 'center' }}>
               <Text style={{ color: revealed.correct ? theme.success : theme.danger, fontWeight: '700', marginBottom: spacing.sm }}>
-                {revealed.correct ? '✓ Correct!' : '✗ Not quite'}
+                {revealed.correct ? t('runner.correctBang') : t('runner.notQuite')}
               </Text>
               {currentCard.explanation && (
                 <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', marginBottom: spacing.md }}>
@@ -372,7 +373,7 @@ export default function StudyRunnerScreen() {
                 </Text>
               )}
               <Button
-                title="Next card"
+                title={t('runner.nextCard')}
                 style={{ width: '100%' }}
                 onPress={() =>
                   submitAnswer(
@@ -398,21 +399,20 @@ export default function StudyRunnerScreen() {
  * run here files it rather than discarding it — `pauseAndAbandon` writes the
  * summary as long as at least one answer was given.
  */
-function MissingCard({ onEnd, onRestart }: { onEnd: () => void; onRestart: () => void }) {
+function MissingCard({ t, onEnd, onRestart }: { t: ReturnType<typeof useT>; onEnd: () => void; onRestart: () => void }) {
   const theme = useTheme();
   return (
     <Screen scroll={false} style={{ justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
       <Text style={{ fontSize: 34 }}>🃏</Text>
       <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, marginTop: spacing.md, textAlign: 'center' }}>
-        This card isn&apos;t here any more
+        {t('runner.missingTitle')}
       </Text>
       <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' }}>
-        It was deleted somewhere else while you were studying. Everything you answered up to now has
-        been counted.
+        {t('runner.missingBody')}
       </Text>
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl }}>
-        <Button title="End session" onPress={onEnd} />
-        <Button title="Start a new one" variant="outline" onPress={onRestart} />
+        <Button title={t('runner.endSession')} onPress={onEnd} />
+        <Button title={t('runner.startNewOne')} variant="outline" onPress={onRestart} />
       </View>
     </Screen>
   );

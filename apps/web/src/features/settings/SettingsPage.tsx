@@ -1,29 +1,34 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  LOCALE_LABELS,
   PLAN_LIMITS,
   PLANS,
+  SUPPORTED_LOCALES,
   isAdmin,
   type AccountSubscription,
   type App,
+  type LanguagePreference,
   type Plan,
   type PurchasablePlan,
+  type Translator,
 } from '@autocards/core';
 import { FunctionsFetchError } from '@supabase/supabase-js';
 import { useApp, getSupabaseClient } from '../../lib/appContext';
+import { useLocale, useT } from '../../lib/i18n';
 import { Avatar, Badge, Button, Card, CardBody, Field, Input, Modal, Progress, Select, Switch, Tabs } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useUploadQuota } from '../../lib/useUploadQuota';
 
-const TABS = [
-  { id: 'profile', label: 'Profile', icon: '👤' },
-  { id: 'appearance', label: 'Appearance', icon: '🎨' },
-  { id: 'generation', label: 'Generation', icon: '🧠' },
-  { id: 'billing', label: 'Billing', icon: '💳' },
-];
-
 export function SettingsPage() {
+  const t = useT();
   const [params] = useSearchParams();
+  const TABS = [
+    { id: 'profile', label: t('settings.tab.profile'), icon: '👤' },
+    { id: 'appearance', label: t('settings.tab.appearance'), icon: '🎨' },
+    { id: 'generation', label: t('settings.tab.generation'), icon: '🧠' },
+    { id: 'billing', label: t('settings.tab.billing'), icon: '💳' },
+  ];
   const [tab, setTab] = useState(() => {
     if (params.get('checkout')) return 'billing';
     const requested = params.get('tab');
@@ -33,8 +38,8 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your account and preferences.</p>
+        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.subtitle')}</p>
       </div>
 
       <Tabs items={TABS} active={tab} onChange={setTab} />
@@ -49,6 +54,7 @@ export function SettingsPage() {
 
 function ProfileTab() {
   const app = useApp();
+  const t = useT();
   const user = app.authStore((s) => s.session?.user);
   const signOut = app.authStore((s) => s.signOut);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -81,7 +87,7 @@ function ProfileTab() {
       setConfirmOpen(false);
       toast({
         variant: 'error',
-        title: 'Could not delete account',
+        title: t('settings.profile.deleteFailedTitle'),
         description: err instanceof Error ? err.message : undefined,
       });
     }
@@ -99,15 +105,15 @@ function ProfileTab() {
             <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
           </div>
         </div>
-        <Field label="Username">
+        <Field label={t('common.username')}>
           <Input value={user.username} disabled />
         </Field>
-        <Field label="Email">
+        <Field label={t('common.email')}>
           <Input value={user.email} disabled />
         </Field>
         <div className="pt-2">
           <Button variant="danger" onClick={() => setConfirmOpen(true)}>
-            Delete account
+            {t('settings.profile.deleteAccount')}
           </Button>
         </div>
       </CardBody>
@@ -115,58 +121,69 @@ function ProfileTab() {
       <Modal
         open={confirmOpen}
         onClose={() => !deleting && setConfirmOpen(false)}
-        title="Delete your account?"
-        description="This action is permanent and cannot be undone."
+        title={t('settings.profile.deleteConfirmTitle')}
+        description={t('settings.profile.deleteConfirmBody')}
         size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={deleting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" onClick={() => void deleteAccount()} loading={deleting}>
-              Delete account
+              {t('settings.profile.deleteAccount')}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          All your decks, cards and study history will be deleted. You will be signed out immediately.
-        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">{t('settings.profile.deleteWarning')}</p>
       </Modal>
     </Card>
   );
 }
 
+const THEME_ICONS = { light: '☀️', dark: '🌙', system: '💻' } as const;
+
+function themeLabel(t: Translator, option: 'light' | 'dark' | 'system'): string {
+  return t(`settings.appearance.theme.${option}` as const);
+}
+
 function AppearanceTab() {
   const app = useApp();
+  const t = useT();
   const theme = app.settingsStore((s) => s.theme);
   const setTheme = app.settingsStore((s) => s.setTheme);
+  const language = app.settingsStore((s) => s.language);
+  const setLanguage = app.settingsStore((s) => s.setLanguage);
   const completedTours = app.tourStore((s) => s.completedTours);
   const resetTours = app.tourStore((s) => s.resetTours);
 
   function replayTours() {
     resetTours();
-    toast({ variant: 'success', title: 'Walkthroughs reset', description: 'They will run again on your next visit.' });
+    toast({
+      variant: 'success',
+      title: t('settings.appearance.toursResetTitle'),
+      description: t('settings.appearance.toursResetBody'),
+    });
   }
 
   return (
     <div className="space-y-6">
       <Card>
         <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">Theme</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.theme')}</h3>
           <div className="grid grid-cols-3 gap-3">
             {(['light', 'dark', 'system'] as const).map((option) => (
               <button
                 key={option}
                 onClick={() => setTheme(option)}
-                className={`rounded-xl border p-4 text-center text-sm font-medium capitalize transition-colors ${
+                className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
                   theme === option
                     ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
                     : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
                 }`}
               >
-                <span className="mb-2 block text-xl">{option === 'light' ? '☀️' : option === 'dark' ? '🌙' : '💻'}</span>
-                {option}
+                <span className="mb-2 block text-xl">{THEME_ICONS[option]}</span>
+                {themeLabel(t, option)}
               </button>
             ))}
           </div>
@@ -174,15 +191,35 @@ function AppearanceTab() {
       </Card>
 
       <Card>
+        <CardBody className="space-y-4">
+          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.language')}</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {(['system', ...SUPPORTED_LOCALES] as LanguagePreference[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setLanguage(option)}
+                className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
+                  language === option
+                    ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {option === 'system' ? t('settings.appearance.language.system') : LOCALE_LABELS[option]}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400">{t('settings.appearance.language.hint')}</p>
+        </CardBody>
+      </Card>
+
+      <Card>
         <CardBody className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white">Guided walkthroughs</h3>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              The short tours that run the first time you open a deck and the study setup.
-            </p>
+            <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.tours')}</h3>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('settings.appearance.toursBody')}</p>
           </div>
           <Button variant="outline" onClick={replayTours} disabled={completedTours.length === 0}>
-            {completedTours.length === 0 ? 'Not seen yet' : 'Show them again'}
+            {completedTours.length === 0 ? t('settings.appearance.toursNotSeen') : t('settings.appearance.toursReplay')}
           </Button>
         </CardBody>
       </Card>
@@ -192,6 +229,7 @@ function AppearanceTab() {
 
 function GenerationTab() {
   const app = useApp();
+  const t = useT();
   const defaults = app.settingsStore((s) => s.generationDefaults);
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
 
@@ -199,8 +237,8 @@ function GenerationTab() {
     <div className="space-y-6">
       <Card>
         <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">Default generation settings</h3>
-          <Field label="Default card count">
+          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.generation.title')}</h3>
+          <Field label={t('settings.generation.cardCount')}>
             <Input
               type="number"
               min={5}
@@ -212,17 +250,17 @@ function GenerationTab() {
           <Switch
             checked={defaults.autoCategories}
             onChange={(v) => updateDefaults({ autoCategories: v })}
-            label="Auto-categorize by default"
+            label={t('settings.generation.autoCategorize')}
           />
           <Switch
             checked={defaults.includeHints}
             onChange={(v) => updateDefaults({ includeHints: v })}
-            label="Include hints by default"
+            label={t('settings.generation.includeHints')}
           />
           <Switch
             checked={defaults.includeExplanations}
             onChange={(v) => updateDefaults({ includeExplanations: v })}
-            label="Include explanations by default"
+            label={t('settings.generation.includeExplanations')}
           />
         </CardBody>
       </Card>
@@ -232,19 +270,20 @@ function GenerationTab() {
 
 const PURCHASABLE_PLANS: Plan[] = ['pro', 'lifetime'];
 const ONE_TIME_PLANS: Plan[] = ['lifetime'];
-const PLAN_PRICES: Record<Plan, string> = {
-  free: 'Free',
-  pro: '$4 / month',
-  lifetime: '$39 once',
-};
 
-function describeSubscription(subscription: AccountSubscription): string {
+function planPrice(t: Translator, plan: Plan): string {
+  if (plan === 'free') return t('settings.billing.priceFree');
+  if (plan === 'lifetime') return t('settings.billing.priceLifetimeOnce', { price: '$39' });
+  return t('settings.billing.priceProMonthly', { price: '$4' });
+}
+
+function describeSubscription(t: Translator, locale: string, subscription: AccountSubscription): string {
   if (ONE_TIME_PLANS.includes(subscription.plan)) {
-    return 'Bought outright. There is nothing to renew and nothing to cancel.';
+    return t('settings.billing.boughtOutright');
   }
 
   const ends = subscription.currentPeriodEnd
-    ? new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, {
+    ? new Date(subscription.currentPeriodEnd).toLocaleDateString(locale, {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -253,19 +292,19 @@ function describeSubscription(subscription: AccountSubscription): string {
 
   if (subscription.status === 'past_due') {
     return ends
-      ? `Your last payment didn’t go through. We’ll keep retrying, and you keep ${subscription.plan} until ${ends}.`
-      : 'Your last payment didn’t go through. We’ll keep retrying, and your plan still works in the meantime.';
+      ? t('settings.billing.pastDueUntil', { plan: subscription.plan, date: ends })
+      : t('settings.billing.pastDue');
   }
   if (subscription.cancelAtPeriodEnd) {
     return ends
-      ? `Cancelled. You keep ${subscription.plan} until ${ends}, then move back to free.`
-      : `Cancelled. You keep ${subscription.plan} until the current period ends.`;
+      ? t('settings.billing.cancelledUntil', { plan: subscription.plan, date: ends })
+      : t('settings.billing.cancelledPeriodEnd', { plan: subscription.plan });
   }
   if (subscription.status === 'active' || subscription.status === 'trialing') {
-    return ends ? `Renews on ${ends}.` : 'Active.';
+    return ends ? t('settings.billing.renewsOn', { date: ends }) : t('settings.billing.active');
   }
-  if (subscription.status === 'canceled') return 'This subscription has ended.';
-  return `Status: ${subscription.status}.`;
+  if (subscription.status === 'canceled') return t('settings.billing.ended');
+  return t('settings.billing.statusOther', { status: subscription.status });
 }
 
 async function waitForUpgrade(app: App, purchased: Plan): Promise<Plan | null> {
@@ -280,6 +319,8 @@ async function waitForUpgrade(app: App, purchased: Plan): Promise<Plan | null> {
 
 function BillingTab() {
   const app = useApp();
+  const t = useT();
+  const locale = useLocale();
   const user = app.authStore((s) => s.session?.user);
   const changePlan = app.authStore((s) => s.changePlan);
   const quota = useUploadQuota();
@@ -319,7 +360,11 @@ function BillingTab() {
     setParams(next, { replace: true });
 
     if (outcome === 'cancelled') {
-      toast({ variant: 'info', title: 'Checkout cancelled', description: 'You have not been charged.' });
+      toast({
+        variant: 'info',
+        title: t('settings.billing.checkoutCancelledTitle'),
+        description: t('settings.billing.checkoutCancelledBody'),
+      });
       return;
     }
     if (outcome !== 'success') return;
@@ -331,21 +376,24 @@ function BillingTab() {
           upgraded
             ? {
                 variant: 'success',
-                title: upgraded === 'lifetime' ? 'Auto Cards is yours' : 'You’re on Pro',
+                title:
+                  upgraded === 'lifetime'
+                    ? t('settings.billing.lifetimeOwnedTitle')
+                    : t('settings.billing.proOwnedTitle'),
                 description:
                   upgraded === 'lifetime'
-                    ? 'Bought outright, so there is nothing to renew. Your new allowance is live.'
-                    : 'Your new allowance is live.',
+                    ? t('settings.billing.lifetimeOwnedBody')
+                    : t('settings.billing.upgradeOwnedBody'),
               }
             : {
                 variant: 'info',
-                title: 'Payment received',
-                description: 'Your plan is taking a moment to activate. Refresh in a minute.',
+                title: t('settings.billing.paymentReceivedTitle'),
+                description: t('settings.billing.paymentReceivedBody'),
               },
         );
       })
       .finally(() => setActivating(false));
-  }, [app, params, setParams]);
+  }, [app, params, setParams, t]);
 
   if (!user) return null;
 
@@ -360,7 +408,7 @@ function BillingTab() {
     } catch (error) {
       toast({
         variant: 'error',
-        title: error instanceof Error ? error.message : 'Could not start the checkout.',
+        title: error instanceof Error ? error.message : t('settings.billing.checkoutFailed'),
       });
       setStarting(null);
     }
@@ -369,11 +417,11 @@ function BillingTab() {
   async function comp(plan: Plan) {
     try {
       await changePlan(plan);
-      toast({ variant: 'success', title: `Switched to ${plan}` });
+      toast({ variant: 'success', title: t('settings.billing.switchedTo', { plan }) });
     } catch (error) {
       toast({
         variant: 'error',
-        title: error instanceof Error ? error.message : 'Could not change that plan.',
+        title: error instanceof Error ? error.message : t('settings.billing.switchPlanFailed'),
       });
     }
   }
@@ -386,7 +434,7 @@ function BillingTab() {
     } catch (error) {
       toast({
         variant: 'error',
-        title: error instanceof Error ? error.message : 'Could not open your billing.',
+        title: error instanceof Error ? error.message : t('settings.billing.portalFailed'),
       });
       setOpeningPortal(false);
     }
@@ -397,7 +445,7 @@ function BillingTab() {
       {activating && (
         <Card>
           <CardBody className="text-sm text-slate-500 dark:text-slate-400">
-            Payment received. Activating your plan…
+            {t('settings.billing.activating')}
           </CardBody>
         </Card>
       )}
@@ -408,17 +456,21 @@ function BillingTab() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-slate-900 dark:text-white">
-                  {ownsOutright ? 'Your plan' : 'Your subscription'}
+                  {ownsOutright ? t('settings.billing.yourPlan') : t('settings.billing.yourSubscription')}
                 </h3>
-                {subscription.status === 'past_due' && <Badge variant="warning">Payment failed</Badge>}
-                {subscription.cancelAtPeriodEnd && <Badge variant="info">Cancelling</Badge>}
+                {subscription.status === 'past_due' && <Badge variant="warning">{t('settings.billing.paymentFailed')}</Badge>}
+                {subscription.cancelAtPeriodEnd && <Badge variant="info">{t('settings.billing.cancelling')}</Badge>}
               </div>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                {describeSubscription(subscription)}
+                {describeSubscription(t, locale, subscription)}
               </p>
             </div>
             <Button variant="outline" onClick={() => void manageBilling()} disabled={openingPortal}>
-              {openingPortal ? 'Opening…' : ownsOutright ? 'Receipts' : 'Manage billing'}
+              {openingPortal
+                ? t('settings.billing.opening')
+                : ownsOutright
+                  ? t('settings.billing.receipts')
+                  : t('settings.billing.manageBilling')}
             </Button>
           </CardBody>
         </Card>
@@ -426,18 +478,15 @@ function BillingTab() {
       <Card>
         <CardBody className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <h3 className="font-semibold text-slate-900 dark:text-white">Uploads this month</h3>
+            <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.billing.uploadsThisMonth')}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {quota.used} / {formatLimit(quota.limit)}
+              {quota.used} / {formatLimit(t, quota.limit)}
             </p>
           </div>
           {quota.limit !== Number.POSITIVE_INFINITY && (
             <Progress value={quota.used} max={quota.limit} />
           )}
-          <p className="text-xs text-slate-400">
-            Each generation uses one, however many files it reads, whether it starts a new deck or adds to an
-            existing one. Resets on the 1st.
-          </p>
+          <p className="text-xs text-slate-400">{t('settings.billing.uploadsHint')}</p>
         </CardBody>
       </Card>
 
@@ -451,13 +500,13 @@ function BillingTab() {
               <CardBody>
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold capitalize text-slate-900 dark:text-white">{plan}</h3>
-                  {isCurrent && <Badge variant="info">Current</Badge>}
+                  {isCurrent && <Badge variant="info">{t('settings.billing.current')}</Badge>}
                 </div>
-                <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{PLAN_PRICES[plan]}</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{planPrice(t, plan)}</p>
                 <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <li>{formatLimit(limits.monthlyUploads)} uploads/mo</li>
-                  <li>{formatLimit(limits.maxDecks)} decks</li>
-                  <li>{formatLimit(limits.maxPagesPerPdf)} pages per PDF or slide deck</li>
+                  <li>{t('settings.billing.uploadsPerMonth', { count: formatLimit(t, limits.monthlyUploads) })}</li>
+                  <li>{t('settings.billing.decksCount', { count: formatLimit(t, limits.maxDecks) })}</li>
+                  <li>{t('settings.billing.pagesPerDoc', { count: formatLimit(t, limits.maxPagesPerPdf) })}</li>
                 </ul>
                 {!isCurrent && forSale && (
                   <Button
@@ -467,10 +516,10 @@ function BillingTab() {
                     onClick={() => void upgrade(plan)}
                   >
                     {starting === plan
-                      ? 'Opening checkout…'
+                      ? t('settings.billing.openingCheckout')
                       : ONE_TIME_PLANS.includes(plan)
-                        ? 'Buy lifetime'
-                        : `Upgrade to ${plan}`}
+                        ? t('settings.billing.buyLifetime')
+                        : t('settings.billing.upgradeTo', { plan })}
                   </Button>
                 )}
                 {!isCurrent && canSwitchPlans && (
@@ -480,7 +529,7 @@ function BillingTab() {
                     className="mt-2 w-full"
                     onClick={() => void comp(plan)}
                   >
-                    Switch to {plan}
+                    {t('settings.billing.switchTo', { plan })}
                   </Button>
                 )}
               </CardBody>
@@ -490,12 +539,12 @@ function BillingTab() {
       </div>
 
       {!billing && (
-        <p className="text-xs text-slate-400">Checkout isn’t switched on in this build, so plans are read-only here.</p>
+        <p className="text-xs text-slate-400">{t('settings.billing.checkoutOff')}</p>
       )}
     </div>
   );
 }
 
-function formatLimit(value: number): string {
-  return value === Number.POSITIVE_INFINITY ? 'Unlimited' : String(value);
+function formatLimit(t: Translator, value: number): string {
+  return value === Number.POSITIVE_INFINITY ? t('settings.billing.unlimited') : String(value);
 }

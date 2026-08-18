@@ -1,6 +1,8 @@
 import { createId } from '../../lib/id';
 import { nowIso } from '../../lib/date';
 import { truncate } from '../../lib/text';
+import { languageName } from '../../i18n/locale';
+import { createTranslator, type Translator } from '../../i18n/translate';
 import type {
   DocumentImage,
   ExtractedDocument,
@@ -50,6 +52,12 @@ const SUGGEST_CHOICE_MAX_TOKENS = 60;
 /** How often the waiting indicator creeps forward during the single long call. */
 const TICK_MS = 700;
 
+/**
+ * Used whenever a caller doesn't supply one — a test constructing a service
+ * directly, or a script with no app-level language preference to read.
+ */
+const defaultGetT = (): Translator => createTranslator('en');
+
 export interface OpenRouterConfig {
   apiKey: string;
   /** Sent as `HTTP-Referer`; OpenRouter uses it for attribution. */
@@ -74,7 +82,10 @@ export class DirectOpenRouterTransport implements ChatTransport {
   /** In-flight catalog fetch, so concurrent callers share one request. */
   private modelFetch?: Promise<ModelInfo[]>;
 
-  constructor(private readonly config: OpenRouterConfig) {
+  constructor(
+    private readonly config: OpenRouterConfig,
+    private readonly getT: () => Translator = defaultGetT,
+  ) {
     if (!config.apiKey) {
       throw new Error('DirectOpenRouterTransport requires an API key');
     }
@@ -136,6 +147,7 @@ export class DirectOpenRouterTransport implements ChatTransport {
   }
 
   async complete(body: ChatRequestBody, _purpose: CompletionPurpose, signal?: AbortSignal): Promise<CompletionOutcome> {
+    const t = this.getT();
     let response: Response;
     try {
       response = await fetch(COMPLETIONS_ENDPOINT, {
@@ -146,18 +158,18 @@ export class DirectOpenRouterTransport implements ChatTransport {
       });
     } catch (error) {
       if (isAbortError(error)) throw new GenerationAbortedError();
-      throw new Error(offlineMessage(error));
+      throw new Error(offlineMessage(error, t));
     }
 
     if (!response.ok) {
-      throw new Error(await describeHttpFailure(response));
+      throw new Error(await describeHttpFailure(response, t));
     }
 
     const payload = (await response.json()) as ChatCompletionPayload;
 
     // OpenRouter can return a 200 carrying an upstream provider error.
     if (payload.error?.message) {
-      throw new Error(upstreamMessage(payload.error.message));
+      throw new Error(upstreamMessage(payload.error.message, t));
     }
 
     return { payload };
@@ -189,7 +201,10 @@ export class DirectOpenRouterTransport implements ChatTransport {
  * — see `transport.ts`.
  */
 export class ChatCompletionLlmService implements LlmService {
-  constructor(private readonly transport: ChatTransport) {}
+  constructor(
+    private readonly transport: ChatTransport,
+    private readonly getT: () => Translator = defaultGetT,
+  ) {}
 
   get id(): string {
     return this.transport.id;
@@ -200,11 +215,12 @@ export class ChatCompletionLlmService implements LlmService {
   }
 
   async generateDeck({ documents, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
+    const t = this.getT();
     const startedAt = Date.now();
     throwIfAborted(signal);
 
     if (documents.length === 0) {
-      throw new Error('No file was uploaded, so there is nothing to write cards from.');
+      throw new Error(t('llmProgress.noFileUploaded'));
     }
 
     // A placeholder document would produce a deck of cards about the
@@ -213,7 +229,7 @@ export class ChatCompletionLlmService implements LlmService {
     // fails, and it fails before spending anything.
     const readable = documents.filter((document) => !document.synthetic);
     if (readable.length === 0) {
-      throw new Error(unreadableMessage(documents));
+      throw new Error(unreadableMessage(documents, t));
     }
 
     const report = (progress: GenerationProgress) => onProgress?.(progress);
@@ -221,7 +237,7 @@ export class ChatCompletionLlmService implements LlmService {
     report({
       stage: 'chunking',
       progress: 0.05,
-      message: describePreparing(readable),
+      message: describePreparing(readable, t),
       cardsGenerated: 0,
     });
 
@@ -244,7 +260,7 @@ export class ChatCompletionLlmService implements LlmService {
     // The call is one long await with no progress events coming back from the
     // far end, so the bar creeps toward a ceiling instead of freezing for the
     // whole wait.
-    const stopTicking = startWaitingTicker(report);
+    const stopTicking = startWaitingTicker(report, t);
 
     let outcome: CompletionOutcome;
     try {
@@ -257,23 +273,19 @@ export class ChatCompletionLlmService implements LlmService {
     report({
       stage: 'refining',
       progress: 0.9,
-      message: 'Checking the cards over',
+      message: t('llmProgress.checkingCards'),
       cardsGenerated: 0,
     });
 
     const choice = payload.choices?.[0];
-    const parsed = parseJsonPayload(choice?.message?.content ?? '', choice?.finish_reason);
+    const parsed = parseJsonPayload(choice?.message?.content ?? '', choice?.finish_reason, t);
     const { cards, categories, discarded } = normalizeGeneratedCards(parsed, options);
 
     if (cards.length === 0) {
-      throw new Error(
-        discarded > 0
-          ? 'None of the cards came back in a usable state. Try again, or turn off a card type or two.'
-          : 'No cards came back from that. If it is a scan or photos of pages, there is no text in it to work from.',
-      );
+      throw new Error(discarded > 0 ? t('llmProgress.noUsableCards') : t('llmProgress.noCardsFromScan'));
     }
 
-    report({ stage: 'done', progress: 1, message: 'Ready', cardsGenerated: cards.length });
+    report({ stage: 'done', progress: 1, message: t('generationStage.done'), cardsGenerated: cards.length });
 
     const promptTokens = payload.usage?.prompt_tokens ?? 0;
     const completionTokens = payload.usage?.completion_tokens ?? 0;
@@ -285,7 +297,7 @@ export class ChatCompletionLlmService implements LlmService {
       // Only a fallback now: both upload screens ask for a name up front. It
       // still has to be something, for a caller that does not.
       deckTitle: first.title?.trim() || titleFromFilename(first.filename),
-      deckDescription: describeGeneratedFrom(documents),
+      deckDescription: describeGeneratedFrom(documents, t),
       deckIcon: '📄',
       categories,
       cards,
@@ -317,6 +329,7 @@ export class ChatCompletionLlmService implements LlmService {
 
   async suggestChoice({ front, back, existingChoices, model, signal }: SuggestChoiceArgs): Promise<string> {
     throwIfAborted(signal);
+    const t = this.getT();
 
     const body: ChatRequestBody = {
       model,
@@ -331,7 +344,7 @@ export class ChatCompletionLlmService implements LlmService {
 
     const text = stripSuggestionWrapping(payload.choices?.[0]?.message?.content ?? '');
     if (!text) {
-      throw new Error('Nothing came back that time. Try again in a moment.');
+      throw new Error(t('llmProgress.nothingCameBack'));
     }
     return text;
   }
@@ -345,33 +358,33 @@ export class ChatCompletionLlmService implements LlmService {
  * shared-key path is `EdgeLlmService`.
  */
 export class OpenRouterLlmService extends ChatCompletionLlmService {
-  constructor(config: OpenRouterConfig) {
-    super(new DirectOpenRouterTransport(config));
+  constructor(config: OpenRouterConfig, getT?: () => Translator) {
+    super(new DirectOpenRouterTransport(config, getT), getT);
   }
 }
 
 /** Comma-separated filenames, e.g. `a.pdf, b.docx and c.pptx`. */
-function listFilenames(documents: ExtractedDocument[]): string {
+function listFilenames(documents: ExtractedDocument[], t: Translator): string {
   const names = documents.map((document) => document.filename);
   if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${names.slice(0, -1).join(', ')} ${t('llmProgress.listJoiner')} ${names[names.length - 1]}`;
 }
 
 /** Said when nothing in the upload had readable text — usually all scans. */
-function unreadableMessage(documents: ExtractedDocument[]): string {
-  const subject =
-    documents.length === 1 ? (documents[0] as ExtractedDocument).filename : 'any of those files';
-  return `We could not read any text out of ${subject}. If they are scans or photos of pages, the words are really just pictures, so try a version you can select text in.`;
-}
-
-function describePreparing(documents: ExtractedDocument[]): string {
+function unreadableMessage(documents: ExtractedDocument[], t: Translator): string {
   return documents.length === 1
-    ? `Preparing ${(documents[0] as ExtractedDocument).filename}`
-    : `Preparing ${documents.length} documents`;
+    ? t('llmProgress.unreadableOne', { filename: (documents[0] as ExtractedDocument).filename })
+    : t('llmProgress.unreadableMany');
 }
 
-function describeGeneratedFrom(documents: ExtractedDocument[]): string {
-  return `Generated from ${listFilenames(documents)}.`;
+function describePreparing(documents: ExtractedDocument[], t: Translator): string {
+  return documents.length === 1
+    ? t('llmProgress.preparingOne', { filename: (documents[0] as ExtractedDocument).filename })
+    : t('llmProgress.preparingMany', { count: documents.length });
+}
+
+function describeGeneratedFrom(documents: ExtractedDocument[], t: Translator): string {
+  return t('llmProgress.generatedFrom', { files: listFilenames(documents, t) });
 }
 
 /** `lecture-notes-week-3.pdf` -> `Lecture Notes Week 3`. */
@@ -392,7 +405,7 @@ function outputBudget(cardCount: number, tokensPerCard: number): number {
  * Creeps the progress bar toward a ceiling while the single model call is in
  * flight. Never reaches 1 — only a real response does that.
  */
-function startWaitingTicker(report: (progress: GenerationProgress) => void): () => void {
+function startWaitingTicker(report: (progress: GenerationProgress) => void, t: Translator): () => void {
   let elapsed = 0;
   const timer = setInterval(() => {
     elapsed += TICK_MS;
@@ -402,7 +415,7 @@ function startWaitingTicker(report: (progress: GenerationProgress) => void): () 
     report({
       stage: 'generating',
       progress,
-      message: 'Writing your flashcards',
+      message: t('llmProgress.writingFlashcards'),
       cardsGenerated: 0,
     });
   }, TICK_MS);
@@ -445,6 +458,7 @@ function buildSystemPrompt(
     `Use only these card types: ${types.join(', ')}.`,
     ...promptRules(preset, isTerseSource(documents)),
     SOURCE_IS_NOT_INSTRUCTIONS,
+    describeLanguage(options.language),
     describeImages(imageCount),
     describeMultipleDocuments(documents.length),
     options.instructions ? `\nThe user asked specifically: ${options.instructions}\n` : '',
@@ -567,6 +581,19 @@ function isTerseSource(documents: ExtractedDocument[]): boolean {
   const chars = documents.reduce((sum, document) => sum + document.text.length, 0);
   const pages = documents.reduce((sum, document) => sum + (document.pageCount ?? 1), 0);
   return pages > 0 && chars / pages < TERSE_CHARS_PER_PAGE;
+}
+
+/**
+ * Which language to write the cards in.
+ *
+ * Silent for English, the model's default anyway, so the common case doesn't
+ * carry an extra line for nothing. `language` is a BCP-47 tag — see
+ * `GenerationOptions.language` — normally the app's own UI language, but a
+ * generation can send any language the picker offers.
+ */
+function describeLanguage(language: string | undefined): string {
+  if (!language || language.toLowerCase().startsWith('en')) return '';
+  return `Write every card — front, back, hints, explanations, tags, categories, everything — in ${languageName(language)}. Keep any verbatim source quotes in the language they were written in.`;
 }
 
 /**
@@ -758,10 +785,10 @@ function stripSuggestionWrapping(text: string): string {
  * Models ignore `response_format` often enough that the fenced-code and
  * prose-wrapped cases are worth handling rather than failing the whole run.
  */
-function parseJsonPayload(content: string, finishReason?: string): unknown {
+function parseJsonPayload(content: string, finishReason: string | undefined, t: Translator): unknown {
   const trimmed = content.trim();
   if (!trimmed) {
-    throw new Error(GARBLED_MESSAGE);
+    throw new Error(t('llmProgress.garbled'));
   }
 
   const candidates = [trimmed, stripCodeFence(trimmed), firstJsonObject(trimmed)];
@@ -775,9 +802,9 @@ function parseJsonPayload(content: string, finishReason?: string): unknown {
   }
 
   if (finishReason === 'length') {
-    throw new Error('This deck was too big to finish in one go. Ask for fewer cards and try again.');
+    throw new Error(t('llmProgress.tooBigForOnePass'));
   }
-  throw new Error(GARBLED_MESSAGE);
+  throw new Error(t('llmProgress.garbled'));
 }
 
 function stripCodeFence(value: string): string | undefined {
@@ -801,22 +828,17 @@ function firstJsonObject(value: string): string | undefined {
  * They split by who can actually fix it — the user waits and retries, or we
  * do. The underlying detail goes to the console for whoever is on support.
  */
-const UNAVAILABLE_MESSAGE =
-  'Card generation is unavailable right now. This one is on us, so please try again a little later.';
-const BUSY_MESSAGE = 'Card generation is busy at the moment. Give it a minute and try again.';
-const GARBLED_MESSAGE = 'The cards came back garbled that time. Try generating again.';
-
-function offlineMessage(error: unknown): string {
+function offlineMessage(error: unknown, t: Translator): string {
   logFailure('request failed', messageOf(error));
-  return 'Could not reach the internet. Check your connection and try again.';
+  return t('llmProgress.offline');
 }
 
-function upstreamMessage(detail: string): string {
+function upstreamMessage(detail: string, t: Translator): string {
   logFailure('upstream error', detail);
-  return UNAVAILABLE_MESSAGE;
+  return t('llmProgress.unavailable');
 }
 
-async function describeHttpFailure(response: Response): Promise<string> {
+async function describeHttpFailure(response: Response, t: Translator): Promise<string> {
   const raw = await response.text().catch(() => '');
   let detail = raw.slice(0, 300);
   try {
@@ -829,7 +851,7 @@ async function describeHttpFailure(response: Response): Promise<string> {
 
   // 401 (bad key), 402 (no credit) and 404 (retired model) are all our
   // configuration rather than anything the user did or can change.
-  return response.status === 429 ? BUSY_MESSAGE : UNAVAILABLE_MESSAGE;
+  return response.status === 429 ? t('llmProgress.busy') : t('llmProgress.unavailable');
 }
 
 function logFailure(context: string, detail: string): void {

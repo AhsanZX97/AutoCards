@@ -1,5 +1,6 @@
 import type { Flashcard } from '@autocards/core';
 import { DIFFICULTY_BADGE } from '../../lib/badges';
+import { useT } from '../../lib/i18n';
 
 interface CardFaceProps {
   card: Flashcard;
@@ -10,6 +11,7 @@ interface CardFaceProps {
 }
 
 export function CardFace({ card, flipped, promptText, answerText, onFlip }: CardFaceProps) {
+  const t = useT();
   return (
     <div className="relative" style={{ perspective: '1200px' }}>
       <div
@@ -25,10 +27,10 @@ export function CardFace({ card, flipped, promptText, answerText, onFlip }: Card
           className="card-face absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center shadow-glow"
         >
           <span className={`mb-4 rounded-full px-2.5 py-1 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
-            {DIFFICULTY_BADGE[card.difficulty].label}
+            {t(`difficulty.${card.difficulty}` as const)}
           </span>
           <p className="text-lg font-semibold leading-snug text-white sm:text-xl">{promptText}</p>
-          <p className="mt-6 text-xs text-slate-500">Click card or "Show answer" to flip</p>
+          <p className="mt-6 text-xs text-slate-500">{t('cardFace.flipHint')}</p>
         </div>
 
         {/* Back */}
@@ -36,7 +38,7 @@ export function CardFace({ card, flipped, promptText, answerText, onFlip }: Card
           className="card-face absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-brand-500/40 bg-gradient-to-br from-brand-950 to-slate-900 p-8 text-center shadow-glow"
           style={{ transform: 'rotateY(180deg)' }}
         >
-          <span className="mb-4 text-xs font-medium uppercase tracking-wide text-brand-400">Answer</span>
+          <span className="mb-4 text-xs font-medium uppercase tracking-wide text-brand-400">{t('cardFace.answer')}</span>
           <p className="text-lg font-semibold leading-snug text-white sm:text-xl">{answerText}</p>
         </div>
       </div>

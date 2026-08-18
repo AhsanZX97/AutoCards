@@ -1,4 +1,5 @@
 import type { UploadQuotaSnapshot } from '../../types';
+import { createTranslator, type Translator } from '../../i18n/translate';
 import type { EdgeConfig } from '../edgeConfig';
 import { MODEL_CATALOG } from './models';
 import { ChatCompletionLlmService } from './openRouter';
@@ -24,6 +25,9 @@ const FUNCTION_BY_PURPOSE: Record<CompletionPurpose, string> = {
  */
 export type EdgeLlmConfig = EdgeConfig;
 
+/** Used whenever a caller doesn't supply one — see `openRouter.ts`. */
+const defaultGetT = (): Translator => createTranslator('en');
+
 /**
  * Sends the call to our own server, which holds the OpenRouter key.
  *
@@ -37,7 +41,10 @@ export class EdgeFunctionTransport implements ChatTransport {
   readonly id = 'edge';
   private readonly base: string;
 
-  constructor(private readonly config: EdgeLlmConfig) {
+  constructor(
+    private readonly config: EdgeLlmConfig,
+    private readonly getT: () => Translator = defaultGetT,
+  ) {
     this.base = config.supabaseUrl.replace(/\/+$/, '');
   }
 
@@ -57,9 +64,10 @@ export class EdgeFunctionTransport implements ChatTransport {
     purpose: CompletionPurpose,
     signal?: AbortSignal,
   ): Promise<CompletionOutcome> {
+    const t = this.getT();
     const token = await this.config.getAccessToken();
     if (!token) {
-      throw new Error('Sign in to generate cards.');
+      throw new Error(t('llmProgress.signInRequired'));
     }
 
     let response: Response;
@@ -76,13 +84,13 @@ export class EdgeFunctionTransport implements ChatTransport {
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw new GenerationAbortedError();
-      throw new Error('We could not reach card generation just now. Check your connection and try again.');
+      throw new Error(t('llmProgress.networkUnreachable'));
     }
 
     const envelope = await readJson(response);
 
     if (!response.ok) {
-      throw failureFrom(envelope, readQuota(envelope?.quota));
+      throw failureFrom(envelope, readQuota(envelope?.quota), t);
     }
 
     const quota = readQuota(envelope?.quota);
@@ -95,8 +103,8 @@ export class EdgeFunctionTransport implements ChatTransport {
 
 /** The generator every signed-in user runs on. */
 export class EdgeLlmService extends ChatCompletionLlmService {
-  constructor(config: EdgeLlmConfig) {
-    super(new EdgeFunctionTransport(config));
+  constructor(config: EdgeLlmConfig, getT?: () => Translator) {
+    super(new EdgeFunctionTransport(config, getT), getT);
   }
 }
 
@@ -120,11 +128,19 @@ async function readJson(response: Response): Promise<Envelope | undefined> {
  * is passed through as-is. Only the code is interpreted, and only to tell a
  * spent allowance apart from a genuine failure.
  */
-function failureFrom(envelope: Envelope | undefined, quota: UploadQuotaSnapshot | undefined): Error {
+function failureFrom(
+  envelope: Envelope | undefined,
+  quota: UploadQuotaSnapshot | undefined,
+  t: Translator,
+): Error {
+  // The function's own message is server-authored English, whatever the
+  // caller's locale — translating it would mean the function itself
+  // accepting and rendering a locale, which it does not do today. Only the
+  // fallback for a message-less failure is ours to translate.
   const message =
     typeof envelope?.error?.message === 'string' && envelope.error.message
       ? envelope.error.message
-      : 'Card generation did not work that time. Try again in a moment.';
+      : t('llmProgress.genericFailure');
 
   if (envelope?.error?.code === 'quota_exhausted') {
     // A refusal reports the count too, so a meter that was out of step is

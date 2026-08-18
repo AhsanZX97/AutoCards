@@ -2,18 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import {
-  CARD_TYPE_LABELS,
   CARD_TYPES,
   DEFAULT_GENERATION_PRESET,
   DEFAULT_MODEL_ID,
   DIFFICULTIES,
   DOCUMENT_KIND_ICONS,
   GENERATION_PRESETS,
-  GENERATION_PRESET_DESCRIPTIONS,
-  GENERATION_PRESET_LABELS,
-  GENERATION_STAGE_LABELS,
   GenerationAbortedError,
+  LOCALE_LABELS,
   SUPPORTED_FORMATS_LABEL,
+  SUPPORTED_LOCALES,
   UploadQuotaExceededError,
   describeOversized,
   describeUnsupported,
@@ -29,8 +27,10 @@ import {
   type GeneratedCard,
   type GenerationPresetId,
   type GenerationProgress,
+  type Locale,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { useLocale, useT } from '../../lib/i18n';
 import { documentSourceFromUri } from '../../lib/pdfSource';
 import { toast } from '../../lib/toastStore';
 import { useTheme, spacing } from '../../lib/theme';
@@ -55,6 +55,8 @@ interface GenerateCardsModalProps {
  *  `avoidPrompts`, fed into `addGeneratedCards` instead of creating a new deck. */
 export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCardsModalProps) {
   const app = useApp();
+  const t = useT();
+  const appLocale = useLocale();
   const theme = useTheme();
   const quota = useUploadQuota();
   const defaults = app.settingsStore((s) => s.generationDefaults);
@@ -77,6 +79,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
   const [includeSourceQuotes, setIncludeSourceQuotes] = useState(defaults.includeSourceQuotes);
   const [readImages, setReadImages] = useState(defaults.readImages ?? false);
   const [instructions, setInstructions] = useState('');
+  const [language, setLanguage] = useState<Locale>(appLocale);
 
   useEffect(() => {
     if (!open) return;
@@ -97,11 +100,11 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
     const size = asset.size ?? 0;
 
     if (!isSupportedDocument(asset.name)) {
-      toast({ variant: 'error', title: 'Cannot read that file', description: describeUnsupported(asset.name) });
+      toast({ variant: 'error', title: t('uploadDropzone.cannotReadTitle'), description: describeUnsupported(asset.name) });
       return;
     }
     if (isOversizedUpload(size)) {
-      toast({ variant: 'error', title: 'That file is too big', description: describeOversized(asset.name, size) });
+      toast({ variant: 'error', title: t('uploadDropzone.tooBigTitle'), description: describeOversized(asset.name, size) });
       return;
     }
     setFile({ uri: asset.uri, name: asset.name, size });
@@ -151,7 +154,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
           includeSourceQuotes,
           readImages,
           instructions: instructions.trim() || undefined,
-          language: 'en',
+          language,
         },
         avoidPrompts: cards.map((card) => getPromptText(card)).filter(Boolean),
         onProgress: setProgress,
@@ -165,17 +168,16 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
       quota.record(result.quota);
 
       if (added.length === 0) {
-        setErrorMessage(
-          'Every card written for this batch was already in the deck. Try a different section of the document, or add custom instructions pointing it somewhere new.',
-        );
+        setErrorMessage(t('addCards.allDuplicates'));
         setStep('error');
         return;
       }
 
       toast({
         variant: 'success',
-        title: `${added.length} card${added.length === 1 ? '' : 's'} added`,
-        description: duplicates > 0 ? `${duplicates} duplicate${duplicates === 1 ? ' was' : 's were'} skipped.` : undefined,
+        title: t.plural('addCards.cardsAdded', added.length, { count: added.length }),
+        description:
+          duplicates > 0 ? t.plural('addCards.duplicatesSkipped', duplicates, { count: duplicates }) : undefined,
       });
       onClose();
     } catch (err) {
@@ -184,7 +186,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
         return;
       }
       if (err instanceof UploadQuotaExceededError && err.quota) quota.record(err.quota);
-      setErrorMessage(err instanceof Error ? err.message : 'Something went wrong generating your cards.');
+      setErrorMessage(err instanceof Error ? err.message : t('addCards.genericError'));
       setStep('error');
     } finally {
       abortRef.current = null;
@@ -199,14 +201,14 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
     <Modal
       open={open}
       onClose={step === 'generating' ? cancelGeneration : onClose}
-      title="Add cards from a document"
-      description={`New cards are checked against the ${cards.length} already in ${deck.title}.`}
+      title={t('addCards.title')}
+      description={t('addCards.description', { count: cards.length, deckTitle: deck.title })}
       footer={
         step === 'setup' ? (
           <>
-            <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+            <Button title={t('addCards.cancel')} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
             <Button
-              title="Generate cards"
+              title={t('addCards.generate')}
               onPress={startGeneration}
               disabled={!file || !quota.canUpload}
               style={{ flex: 1 }}
@@ -214,11 +216,11 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
           </>
         ) : step === 'error' ? (
           <>
-            <Button title="Close" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-            <Button title="Try again" onPress={() => setStep('setup')} style={{ flex: 1 }} />
+            <Button title={t('addCards.close')} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+            <Button title={t('addCards.tryAgain')} onPress={() => setStep('setup')} style={{ flex: 1 }} />
           </>
         ) : (
-          <Button title="Cancel generation" variant="ghost" onPress={cancelGeneration} style={{ flex: 1 }} />
+          <Button title={t('addCards.cancelGeneration')} variant="ghost" onPress={cancelGeneration} style={{ flex: 1 }} />
         )
       }
     >
@@ -226,7 +228,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
         <View style={{ alignItems: 'center', paddingVertical: spacing.xxl }}>
           <ActivityIndicator color={theme.primary} size="large" />
           <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.lg }}>
-            {progress ? GENERATION_STAGE_LABELS[progress.stage] : 'Getting started…'}
+            {progress ? t(`generationStage.${progress.stage}` as const) : t('addCards.gettingStarted')}
           </Text>
           {progress && <Text style={{ color: theme.textFaint, fontSize: 13, marginTop: 4 }}>{progress.message}</Text>}
           <View style={{ width: '100%', marginTop: spacing.lg }}>
@@ -238,7 +240,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
       {step === 'error' && (
         <View style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
           <Text style={{ fontSize: 32 }}>⚠️</Text>
-          <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.md }}>No cards were added</Text>
+          <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.md }}>{t('addCards.noneAddedTitle')}</Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center' }}>{errorMessage}</Text>
         </View>
       )}
@@ -247,9 +249,7 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
         <View>
           {!quota.canUpload && (
             <View style={{ marginBottom: spacing.md }}>
-              <Notice variant="warning">
-                You have used all {quota.limit} of this month's generations. Your allowance resets on the 1st.
-              </Notice>
+              <Notice variant="warning">{t('addCards.quotaUsedUp', { limit: quota.limit })}</Notice>
             </View>
           )}
 
@@ -262,104 +262,114 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
                   </Text>
                   <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: 2 }}>{Math.round(file.size / 1024)} KB</Text>
                 </View>
-                <Button title="Change" variant="ghost" size="sm" onPress={pickFile} />
+                <Button title={t('mobileGenerate.change')} variant="ghost" size="sm" onPress={pickFile} />
               </View>
             ) : (
               <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
                 <Text style={{ fontSize: 32 }}>📄</Text>
                 <Text style={{ fontWeight: '700', color: theme.text, marginTop: spacing.sm, textAlign: 'center' }}>
-                  Choose another document
+                  {t('mobileGenerate.chooseDocument')}
                 </Text>
                 <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4, textAlign: 'center' }}>
-                  Takes {SUPPORTED_FORMATS_LABEL}.
+                  {t('mobileGenerate.takesFormats', { formats: SUPPORTED_FORMATS_LABEL })}
                 </Text>
-                <Button title="Browse files" onPress={pickFile} style={{ marginTop: spacing.md }} />
+                <Button title={t('mobileGenerate.browseFiles')} onPress={pickFile} style={{ marginTop: spacing.md }} />
               </View>
             )}
           </Card>
 
           <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginBottom: spacing.sm }}>
-            What are these cards for?
+            {t('addCards.whatFor')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {GENERATION_PRESETS.map((id) => (
-              <Chip key={id} label={GENERATION_PRESET_LABELS[id]} active={preset === id} onPress={() => choosePreset(id)} />
+              <Chip key={id} label={t(`generationPreset.${id}` as const)} active={preset === id} onPress={() => choosePreset(id)} />
             ))}
           </View>
           <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: -4, marginBottom: spacing.md }}>
-            {GENERATION_PRESET_DESCRIPTIONS[preset]}
+            {t(`generationPreset.${preset}.description` as const)}
           </Text>
 
           <Stepper
-            label="Number of cards"
+            label={t('addCards.numberOfCards')}
             value={cardCount}
             min={5}
             max={60}
             step={5}
-            formatValue={(v) => `${v} cards`}
+            formatValue={(v) => t('createDeck.cardsUnit', { count: v })}
             onChange={setCardCount}
           />
 
           <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginTop: spacing.md, marginBottom: spacing.sm }}>
-            Card types
+            {t('addCards.cardTypesToInclude')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {CARD_TYPES.map((type) => (
-              <Chip key={type} label={CARD_TYPE_LABELS[type]} active={cardTypes.includes(type)} onPress={() => toggleCardType(type)} />
+              <Chip key={type} label={t(`cardType.${type}` as const)} active={cardTypes.includes(type)} onPress={() => toggleCardType(type)} />
             ))}
           </View>
 
           <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text, marginTop: spacing.md, marginBottom: spacing.sm }}>
-            Difficulty
+            {t('addCards.targetDifficulty')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {DIFFICULTIES.map((d) => (
-              <Chip key={d} label={d[0]!.toUpperCase() + d.slice(1)} active={difficulty === d} onPress={() => setDifficulty(d)} />
+              <Chip key={d} label={t(`difficulty.${d}` as const)} active={difficulty === d} onPress={() => setDifficulty(d)} />
             ))}
           </View>
 
           <View style={{ marginTop: spacing.md }}>
             <SelectField
-              label="Put the new cards in"
-              hint="Auto-categorize reuses matching names"
+              label={t('addCards.putNewCardsIn')}
+              hint={t('addCards.putNewCardsInHint')}
               value={categoryTarget}
               onChange={setCategoryTarget}
               options={[
-                { value: AUTO_CATEGORY, label: 'Auto-categorize from the document' },
-                { value: NO_CATEGORY, label: 'No category' },
+                { value: AUTO_CATEGORY, label: t('addCards.autoCategorizeOption') },
+                { value: NO_CATEGORY, label: t('addCards.noCategoryOption') },
                 ...deck.categories.map((cat) => ({ value: cat.id, label: `${cat.icon} ${cat.name}` })),
               ]}
             />
           </View>
 
+          <View style={{ marginTop: spacing.md }}>
+            <SelectField
+              label={t('createDeck.language')}
+              hint={t('createDeck.languageHint')}
+              value={language}
+              onChange={(value) => setLanguage(value as Locale)}
+              options={SUPPORTED_LOCALES.map((locale) => ({ value: locale, label: LOCALE_LABELS[locale] }))}
+            />
+          </View>
+
           <Field
-            label="Custom instructions"
-            hint="optional"
+            label={t('addCards.customInstructions')}
+            hint={t('common.optional')}
             multiline
             numberOfLines={2}
             value={instructions}
             onChangeText={setInstructions}
-            placeholder="e.g. Only cover chapter 5; the deck already has chapters 1–4."
+            placeholder={t('addCards.customInstructionsPlaceholder')}
           />
 
           <View style={{ marginTop: spacing.sm }}>
-            <SwitchRow label="Include hints" value={includeHints} onValueChange={setIncludeHints} />
-            <SwitchRow label="Include explanations" value={includeExplanations} onValueChange={setIncludeExplanations} />
+            <SwitchRow label={t('addCards.includeHints')} value={includeHints} onValueChange={setIncludeHints} />
+            <SwitchRow label={t('addCards.includeExplanations')} value={includeExplanations} onValueChange={setIncludeExplanations} />
             <SwitchRow
-              label="Quote source passages"
-              description="Show the original text each card was based on"
+              label={t('addCards.quoteSource')}
+              description={t('addCards.quoteSourceDescription')}
               value={includeSourceQuotes}
               onValueChange={setIncludeSourceQuotes}
             />
             <SwitchRow
-              label="Read the pictures too"
-              description="Reads diagrams and charts as well as the text. Slower and costs more."
+              label={t('addCards.readImages')}
+              description={t('addCards.readImagesDescription')}
               value={readImages}
               onValueChange={setReadImages}
             />
           </View>
 
-          <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: spacing.md }}>{formatQuota(quota)}</Text>
+          <Text style={{ fontSize: 12, color: theme.textFaint, marginTop: spacing.md }}>{formatQuota(t, quota)}</Text>
         </View>
       )}
     </Modal>

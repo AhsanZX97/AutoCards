@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Wordmark } from '../ui';
+import { useT } from '../../lib/i18n';
 
 export function AuthLayout({ children, title, subtitle }: { children: ReactNode; title: string; subtitle: string }) {
+  const t = useT();
   return (
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col justify-center px-4 py-12 sm:px-6 lg:w-[480px] lg:flex-none lg:px-16">
@@ -27,12 +29,8 @@ export function AuthLayout({ children, title, subtitle }: { children: ReactNode;
               </div>
             ))}
           </div>
-          <h2 className="max-w-md text-2xl font-bold text-white">
-            Turn your slides and notes into a study-ready flashcard deck
-          </h2>
-          <p className="mt-3 max-w-sm text-slate-400">
-            Upload lecture notes, textbooks, or reports and get customizable, gamified flashcards in seconds.
-          </p>
+          <h2 className="max-w-md text-2xl font-bold text-white">{t('auth.layout.heroTitle')}</h2>
+          <p className="mt-3 max-w-sm text-slate-400">{t('auth.layout.heroBody')}</p>
         </div>
       </div>
     </div>

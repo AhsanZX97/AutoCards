@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useURL } from 'expo-linking';
 import { useApp } from '../../src/lib/appContext';
+import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
 import { Screen } from '../../src/components';
 
@@ -22,6 +23,7 @@ const GIVE_UP_AFTER_MS = 15_000;
  */
 export default function AuthCallbackScreen() {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const url = useURL();
   const [outcome, setOutcome] = useState<'pending' | 'failed'>('pending');
@@ -71,7 +73,7 @@ export default function AuthCallbackScreen() {
               textAlign: 'center',
             }}
           >
-            That didn&apos;t finish
+            {t('auth.callback.failedTitle')}
           </Text>
           <Text
             style={{
@@ -82,10 +84,10 @@ export default function AuthCallbackScreen() {
               lineHeight: 22,
             }}
           >
-            {message ?? 'This is taking longer than it should. Try signing in again.'}
+            {message ?? t('auth.callback.timedOut')}
           </Text>
           <Link href="/(auth)/sign-in" style={{ marginTop: spacing.xl }}>
-            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>Back to sign in</Text>
+            <Text style={{ color: theme.primaryText, fontWeight: '700', fontSize: 16 }}>{t('auth.callback.backToSignIn')}</Text>
           </Link>
         </View>
       </Screen>
@@ -95,7 +97,7 @@ export default function AuthCallbackScreen() {
   return (
     <Screen>
       <View style={{ marginTop: spacing.xxl, alignItems: 'center' }}>
-        <Text style={{ color: theme.textMuted }}>Signing you in…</Text>
+        <Text style={{ color: theme.textMuted }}>{t('auth.callback.signingIn')}</Text>
       </View>
     </Screen>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 
 /** Long enough for a slow exchange, short enough not to look like a hang. */
 const GIVE_UP_AFTER_MS = 15_000;
@@ -31,6 +32,7 @@ function safeNext(raw: string | null): string {
  */
 export function AuthCallbackPage() {
   const app = useApp();
+  const t = useT();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const status = app.authStore((s) => s.status);
@@ -64,20 +66,16 @@ export function AuthCallbackPage() {
           ⚠️
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-            That didn&apos;t finish
-          </h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">{t('auth.callback.failedTitle')}</h2>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {denial
-              ? 'Google didn’t complete the sign-in. You can try again, or use your email and password.'
-              : 'This is taking longer than it should. Try signing in again.'}
+            {denial ? t('auth.callback.googleDenied') : t('auth.callback.timedOut')}
           </p>
         </div>
         <Link
           to="/sign-in"
           className="inline-block rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
         >
-          Back to sign in
+          {t('auth.callback.backToSignIn')}
         </Link>
       </div>
     );
@@ -86,7 +84,7 @@ export function AuthCallbackPage() {
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-      <p className="text-sm text-slate-500 dark:text-slate-400">Signing you in…</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{t('auth.callback.signingIn')}</p>
     </div>
   );
 }

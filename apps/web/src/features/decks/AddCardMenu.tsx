@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/ui';
 import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n';
 
 interface AddCardMenuProps {
   /** Open the card editor and write one by hand. */
@@ -13,6 +14,7 @@ interface AddCardMenuProps {
 
 /** The two ways a card gets into a deck, behind one button. */
 export function AddCardMenu({ onWriteCard, onGenerateFromPdf, quotaLabel }: AddCardMenuProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,8 +50,8 @@ export function AddCardMenu({ onWriteCard, onGenerateFromPdf, quotaLabel }: AddC
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Add card"
-        title="Add card"
+        aria-label={t('addCardMenu.addCard')}
+        title={t('addCardMenu.addCard')}
       >
         <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -60,11 +62,11 @@ export function AddCardMenu({ onWriteCard, onGenerateFromPdf, quotaLabel }: AddC
           role="menu"
           className="absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
         >
-          <MenuItem icon="✍️" label="Write one myself" hint="Open the card editor" onClick={() => choose(onWriteCard)} />
+          <MenuItem icon="✍️" label={t('addCardMenu.writeOne')} hint={t('addCardMenu.writeOneHint')} onClick={() => choose(onWriteCard)} />
           <MenuItem
             icon="📄"
-            label="Generate from a document"
-            hint={quotaLabel ?? 'Upload a document and let AI write them'}
+            label={t('addCardMenu.generateFromDocument')}
+            hint={quotaLabel ?? t('addCardMenu.generateFromDocumentHint')}
             onClick={() => choose(onGenerateFromPdf)}
           />
         </div>

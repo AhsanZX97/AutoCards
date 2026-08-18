@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ACCENTS, type Accent } from '@autocards/core';
 import { useTheme, ACCENT_HEX, radius, spacing } from '../../lib/theme';
+import { useT } from '../../lib/i18n';
 import { Modal } from '../../components';
 
 /** Mirrors the web's `ICON_CHOICES` (`DeckEditorModal.tsx`) — a fixed grid so
@@ -16,13 +17,14 @@ const ICON_CHOICES = [
 
 export function IconPicker({ value, onChange, label }: { value: string; onChange: (icon: string) => void; label: string }) {
   const theme = useTheme();
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        accessibilityLabel={`Change ${label}`}
+        accessibilityLabel={t('deckEditor.changeIcon', { label })}
         style={{
           width: 52,
           height: 44,
@@ -36,7 +38,7 @@ export function IconPicker({ value, onChange, label }: { value: string; onChange
       >
         <Text style={{ fontSize: 20 }}>{value}</Text>
       </Pressable>
-      <Modal open={open} onClose={() => setOpen(false)} title={`Choose ${label}`}>
+      <Modal open={open} onClose={() => setOpen(false)} title={t('deckEditor.chooseIcon', { label })}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingBottom: spacing.md }}>
           {ICON_CHOICES.map((icon) => (
             <Pressable

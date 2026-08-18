@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { useThemeEffect } from './lib/useTheme';
+import { useLocaleEffect, useT } from './lib/i18n';
 import { RequireAuth } from './components/layout/RequireAuth';
 import { AppLayout } from './components/layout/AppLayout';
 import { MarketingLayout } from './components/layout/MarketingLayout';
@@ -26,6 +27,8 @@ import { SettingsPage } from './features/settings/SettingsPage';
 
 export default function App() {
   useThemeEffect();
+  useLocaleEffect();
+  const t = useT();
 
   return (
     <>
@@ -36,7 +39,7 @@ export default function App() {
         <Route
           path="/sign-in"
           element={
-            <AuthLayout title="Welcome back" subtitle="Sign in to keep studying where you left off.">
+            <AuthLayout title={t('auth.signIn.title')} subtitle={t('auth.signIn.subtitle')}>
               <SignInPage />
             </AuthLayout>
           }
@@ -44,7 +47,7 @@ export default function App() {
         <Route
           path="/sign-up"
           element={
-            <AuthLayout title="Create your account" subtitle="Free to start. No credit card required.">
+            <AuthLayout title={t('auth.signUp.title')} subtitle={t('auth.signUp.subtitle')}>
               <SignUpPage />
             </AuthLayout>
           }
@@ -53,8 +56,8 @@ export default function App() {
           path="/forgot-password"
           element={
             <AuthLayout
-              title="Reset your password"
-              subtitle="We'll email you a link to set a new one."
+              title={t('auth.forgotPassword.title')}
+              subtitle={t('auth.forgotPassword.subtitle')}
             >
               <ForgotPasswordPage />
             </AuthLayout>
@@ -66,7 +69,7 @@ export default function App() {
         <Route
           path="/auth/callback"
           element={
-            <AuthLayout title="Almost there" subtitle="Finishing your sign-in.">
+            <AuthLayout title={t('auth.callback.title')} subtitle={t('auth.callback.subtitle')}>
               <AuthCallbackPage />
             </AuthLayout>
           }
@@ -76,7 +79,7 @@ export default function App() {
         <Route
           path="/reset-password"
           element={
-            <AuthLayout title="Choose a new password" subtitle="Then you're straight back in.">
+            <AuthLayout title={t('auth.resetPassword.title')} subtitle={t('auth.resetPassword.subtitle')}>
               <ResetPasswordPage />
             </AuthLayout>
           }

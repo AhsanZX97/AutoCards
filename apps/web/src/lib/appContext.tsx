@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createApp, type App, type EdgeLlmConfig } from '@autocards/core';
+import { createApp, createTranslator, resolveLocale, type App, type EdgeLlmConfig } from '@autocards/core';
 import { RoutingDocumentExtractor } from '@autocards/core';
 import { BrowserPdfExtractor } from '@autocards/core/browser';
 import { createWebStorage } from './webStorage';
@@ -42,6 +42,7 @@ function getApp(): App {
       storage: createWebStorage(),
       documentExtractor: new RoutingDocumentExtractor(new BrowserPdfExtractor()),
       supabase: supabaseClient,
+      getDeviceLocales: () => (typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language]),
       ...(supabaseSetup ? { edge: buildEdge(supabaseSetup) } : {}),
     });
   }
@@ -52,18 +53,25 @@ export function getSupabaseClient(): SupabaseClient | undefined {
   return supabaseClient;
 }
 
+/**
+ * Renders before `AppProvider` has anything to provide — no settings store,
+ * no language preference — so this reads the device language directly rather
+ * than going through `useT`, the same way `ErrorBoundary` does.
+ */
 function ConfigurationNeeded() {
+  const deviceLocales = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language];
+  const t = createTranslator(resolveLocale('system', deviceLocales));
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
       <div className="w-full max-w-md text-center">
         <span className="text-4xl">🔌</span>
         <h1 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">
-          Auto Cards isn&apos;t connected to its database
+          {t('config.notConnectedTitle')}
         </h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          This build is missing <code className="font-mono text-xs">VITE_SUPABASE_URL</code> and{' '}
-          <code className="font-mono text-xs">VITE_SUPABASE_ANON_KEY</code>. Set both on the
-          deployment and build again.
+          {t('config.notConnectedBefore')} <code className="font-mono text-xs">VITE_SUPABASE_URL</code>{' '}
+          {t('config.notConnectedMiddle')} <code className="font-mono text-xs">VITE_SUPABASE_ANON_KEY</code>.{' '}
+          {t('config.notConnectedAfterWeb')}
         </p>
       </div>
     </div>

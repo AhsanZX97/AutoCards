@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 import { useApp } from '../../lib/appContext';
+import { useT } from '../../lib/i18n';
 import { useTheme, spacing } from '../../lib/theme';
 import { toast } from '../../lib/toastStore';
 import { Button, Field, Modal } from '../../components';
@@ -15,6 +16,7 @@ const MAX_MESSAGE_CHARS = 4_000;
 
 export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
   const app = useApp();
+  const t = useT();
   const theme = useTheme();
   const feedback = app.services.feedback;
   const [message, setMessage] = useState('');
@@ -36,10 +38,10 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
     setError(undefined);
     try {
       await feedback.send(trimmed);
-      toast({ variant: 'success', title: 'Thanks — feedback sent' });
+      toast({ variant: 'success', title: t('feedback.sentTitle') });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We could not send that just now. Try again in a moment.');
+      setError(err instanceof Error ? err.message : t('feedback.sendFailed'));
     } finally {
       setSending(false);
     }
@@ -49,13 +51,13 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Send feedback"
-      description="Bugs, ideas, anything that's not working — it goes straight to the team."
+      title={t('feedback.title')}
+      description={t('feedback.description')}
       footer={
         <>
-          <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button title={t('feedback.cancel')} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
           <Button
-            title={sending ? 'Sending…' : 'Send'}
+            title={sending ? t('feedback.sending') : t('feedback.send')}
             onPress={() => void handleSend()}
             disabled={sending || !message.trim()}
             style={{ flex: 1 }}
@@ -64,12 +66,12 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
       }
     >
       <Field
-        label="Your message"
-        hint={`${message.length}/${MAX_MESSAGE_CHARS}`}
+        label={t('feedback.yourMessage')}
+        hint={t('feedback.charCount', { used: message.length, max: MAX_MESSAGE_CHARS })}
         multiline
         numberOfLines={6}
         maxLength={MAX_MESSAGE_CHARS}
-        placeholder="What's on your mind?"
+        placeholder={t('feedback.placeholder')}
         value={message}
         onChangeText={setMessage}
         style={{ minHeight: 120, textAlignVertical: 'top' }}
