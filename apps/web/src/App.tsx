@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { useThemeEffect } from './lib/useTheme';
 import { useLocaleEffect, useT } from './lib/i18n';
 import { RequireAuth } from './components/layout/RequireAuth';
+import { RequireAdmin } from './components/layout/RequireAdmin';
 import { AppLayout } from './components/layout/AppLayout';
 import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
@@ -24,6 +25,7 @@ import { StudyRunnerPage } from './features/study/StudyRunnerPage';
 import { StudyResultsPage } from './features/study/StudyResultsPage';
 import { StatsPage } from './features/stats/StatsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { AnalyticsPage } from './features/admin/AnalyticsPage';
 
 export default function App() {
   useThemeEffect();
@@ -170,6 +172,21 @@ export default function App() {
               <AppLayout>
                 <SettingsPage />
               </AppLayout>
+            </RequireAuth>
+          }
+        />
+        {/* Owner only. The gate that matters is server-side — `admin_analytics`
+            checks `is_admin` itself — so this guard only spares everyone else a
+            page that would refuse to load. */}
+        <Route
+          path="/app/analytics"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AppLayout>
+                  <AnalyticsPage />
+                </AppLayout>
+              </RequireAdmin>
             </RequireAuth>
           }
         />

@@ -18,6 +18,63 @@
   ::selection {
     @apply bg-brand-500/30;
   }
+
+  /*
+   * Chart tokens, used only by the admin analytics page.
+   *
+   * Custom properties rather than Tailwind classes because SVG marks need real
+   * colour values, and because this is the one place a colour has to change
+   * with the theme without React re-rendering anything.
+   *
+   * The categorical slots are a fixed order — a series keeps its hue when a
+   * chart gains or loses one, so "learners are cyan" stays true. Both modes
+   * were validated as a set (lightness band, chroma floor, colourblind
+   * separation under protanopia and deuteranopia, contrast against the card
+   * surface each mode actually uses). Do not re-pick one by eye: the safety
+   * is in the pairwise distances, not in the individual colours.
+   *
+   * `--viz-step-*` is the ordinal ramp, one hue light→dark, for values that
+   * carry an order of their own — the signup funnel. Never for nominal
+   * categories: darker-where-bigger re-encodes what the bar length already
+   * shows and spends the identity channel on nothing.
+   */
+  :root {
+    --viz-surface: theme('colors.white');
+    --viz-grid: theme('colors.slate.200');
+    --viz-axis: theme('colors.slate.300');
+    --viz-ink-muted: theme('colors.slate.400');
+
+    --viz-series-1: #0891b2;
+    --viz-series-2: #eb6834;
+    --viz-series-3: #4a3aa7;
+    --viz-series-4: #eda100;
+
+    --viz-step-1: #06b6d4;
+    --viz-step-2: #0891b2;
+    --viz-step-3: #0e7490;
+    --viz-step-4: #155e75;
+
+    --viz-good: #0ca30c;
+    --viz-warning: #fab219;
+    --viz-critical: #d03b3b;
+  }
+
+  html.dark {
+    --viz-surface: theme('colors.slate.900');
+    --viz-grid: theme('colors.slate.800');
+    --viz-axis: theme('colors.slate.700');
+    --viz-ink-muted: theme('colors.slate.500');
+
+    --viz-series-1: #0891b2;
+    --viz-series-2: #d95926;
+    --viz-series-3: #9085e9;
+    --viz-series-4: #c98500;
+
+    --viz-step-1: #a5f3fc;
+    --viz-step-2: #22d3ee;
+    --viz-step-3: #0891b2;
+    --viz-step-4: #155e75;
+  }
 }
 
 @layer utilities {

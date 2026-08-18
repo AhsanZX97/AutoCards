@@ -1,10 +1,17 @@
 -- Analytics queries for the Supabase dashboard — a rolling 7 days.
 --
--- None of these are run by the app. They exist to be pasted into the SQL
--- Editor, saved as snippets, and pinned as blocks on a custom report. They
--- live here rather than only in the dashboard because they read `data`
--- payloads and column names that this repo owns — a schema change that breaks
--- one should be visible in the same diff.
+-- These are the loose, paste-into-the-SQL-Editor versions. The app has its own
+-- copy of every question here: `admin_analytics`, added in
+-- migrations/0014_admin_analytics.sql, rolls the lot into one jsonb payload
+-- behind the `is_admin` flag, and that is what /app/analytics renders.
+--
+-- Keep them together when either changes. Two differences are deliberate, not
+-- drift: the function windows on a zone the caller passes rather than on UTC,
+-- and it reports accuracy as a percentage — `data->>'accuracy'` is stored 0..1
+-- by the scorer, so the `round(avg(...), 1)` below reads 0.7, not 70.
+--
+-- These stay useful for the questions the page does not ask, and for checking
+-- one of its numbers against the table it came from.
 --
 -- The SQL Editor runs as superuser, so RLS does not apply and `auth.users` is
 -- readable. That is exactly why none of this belongs in the app: the same

@@ -9,6 +9,8 @@ import { EdgeFeedbackService } from './services/feedback';
 import type { FeedbackService } from './services/feedback';
 import { SupabaseAccountBackend } from './services/account';
 import type { AccountBackend } from './services/account';
+import { SupabaseAnalyticsBackend } from './services/analytics';
+import type { AnalyticsBackend } from './services/analytics';
 import { SupabaseReminderBackend } from './services/reminders';
 import type { ReminderBackend } from './services/reminders';
 import type { DocumentExtractor } from './services/documents';
@@ -118,6 +120,14 @@ export function createApp(options: CreateAppOptions) {
     ? new SupabaseAccountBackend(options.supabase)
     : null;
 
+  // Owner-only, and gated by the server rather than by this line: the function
+  // behind it checks `profiles.is_admin` before it will read anything. Built
+  // for every account because the screen it feeds is what decides whether to
+  // ask, and the answer to a non-admin asking is an exception, not data.
+  const analytics: AnalyticsBackend | null = options.supabase
+    ? new SupabaseAnalyticsBackend(options.supabase)
+    : null;
+
   // Declared up front so the auth store can reach the engine that does not
   // exist yet: signing out has to push the outbox before local state is wiped,
   // and only the engine knows how. Without a backend there is nothing to
@@ -214,7 +224,7 @@ export function createApp(options: CreateAppOptions) {
   }
 
   return {
-    services: { auth, llm, billing, feedback, account, documents: options.documentExtractor },
+    services: { auth, llm, billing, feedback, account, analytics, documents: options.documentExtractor },
     authStore,
     deckStore,
     studyStore,

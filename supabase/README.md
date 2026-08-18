@@ -3,6 +3,28 @@
 `schema.sql` is the base; `migrations/` layer on top of it in order. Edge Function keys and
 deployment live in [`functions/README.md`](functions/README.md).
 
+## The analytics page
+
+`/app/analytics` in the web app is the owner's dashboard. It needs two things doing by hand on a
+project, both one-off:
+
+1. Apply `migrations/0014_admin_analytics.sql` in the SQL editor. It creates `admin_analytics`,
+   which returns the whole report as one `jsonb` payload. **Run it as `postgres`** (which the SQL
+   editor already is) — it is `security definer`, so it executes as whoever owns it, and reading
+   `auth.users` is part of what it does.
+2. Make yourself an admin, if you are not already:
+
+   ```sql
+   update public.profiles set is_admin = true where username = '<you>';
+   ```
+
+The flag is the whole gate. The function checks it before it reads anything and raises otherwise,
+so the route guard and the hidden nav link in the app are conveniences, not the security boundary.
+Nothing else in the app calls it, and no other account can.
+
+`analytics.sql` holds the same questions as loose snippets for the SQL editor. Change one, look at
+the other.
+
 ## Sign in with Google
 
 Done, end to end, on the hosted project (`aiqoojayjueqrgpnaqkl`):

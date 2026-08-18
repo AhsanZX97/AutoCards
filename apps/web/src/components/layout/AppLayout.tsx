@@ -2,16 +2,18 @@ import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
 import { useT } from '../../lib/i18n';
-import type { Translator } from '@autocards/core';
+import { isAdmin, type Translator } from '@autocards/core';
 import { FeedbackModal } from '../../features/feedback/FeedbackModal';
 import { Avatar, Button, Modal, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
 
-function navItems(t: Translator) {
+function navItems(t: Translator, admin: boolean) {
   return [
     { to: '/app', label: t('nav.dashboard'), icon: '🏠', end: true },
     { to: '/app/decks', label: t('nav.myDecks'), icon: '🗂️' },
     { to: '/app/stats', label: t('nav.stats'), icon: '📊' },
+    // Owner only, and untranslated with it: one person sees this link.
+    ...(admin ? [{ to: '/app/analytics', label: 'Analytics', icon: '📈' }] : []),
     { to: '/app/settings', label: t('nav.settings'), icon: '⚙️' },
   ];
 }
@@ -21,6 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const t = useT();
   const navigate = useNavigate();
   const user = app.authStore((s) => s.session?.user);
+  const admin = isAdmin(user);
   const signOut = app.authStore((s) => s.signOut);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -58,7 +61,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
-        <SidebarContent t={t} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
+        <SidebarContent t={t} admin={admin} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
       </aside>
 
       {/* Mobile sidebar */}
@@ -68,6 +71,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
             <SidebarContent
               t={t}
+              admin={admin}
               onNavigate={() => setMobileNavOpen(false)}
               onFeedback={() => {
                 setMobileNavOpen(false);
@@ -158,10 +162,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
 function SidebarContent({
   t,
+  admin,
   onNavigate,
   onFeedback,
 }: {
   t: Translator;
+  admin: boolean;
   onNavigate: () => void;
   onFeedback: () => void;
 }) {
@@ -171,7 +177,7 @@ function SidebarContent({
         <Wordmark className="text-lg" />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems(t).map((item) => (
+        {navItems(t, admin).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
