@@ -95,7 +95,7 @@ export default function DeckDetailScreen() {
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
-  const [view, setView] = useState<'list' | 'flashcards'>('list');
+  const [view, setView] = useState<'list' | 'flashcards'>('flashcards');
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
 

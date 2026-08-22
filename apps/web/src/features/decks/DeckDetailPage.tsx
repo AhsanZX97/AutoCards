@@ -76,7 +76,7 @@ export function DeckDetailPage() {
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'flashcards'>('list');
+  const [view, setView] = useState<'list' | 'flashcards'>('flashcards');
 
   const stats = useMemo(() => computeDeckStats(cards), [cards]);
 
