@@ -88,9 +88,35 @@ function plans(t: Translator) {
   ];
 }
 
-function faqs(t: Translator) {
+const FAQ_LINK_CLASS = 'underline decoration-slate-300 underline-offset-2 hover:text-slate-900 dark:decoration-slate-600 dark:hover:text-white';
+
+/**
+ * The one FAQ answer that links out, to the three format-specific landing
+ * pages — `t()` only ever returns a plain string, so the sentence is built
+ * from smaller pieces instead of one translated string with markup baked in.
+ */
+function FormatsFaqAnswer({ t }: { t: Translator }) {
+  return (
+    <>
+      <Link to="/pdf-to-flashcards" className={FAQ_LINK_CLASS}>
+        {t('landing.faq.q.formats.answer.pdf')}
+      </Link>
+      {', '}
+      <Link to="/word-to-flashcards" className={FAQ_LINK_CLASS}>
+        {t('landing.faq.q.formats.answer.word')}
+      </Link>
+      {', '}
+      <Link to="/powerpoint-to-flashcards" className={FAQ_LINK_CLASS}>
+        {t('landing.faq.q.formats.answer.ppt')}
+      </Link>
+      {t('landing.faq.q.formats.answer.rest')}
+    </>
+  );
+}
+
+function faqs(t: Translator): Array<{ question: string; answer: ReactNode }> {
   return [
-    { question: t('landing.faq.q.formats.question'), answer: t('landing.faq.q.formats.answer') },
+    { question: t('landing.faq.q.formats.question'), answer: <FormatsFaqAnswer t={t} /> },
     { question: t('landing.faq.q.scanned.question'), answer: t('landing.faq.q.scanned.answer') },
     { question: t('landing.faq.q.cost.question'), answer: t('landing.faq.q.cost.answer') },
     { question: t('landing.faq.q.srs.question'), answer: t('landing.faq.q.srs.answer') },
@@ -165,7 +191,7 @@ function StoreBadge({ icon, store, label }: { icon: ReactNode; store: string; la
   );
 }
 
-function FaqItem({ question, answer }: { question: string; answer: string }) {
+function FaqItem({ question, answer }: { question: string; answer: ReactNode }) {
   return (
     <details className="group rounded-2xl border border-slate-100 bg-white/60 p-5 backdrop-blur-sm open:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:open:bg-slate-900">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-sm font-semibold text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden dark:text-slate-100">
