@@ -8,6 +8,7 @@ import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Toaster } from './components/ui';
 import { LandingPage } from './features/marketing/LandingPage';
+import { DemoPage } from './features/marketing/demo/DemoPage';
 import { NotFoundPage } from './features/marketing/NotFoundPage';
 import { PrivacyPage } from './features/marketing/PrivacyPage';
 import { TermsPage } from './features/marketing/TermsPage';
@@ -36,6 +37,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/" element={<MarketingLayout><LandingPage /></MarketingLayout>} />
+        <Route path="/demo" element={<MarketingLayout><DemoPage /></MarketingLayout>} />
         <Route path="/privacy" element={<MarketingLayout><PrivacyPage /></MarketingLayout>} />
         <Route path="/terms" element={<MarketingLayout><TermsPage /></MarketingLayout>} />
         <Route

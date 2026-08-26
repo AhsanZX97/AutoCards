@@ -196,12 +196,12 @@ export function LandingPage() {
               <ArrowRightIcon />
             </BrandButton>
           </Link>
-          <a href="#how-it-works">
+          <Link to="/demo">
             <BrandButton variant="secondary">
               <QuestionIcon />
-              {t('landing.seeHowItWorks')}
+              {t('landing.tryTheDemo')}
             </BrandButton>
-          </a>
+          </Link>
         </div>
 
         <p className="mt-8 text-xs font-medium tracking-wide text-slate-400 dark:text-slate-500">
