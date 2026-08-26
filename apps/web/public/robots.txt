@@ -24,4 +24,4 @@ Allow: /
 User-agent: OAI-SearchBot
 Allow: /
 
-Sitemap: https://autocards.app/sitemap.xml
+Sitemap: https://autocards.study/sitemap.xml

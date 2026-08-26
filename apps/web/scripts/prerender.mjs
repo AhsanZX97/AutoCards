@@ -20,7 +20,7 @@ if (!existsSync(ssrEntry)) {
 
 const { renderApp, publicRoutes } = await import(String(new URL(`file://${ssrEntry.replace(/\\/g, '/')}`)));
 
-const SITE_URL = (process.env.VITE_SITE_URL?.trim() || 'https://autocards.app').replace(/\/+$/, '');
+const SITE_URL = (process.env.VITE_SITE_URL?.trim() || 'https://autocards.study').replace(/\/+$/, '');
 const template = readFileSync(join(distDir, 'index.html'), 'utf8');
 
 function escapeHtml(value) {

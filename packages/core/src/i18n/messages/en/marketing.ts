@@ -162,7 +162,7 @@ export const marketing = {
   'demo.device.desktop': 'Desktop',
   'demo.device.phone': 'Phone',
   'demo.backToHome': 'Back to home',
-  'demo.urlBar': 'autocards.app{path}',
+  'demo.urlBar': 'autocards.study{path}',
   'demo.true': 'True',
   'demo.false': 'False',
   'demo.nearMiss': 'Close enough — counted as correct',

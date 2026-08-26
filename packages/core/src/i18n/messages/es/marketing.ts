@@ -165,7 +165,7 @@ export const marketing: Dict<typeof en> = {
   'demo.device.desktop': 'Escritorio',
   'demo.device.phone': 'Móvil',
   'demo.backToHome': 'Volver al inicio',
-  'demo.urlBar': 'autocards.app{path}',
+  'demo.urlBar': 'autocards.study{path}',
   'demo.true': 'Verdadero',
   'demo.false': 'Falso',
   'demo.nearMiss': 'Casi exacto: cuenta como correcta',
