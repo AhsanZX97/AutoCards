@@ -30,14 +30,14 @@ export default {
       },
       fontFamily: {
         sans: [
-          'Inter var',
+          'Inter Variable',
           'Inter',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
           'sans-serif',
         ],
-        display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        display: ['Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Inter Variable', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.10)',

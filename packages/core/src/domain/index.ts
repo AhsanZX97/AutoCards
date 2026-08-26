@@ -19,3 +19,5 @@ export * from './planLimits';
 export * from './subscription';
 export * from './tourPlacement';
 export * from './reminders';
+export * from './deckPublication';
+export * from './deckSlug';

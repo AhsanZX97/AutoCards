@@ -28,13 +28,22 @@
       content="Upload your slides, notes or a chapter and get a study-ready flashcard deck in seconds."
     />
     <meta name="twitter:image" content="/og-image.png" />
+    <link rel="canonical" href="https://autocards.app/" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- Fonts are self-hosted (@fontsource-variable, imported in app.css) so
+         the first paint never blocks on fonts.googleapis.com. The preload
+         links for the two Latin woff2 files are injected at build time by
+         vite.config.ts, once their hashed filenames exist.
+
+         This file is also the template the prerender script
+         (src/seo/entry-server.tsx + scripts/prerender.mjs) starts from for
+         every route: it replaces the page title, the description/OG/Twitter
+         meta and the canonical link above with that route's own values. The
+         SoftwareApplication JSON-LD lives only on the landing page — see
+         src/seo/LandingJsonLd.tsx — not here, since this shell is shared by
+         every route. -->
     <title>Auto Cards — Turn your notes into flashcards</title>
   </head>
   <body>

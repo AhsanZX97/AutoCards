@@ -1,12 +1,27 @@
 User-agent: *
 Allow: /$
+Allow: /demo
 Allow: /privacy
 Allow: /terms
+Allow: /sign-up
 
 # Nothing under /app is useful to a crawler — it all requires an account, and
 # every one of these URLs renders the same sign-in redirect.
 Disallow: /app
 Disallow: /sign-in
-Disallow: /sign-up
 Disallow: /forgot-password
 Disallow: /reset-password
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+Sitemap: https://autocards.app/sitemap.xml

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { useThemeEffect } from './lib/useTheme';
 import { useLocaleEffect, useT } from './lib/i18n';
@@ -7,26 +8,30 @@ import { AppLayout } from './components/layout/AppLayout';
 import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Toaster } from './components/ui';
-import { LandingPage } from './features/marketing/LandingPage';
-import { DemoPage } from './features/marketing/demo/DemoPage';
 import { NotFoundPage } from './features/marketing/NotFoundPage';
-import { PrivacyPage } from './features/marketing/PrivacyPage';
-import { TermsPage } from './features/marketing/TermsPage';
 import { SignInPage } from './features/auth/SignInPage';
-import { SignUpPage } from './features/auth/SignUpPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { AuthCallbackPage } from './features/auth/AuthCallbackPage';
-import { DashboardPage } from './features/dashboard/DashboardPage';
-import { DeckLibraryPage } from './features/decks/DeckLibraryPage';
-import { CreateDeckPage } from './features/decks/CreateDeckPage';
-import { DeckDetailPage } from './features/decks/DeckDetailPage';
-import { StudySetupPage } from './features/study/StudySetupPage';
-import { StudyRunnerPage } from './features/study/StudyRunnerPage';
-import { StudyResultsPage } from './features/study/StudyResultsPage';
-import { StatsPage } from './features/stats/StatsPage';
-import { SettingsPage } from './features/settings/SettingsPage';
-import { AnalyticsPage } from './features/admin/AnalyticsPage';
+import { publicRoutes } from './seo/routes';
+import { PageMeta } from './seo/PageMeta';
+import { LandingJsonLd } from './seo/LandingJsonLd';
+
+/**
+ * Everything behind `RequireAuth` is loaded on demand — the landing page is a
+ * crawler's and a new visitor's first paint, and it has no reason to pull in
+ * the study runner, PDF extraction or the rest of the signed-in app.
+ */
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const DeckLibraryPage = lazy(() => import('./features/decks/DeckLibraryPage').then((m) => ({ default: m.DeckLibraryPage })));
+const CreateDeckPage = lazy(() => import('./features/decks/CreateDeckPage').then((m) => ({ default: m.CreateDeckPage })));
+const DeckDetailPage = lazy(() => import('./features/decks/DeckDetailPage').then((m) => ({ default: m.DeckDetailPage })));
+const StudySetupPage = lazy(() => import('./features/study/StudySetupPage').then((m) => ({ default: m.StudySetupPage })));
+const StudyRunnerPage = lazy(() => import('./features/study/StudyRunnerPage').then((m) => ({ default: m.StudyRunnerPage })));
+const StudyResultsPage = lazy(() => import('./features/study/StudyResultsPage').then((m) => ({ default: m.StudyResultsPage })));
+const StatsPage = lazy(() => import('./features/stats/StatsPage').then((m) => ({ default: m.StatsPage })));
+const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const AnalyticsPage = lazy(() => import('./features/admin/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 
 export default function App() {
   useThemeEffect();
@@ -35,24 +40,17 @@ export default function App() {
 
   return (
     <>
+      <PageMeta />
+      <LandingJsonLd />
       <Routes>
-        <Route path="/" element={<MarketingLayout><LandingPage /></MarketingLayout>} />
-        <Route path="/demo" element={<MarketingLayout><DemoPage /></MarketingLayout>} />
-        <Route path="/privacy" element={<MarketingLayout><PrivacyPage /></MarketingLayout>} />
-        <Route path="/terms" element={<MarketingLayout><TermsPage /></MarketingLayout>} />
+        {publicRoutes.map((route) => (
+          <Route key={route.path} path={route.path} element={route.element} />
+        ))}
         <Route
           path="/sign-in"
           element={
             <AuthLayout title={t('auth.signIn.title')} subtitle={t('auth.signIn.subtitle')}>
               <SignInPage />
-            </AuthLayout>
-          }
-        />
-        <Route
-          path="/sign-up"
-          element={
-            <AuthLayout title={t('auth.signUp.title')} subtitle={t('auth.signUp.subtitle')}>
-              <SignUpPage />
             </AuthLayout>
           }
         />
@@ -94,7 +92,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <DashboardPage />
+                <Suspense fallback={null}>
+                  <DashboardPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -104,7 +104,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <DeckLibraryPage />
+                <Suspense fallback={null}>
+                  <DeckLibraryPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -114,7 +116,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <CreateDeckPage />
+                <Suspense fallback={null}>
+                  <CreateDeckPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -124,7 +128,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <DeckDetailPage />
+                <Suspense fallback={null}>
+                  <DeckDetailPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -134,7 +140,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <StudySetupPage />
+                <Suspense fallback={null}>
+                  <StudySetupPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -143,7 +151,9 @@ export default function App() {
           path="/app/study/:deckId/run"
           element={
             <RequireAuth>
-              <StudyRunnerPage />
+              <Suspense fallback={null}>
+                <StudyRunnerPage />
+              </Suspense>
             </RequireAuth>
           }
         />
@@ -152,7 +162,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <StudyResultsPage />
+                <Suspense fallback={null}>
+                  <StudyResultsPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -162,7 +174,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <StatsPage />
+                <Suspense fallback={null}>
+                  <StatsPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -172,7 +186,9 @@ export default function App() {
           element={
             <RequireAuth>
               <AppLayout>
-                <SettingsPage />
+                <Suspense fallback={null}>
+                  <SettingsPage />
+                </Suspense>
               </AppLayout>
             </RequireAuth>
           }
@@ -186,7 +202,9 @@ export default function App() {
             <RequireAuth>
               <RequireAdmin>
                 <AppLayout>
-                  <AnalyticsPage />
+                  <Suspense fallback={null}>
+                    <AnalyticsPage />
+                  </Suspense>
                 </AppLayout>
               </RequireAdmin>
             </RequireAuth>

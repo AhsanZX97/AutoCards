@@ -1,0 +1,24 @@
+# Auto Cards
+
+> Auto Cards turns uploaded documents (PDF, Word, PowerPoint, text, Markdown)
+> into gamified, spaced-repetition flashcard decks. Upload a slide deck, a
+> chapter or a set of notes and get a study-ready deck in seconds — web and
+> mobile share the same generation, scoring and scheduling logic.
+
+## Product
+
+- Home: /
+- Live demo (no account required): /demo
+- Sign up: /sign-up
+- Privacy policy: /privacy
+- Terms of service: /terms
+
+## Notes for automated readers
+
+- Generation is model-assisted: uploaded content is sent to an LLM to produce
+  cards, then normalized and repaired client-side so malformed output never
+  reaches the deck as broken cards.
+- Scanned or image-only PDFs (no text layer) are rejected before generation —
+  there is no OCR step.
+- Everything under /app requires a signed-in account and is not useful to
+  crawl; see /robots.txt.

@@ -1,2 +1,6 @@
 .vercel
+dist-ssr/
 .env*
+# No secrets in this one — every value is intentionally blank (see the file's
+# own header) — and the prerender build needs it present in checkouts and CI.
+!.env.prerender

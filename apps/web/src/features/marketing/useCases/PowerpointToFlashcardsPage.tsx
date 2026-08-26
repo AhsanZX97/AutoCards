@@ -1,0 +1,64 @@
+import { Link } from 'react-router-dom';
+import type { Translator } from '@autocards/core';
+import { BrandButton } from '../../../components/ui';
+import { useT } from '../../../lib/i18n';
+
+function steps(t: Translator) {
+  return [
+    { step: '01', title: t('useCase.ppt.step.upload.title'), description: t('useCase.ppt.step.upload.description') },
+    { step: '02', title: t('useCase.ppt.step.notes.title'), description: t('useCase.ppt.step.notes.description') },
+    { step: '03', title: t('useCase.ppt.step.generate.title'), description: t('useCase.ppt.step.generate.description') },
+  ];
+}
+
+/**
+ * Landing page for the "powerpoint to flashcards" search query.
+ *
+ * The speaker-notes claim in the middle step is the real differentiator here
+ * — `OfficeExtractor` reads `ppt/notesSlides/*.xml` alongside each slide's
+ * own text, which a PDF export of the same deck would have thrown away.
+ */
+export function PowerpointToFlashcardsPage() {
+  const t = useT();
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-20">
+      <section className="flex flex-col items-center text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-500/25 px-4 py-1.5 text-xs font-semibold tracking-wide text-cyan-600 brand-tint dark:text-cyan-400">
+          <span className="h-1.5 w-1.5 rounded-full brand-gradient" />
+          {t('useCase.ppt.eyebrow')}
+        </div>
+        <h1 className="mb-5 max-w-2xl font-display text-4xl font-bold tracking-tight text-slate-900 dark:text-white md:text-5xl">
+          {t('useCase.ppt.h1')}
+        </h1>
+        <p className="max-w-xl text-lg leading-relaxed text-slate-500 dark:text-slate-400">
+          {t('useCase.ppt.subtitle')}
+        </p>
+      </section>
+
+      <section className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-3">
+        {steps(t).map((item) => (
+          <div key={item.step} className="rounded-2xl border border-slate-100 bg-white/60 p-6 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white brand-gradient">
+              {item.step}
+            </div>
+            <h3 className="mb-2 font-display text-sm font-semibold text-slate-800 dark:text-slate-100">{item.title}</h3>
+            <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="mt-14 rounded-2xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-900/40">
+        <h2 className="mb-2 font-display text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {t('useCase.ppt.honest.heading')}
+        </h2>
+        <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t('useCase.ppt.honest.body')}</p>
+      </section>
+
+      <div className="mt-14 flex justify-center">
+        <Link to="/demo">
+          <BrandButton>{t('useCase.ppt.cta')}</BrandButton>
+        </Link>
+      </div>
+    </div>
+  );
+}

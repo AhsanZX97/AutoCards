@@ -88,6 +88,17 @@ function plans(t: Translator) {
   ];
 }
 
+function faqs(t: Translator) {
+  return [
+    { question: t('landing.faq.q.formats.question'), answer: t('landing.faq.q.formats.answer') },
+    { question: t('landing.faq.q.scanned.question'), answer: t('landing.faq.q.scanned.answer') },
+    { question: t('landing.faq.q.cost.question'), answer: t('landing.faq.q.cost.answer') },
+    { question: t('landing.faq.q.srs.question'), answer: t('landing.faq.q.srs.answer') },
+    { question: t('landing.faq.q.share.question'), answer: t('landing.faq.q.share.answer') },
+    { question: t('landing.faq.q.mobile.question'), answer: t('landing.faq.q.mobile.answer') },
+  ];
+}
+
 function reviewGrades(t: Translator) {
   return [
     t('landing.preview.grade.again'),
@@ -151,6 +162,20 @@ function StoreBadge({ icon, store, label }: { icon: ReactNode; store: string; la
         <span className="block font-display text-sm font-semibold text-slate-500 dark:text-slate-400">{store}</span>
       </span>
     </div>
+  );
+}
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  return (
+    <details className="group rounded-2xl border border-slate-100 bg-white/60 p-5 backdrop-blur-sm open:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:open:bg-slate-900">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-sm font-semibold text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden dark:text-slate-100">
+        {question}
+        <span className="shrink-0 text-lg leading-none text-slate-400 transition-transform duration-200 group-open:rotate-45 dark:text-slate-500">
+          +
+        </span>
+      </summary>
+      <p className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{answer}</p>
+    </details>
   );
 }
 
@@ -374,6 +399,21 @@ export function LandingPage() {
                 </BrandButton>
               </Link>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="relative z-10 mx-auto max-w-3xl px-6 pb-28">
+        <div className="mb-14 text-center">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cyan-500">{t('landing.faq.eyebrow')}</p>
+          <h2 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+            {t('landing.faq.title')}
+          </h2>
+        </div>
+        <div className="flex flex-col gap-3">
+          {faqs(t).map((item) => (
+            <FaqItem key={item.question} question={item.question} answer={item.answer} />
           ))}
         </div>
       </section>

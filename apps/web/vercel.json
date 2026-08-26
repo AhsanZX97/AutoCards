@@ -2,9 +2,26 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build --workspace @autocards/core && npm run build --workspace @autocards/web",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/((?!assets/|_vercel/).*)",
+      "source": "/app/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sign-in",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/forgot-password",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/auth/callback",
       "destination": "/index.html"
     }
   ],
