@@ -79,7 +79,9 @@ export default function ResetPasswordScreen() {
         title: t('auth.resetPassword.successTitle'),
         description: t('auth.resetPassword.successBody'),
       });
-      router.replace('/(app)');
+      // Through `/` rather than straight to `/(app)` so the root redirect gets
+      // a chance to send a first-time login to onboarding first.
+      router.replace('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.resetPassword.genericError'));
     } finally {

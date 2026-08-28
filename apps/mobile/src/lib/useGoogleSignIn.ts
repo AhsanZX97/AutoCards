@@ -38,7 +38,9 @@ export function useGoogleSignIn() {
 
       const session = await app.services.auth.restoreFromUrl(result.url);
       app.authStore.getState().syncFromProvider(session);
-      if (session) router.replace('/(app)');
+      // Through `/` rather than straight to `/(app)` so the root redirect gets
+      // a chance to send a first-time sign-up to onboarding first.
+      if (session) router.replace('/');
     } catch (err) {
       app.authStore.setState({
         status: 'signed-out',

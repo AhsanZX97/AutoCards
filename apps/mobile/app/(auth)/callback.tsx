@@ -38,7 +38,9 @@ export default function AuthCallbackScreen() {
         if (cancelled) return;
         if (session) {
           app.authStore.getState().syncFromProvider(session);
-          router.replace('/(app)');
+          // Through `/` rather than straight to `/(app)` so the root redirect gets
+          // a chance to send a first-time sign-up to onboarding first.
+          router.replace('/');
         } else {
           setOutcome('failed');
         }

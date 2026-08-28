@@ -22,7 +22,9 @@ export default function SignInScreen() {
 
   async function onSubmit() {
     const ok = await signIn({ email, password });
-    if (ok) router.replace('/(app)');
+    // Through `/` rather than straight to `/(app)` so the root redirect gets
+    // a chance to send a first-time sign-in to onboarding first.
+    if (ok) router.replace('/');
   }
 
   return (

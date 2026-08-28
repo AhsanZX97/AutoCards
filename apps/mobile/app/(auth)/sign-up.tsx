@@ -30,7 +30,9 @@ export default function SignUpScreen() {
     // app rather than on the website's root, which is what an omitted
     // `redirectTo` would fall back to.
     const ok = await signUp({ username, email, password }, Linking.createURL('callback'));
-    if (ok) router.replace('/(app)');
+    // Through `/` rather than straight to `/(app)` so the root redirect gets
+    // a chance to send a first-time sign-up to onboarding first.
+    if (ok) router.replace('/');
   }
 
   if (pendingEmail) {
