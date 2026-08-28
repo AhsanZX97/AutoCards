@@ -96,4 +96,9 @@ export const settings: Dict<typeof en> = {
   'mobileSettings.visitToSeePlans': 'Visita {url} para ver los planes.',
   'mobileSettings.couldNotOpenBilling': 'No se pudo abrir la facturación',
   'mobileSettings.tryAgainMoment': 'Inténtalo de nuevo en un momento.',
+  'mobileSettings.buyPro': 'Obtener Pro — {price}/mes',
+  'mobileSettings.buyLifetime': 'Comprar de por vida — {price}',
+  'mobileSettings.purchaseFailed': 'No se pudo completar la compra',
+  'mobileSettings.manageOnPlay': 'Gestionar en Google Play',
+  'mobileSettings.watchTutorialAgain': 'Ver el tutorial de nuevo',
 };

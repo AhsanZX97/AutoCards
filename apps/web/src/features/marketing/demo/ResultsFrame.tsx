@@ -58,9 +58,9 @@ export function ResultsFrame({
     <div className={cn('mx-auto flex max-w-2xl flex-col justify-center', compact ? 'p-4 pt-12' : 'p-8')}>
       <div className="text-center">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{deckTitle}</p>
-        <h1 className={cn('font-display mt-2 text-7xl font-extrabold', LETTER_COLORS[score.letter] ?? 'text-slate-500')}>
+        <h2 className={cn('font-display mt-2 text-7xl font-extrabold', LETTER_COLORS[score.letter] ?? 'text-slate-500')}>
           {score.letter}
-        </h1>
+        </h2>
         <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
           {t('results.pointsXp', { points: score.finalScore.toLocaleString(), xp: score.xp })}
         </p>

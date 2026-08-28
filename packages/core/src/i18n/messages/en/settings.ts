@@ -93,4 +93,9 @@ export const settings = {
   'mobileSettings.visitToSeePlans': 'Visit {url} to see plans.',
   'mobileSettings.couldNotOpenBilling': 'Could not open billing',
   'mobileSettings.tryAgainMoment': 'Try again in a moment.',
+  'mobileSettings.buyPro': 'Get Pro — {price}/mo',
+  'mobileSettings.buyLifetime': 'Buy lifetime — {price}',
+  'mobileSettings.purchaseFailed': 'Could not complete that purchase',
+  'mobileSettings.manageOnPlay': 'Manage on Google Play',
+  'mobileSettings.watchTutorialAgain': 'Watch tutorial again',
 } as const;

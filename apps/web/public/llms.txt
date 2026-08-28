@@ -7,18 +7,37 @@
 
 ## Product
 
-- Home: /
-- Live demo (no account required): /demo
-- Sign up: /sign-up
-- Privacy policy: /privacy
-- Terms of service: /terms
+- Home: https://autocards.study/
+- Live demo (no account required): https://autocards.study/demo
+- Sign up: https://autocards.study/sign-up
+
+## Upload a file type
+
+- PDF to flashcards: https://autocards.study/pdf-to-flashcards
+- PowerPoint to flashcards: https://autocards.study/powerpoint-to-flashcards
+- Word to flashcards: https://autocards.study/word-to-flashcards
+- Lecture notes to flashcards: https://autocards.study/lecture-notes-to-flashcards
+
+## Comparisons
+
+- Auto Cards vs Anki: https://autocards.study/vs/anki
+- Auto Cards vs Quizlet: https://autocards.study/vs/quizlet
+- Auto Cards vs Knowt: https://autocards.study/vs/knowt
+
+## Legal
+
+- Privacy policy: https://autocards.study/privacy
+- Terms of service: https://autocards.study/terms
 
 ## Notes for automated readers
 
 - Generation is model-assisted: uploaded content is sent to an LLM to produce
   cards, then normalized and repaired client-side so malformed output never
   reaches the deck as broken cards.
+- Supported uploads are PDF, Word (.docx), PowerPoint (.pptx), plain text and
+  Markdown.
 - Scanned or image-only PDFs (no text layer) are rejected before generation —
   there is no OCR step.
 - Everything under /app requires a signed-in account and is not useful to
-  crawl; see /robots.txt.
+  crawl; see https://autocards.study/robots.txt.
+- The full list of indexable URLs is at https://autocards.study/sitemap.xml.

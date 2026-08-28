@@ -3,8 +3,8 @@ import { createTranslator, resolveLocale, type Translator } from './i18n';
 import type { AuthService } from './services/auth/types';
 import { RoutingLlmService } from './services/llm';
 import type { EdgeLlmConfig, LlmService, OpenRouterConfig } from './services/llm';
-import { EdgeBillingService } from './services/billing';
-import type { BillingService } from './services/billing';
+import { EdgeBillingService, EdgePlayBillingService } from './services/billing';
+import type { BillingService, PlayBillingService } from './services/billing';
 import { EdgeFeedbackService } from './services/feedback';
 import type { FeedbackService } from './services/feedback';
 import { SupabaseAccountBackend } from './services/account';
@@ -20,6 +20,7 @@ import { SyncEngine } from './services/sync/syncEngine';
 import {
   createAuthStore,
   createDeckStore,
+  createOnboardingStore,
   createReminderStore,
   createSettingsStore,
   createStudyStore,
@@ -110,6 +111,11 @@ export function createApp(options: CreateAppOptions) {
   // server, since that is where the prices and the Stripe key live.
   const billing: BillingService | null = options.edge ? new EdgeBillingService(options.edge) : null;
 
+  // Same reasoning as billing: only our own server can ask Google whether a
+  // purchase token is real. Web has no use for this — Play only exists on
+  // Android — but it costs nothing to wire everywhere `edge` is set.
+  const playBilling: PlayBillingService | null = options.edge ? new EdgePlayBillingService(options.edge) : null;
+
   // Same reasoning as billing: sending mail needs a credential only the
   // server holds, so this only exists where the functions are deployed.
   const feedback: FeedbackService | null = options.edge ? new EdgeFeedbackService(options.edge) : null;
@@ -144,6 +150,7 @@ export function createApp(options: CreateAppOptions) {
   );
   const usageStore = createUsageStore(options.storage);
   const tourStore = createTourStore(options.storage);
+  const onboardingStore = createOnboardingStore(options.storage);
 
   // Reminders go straight to their own table rather than through the sync
   // outbox. They are not offline-first the way decks are — a schedule that
@@ -224,13 +231,14 @@ export function createApp(options: CreateAppOptions) {
   }
 
   return {
-    services: { auth, llm, billing, feedback, account, analytics, documents: options.documentExtractor },
+    services: { auth, llm, billing, playBilling, feedback, account, analytics, documents: options.documentExtractor },
     authStore,
     deckStore,
     studyStore,
     settingsStore,
     usageStore,
     tourStore,
+    onboardingStore,
     reminderStore,
     syncStore,
     syncEngine,

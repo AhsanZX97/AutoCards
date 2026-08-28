@@ -1,27 +1,34 @@
-User-agent: *
-Allow: /$
-Allow: /demo
-Allow: /privacy
-Allow: /terms
-Allow: /sign-up
+# One group per crawler wins — the most specific matching group, and only
+# that group. So a bot named below is governed by its own rules alone, and
+# any bot NOT named here falls under `*`.
 
+User-agent: *
 # Nothing under /app is useful to a crawler — it all requires an account, and
-# every one of these URLs renders the same sign-in redirect.
+# every one of these URLs renders the same sign-in redirect. Everything else
+# is crawlable; there is no blanket Disallow to carve exceptions out of.
 Disallow: /app
 Disallow: /sign-in
 Disallow: /forgot-password
 Disallow: /reset-password
 
-User-agent: GPTBot
-Allow: /
+# AI *search* crawlers — GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot and
+# friends — are deliberately left to the `*` group above. They cite sources
+# and send readers back, so they get the same access as Googlebot. Giving
+# them their own `Allow: /` group would be worse than useless: it would
+# replace the group above and hand them /app and the auth pages as well.
 
-User-agent: ClaudeBot
-Allow: /
+# Training-only scrapers get nothing. They take the marketing copy and the
+# comparison pages and return no traffic, no citation and no referral.
+User-agent: Google-Extended
+Disallow: /
 
-User-agent: PerplexityBot
-Allow: /
+User-agent: Applebot-Extended
+Disallow: /
 
-User-agent: OAI-SearchBot
-Allow: /
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
 
 Sitemap: https://autocards.study/sitemap.xml

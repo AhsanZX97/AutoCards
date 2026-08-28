@@ -11,6 +11,7 @@
     "dev": "npm run dev --workspace @autocards/web",
     "dev:web": "npm run dev --workspace @autocards/web",
     "dev:mobile": "npm run start --workspace @autocards/mobile",
+    "build:mobile": "npm run android:cloud --workspace @autocards/mobile",
     "build": "npm run build --workspace @autocards/core && npm run build --workspace @autocards/web",
     "build:core": "npm run build --workspace @autocards/core",
     "test": "npm run test --workspace @autocards/core",

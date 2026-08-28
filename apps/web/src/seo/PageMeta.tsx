@@ -54,6 +54,7 @@ export function PageMeta() {
     setMetaByProperty('og:description', route.description);
     setMetaByName('twitter:title', route.title);
     setMetaByName('twitter:description', route.description);
+    setMetaByProperty('og:url', `${SITE_URL}${route.path}`);
     setCanonical(`${SITE_URL}${route.path}`);
   }, [location.pathname]);
 

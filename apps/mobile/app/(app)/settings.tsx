@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, Linking, Text, View } from 'react-native';
+import { Alert, AppState, Linking, Platform, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import {
   computeOverallStats,
@@ -13,6 +13,7 @@ import { useApp, getSupabaseClient } from '../../src/lib/appContext';
 import { useLocale, useT } from '../../src/lib/i18n';
 import { useTheme, radius, spacing } from '../../src/lib/theme';
 import { toast } from '../../src/lib/toastStore';
+import { useGooglePlayPurchase } from '../../src/lib/useGooglePlayPurchase';
 import { useUploadQuota, formatQuota } from '../../src/lib/useUploadQuota';
 import { Badge, Button, Card, Field, GradientPanel, IconTile, Modal, ProgressBar, Screen, SwitchRow } from '../../src/components';
 import { FeedbackModal } from '../../src/features/feedback/FeedbackModal';
@@ -56,6 +57,13 @@ function describeSubscriptionT(t: Translator, locale: string, subscription: Acco
  * billing tab, opened in the browser rather than checkout run in-app.
  */
 const WEB_BILLING_URL = 'https://autocards.study/app/settings?tab=billing';
+
+/**
+ * Where a Play purchase is managed — Stripe has no idea it exists, so its
+ * portal is no use here. The account page rather than the subscriptions-only
+ * one, since this covers both Pro (a subscription) and Lifetime (an order).
+ */
+const PLAY_ACCOUNT_URL = 'https://play.google.com/store/account';
 
 export default function SettingsScreen() {
   const app = useApp();
@@ -116,15 +124,62 @@ export default function SettingsScreen() {
   }, [app, userId]);
 
   const ownsOutright = subscription?.plan === 'lifetime';
+  const { buy, loading: purchasing } = useGooglePlayPurchase();
+  const canBuyOnPlay = Platform.OS === 'android' && !!app.services.playBilling;
+
+  /**
+   * Buys a plan through Google Play — the only in-app purchase path this
+   * screen offers, since Apple has no equivalent yet (see `WEB_BILLING_URL`).
+   * `buy` resolves to `null` for "backed out of the Play sheet", which is not
+   * worth a toast.
+   */
+  async function handleBuyPlan(plan: 'pro' | 'lifetime') {
+    try {
+      const granted = await buy(plan);
+      if (!granted) return;
+
+      const account = app.services.account;
+      if (account && userId) setSubscription(await account.fetchSubscription(userId));
+
+      toast({
+        variant: 'success',
+        title: granted === 'lifetime' ? t('settings.billing.lifetimeOwnedTitle') : t('settings.billing.proOwnedTitle'),
+        description: granted === 'lifetime' ? t('settings.billing.lifetimeOwnedBody') : t('settings.billing.upgradeOwnedBody'),
+      });
+    } catch (error) {
+      toast({
+        variant: 'error',
+        title: t('mobileSettings.purchaseFailed'),
+        description: error instanceof Error ? error.message : t('mobileSettings.tryAgainMoment'),
+      });
+    }
+  }
 
   /**
    * Same call the web app's own "Manage billing" button makes — the Stripe
    * Customer Portal, opened in the browser rather than a static settings URL.
    * A free account has no subscription for the portal to open, so that case
    * falls back to the web app's billing tab instead, same as `PlanLimitNotice`.
+   * A subscription bought through Google Play has no Stripe portal to open at
+   * all — Stripe never heard about it — so that case goes to Play's own
+   * subscriptions page instead.
    */
   async function handleManagePlan() {
     if (!subscriptionLoaded) return;
+
+    if (subscription?.provider === 'google_play') {
+      try {
+        await Linking.openURL(PLAY_ACCOUNT_URL);
+      } catch {
+        toast({
+          variant: 'error',
+          title: t('mobileSettings.couldNotOpenBrowser'),
+          description: t('mobileSettings.visitToSeePlans', { url: PLAY_ACCOUNT_URL }),
+        });
+      }
+      return;
+    }
+
     const billing = app.services.billing;
     if (!subscription || !billing) {
       try {
@@ -342,23 +397,56 @@ export default function SettingsScreen() {
           {formatQuota(t, quota)}
         </Text>
 
-        <Button
-          title={
-            !subscriptionLoaded
-              ? t('common.loading')
-              : subscription
-                ? ownsOutright
-                  ? t('settings.billing.receipts')
-                  : t('settings.billing.manageBilling')
-                : t('mobileSettings.seePlansOnWeb')
-          }
-          variant="outline"
-          size="sm"
-          disabled={!subscriptionLoaded}
-          loading={openingPortal}
-          onPress={handleManagePlan}
-        />
+        {subscriptionLoaded && !subscription && canBuyOnPlay ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <Button
+              title={t('mobileSettings.buyPro', { price: '$4' })}
+              variant="outline"
+              size="sm"
+              loading={purchasing}
+              onPress={() => handleBuyPlan('pro')}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title={t('mobileSettings.buyLifetime', { price: '$39' })}
+              variant="outline"
+              size="sm"
+              loading={purchasing}
+              onPress={() => handleBuyPlan('lifetime')}
+              style={{ flex: 1 }}
+            />
+          </View>
+        ) : (
+          <Button
+            title={
+              !subscriptionLoaded
+                ? t('common.loading')
+                : subscription
+                  ? subscription.provider === 'google_play'
+                    ? t('mobileSettings.manageOnPlay')
+                    : ownsOutright
+                      ? t('settings.billing.receipts')
+                      : t('settings.billing.manageBilling')
+                  : t('mobileSettings.seePlansOnWeb')
+            }
+            variant="outline"
+            size="sm"
+            disabled={!subscriptionLoaded}
+            loading={openingPortal}
+            onPress={handleManagePlan}
+          />
+        )}
       </Card>
+
+      <Button
+        title={t('mobileSettings.watchTutorialAgain')}
+        variant="outline"
+        onPress={() => {
+          app.onboardingStore.getState().resetOnboarding();
+          router.push('/onboarding');
+        }}
+        style={{ marginBottom: spacing.md }}
+      />
 
       <Button
         title={t('mobileSettings.sendFeedback')}

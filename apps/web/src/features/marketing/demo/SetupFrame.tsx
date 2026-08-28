@@ -30,9 +30,9 @@ export function SetupFrame({
   return (
     <div className={cn('mx-auto max-w-3xl', compact ? 'space-y-4 p-4 pt-10' : 'space-y-6 p-8')}>
       <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+        <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
           {t('studySetup.title', { deckTitle })}
-        </h1>
+        </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {t.plural('studySetup.cardsAvailable', cardCount, { count: cardCount })}
         </p>

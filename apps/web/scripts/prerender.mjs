@@ -45,6 +45,13 @@ function withMeta(html, { title, description, canonicalHref, noindex }) {
   out = replaceAttr(out, /<meta[^>]*name="twitter:title"[^>]*>/, 'content', title);
   out = replaceAttr(out, /<meta[^>]*name="twitter:description"[^>]*>/, 'content', description);
   out = replaceAttr(out, /<link[^>]*rel="canonical"[^>]*>/, 'href', canonicalHref);
+  // `og:url` is per-page and must match the canonical URL, or a share card
+  // points every route at the landing page. The two image tags are already
+  // absolute in index.html; they only need rewriting when SITE_URL isn't the
+  // production origin (a staging deploy setting VITE_SITE_URL).
+  out = replaceAttr(out, /<meta[^>]*property="og:url"[^>]*>/, 'content', canonicalHref);
+  out = replaceAttr(out, /<meta[^>]*property="og:image"[^>]*>/, 'content', `${SITE_URL}/og-image.png`);
+  out = replaceAttr(out, /<meta[^>]*name="twitter:image"[^>]*>/, 'content', `${SITE_URL}/og-image.png`);
   if (noindex) {
     out = out.replace('</head>', '  <meta name="robots" content="noindex" />\n  </head>');
   }

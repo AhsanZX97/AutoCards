@@ -3,7 +3,7 @@ import { describeSubscription } from '../subscription';
 import type { AccountSubscription } from '../../services/account/types';
 
 function subscription(overrides: Partial<AccountSubscription>): AccountSubscription {
-  return { plan: 'pro', status: 'active', cancelAtPeriodEnd: false, ...overrides };
+  return { plan: 'pro', provider: 'stripe', status: 'active', cancelAtPeriodEnd: false, ...overrides };
 }
 
 const PERIOD_END = '2026-03-15T00:00:00.000Z';

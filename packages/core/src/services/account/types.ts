@@ -9,6 +9,13 @@ import type { IsoDate, Plan, UploadUsage } from '../../types';
 export interface AccountSubscription {
   /** What was bought. May differ from the account's live plan when a payment lapsed. */
   plan: Plan;
+  /**
+   * Who holds the money for this: `'stripe'` or `'google_play'`. Decides
+   * where "manage billing" sends someone — Stripe subscriptions open the
+   * Stripe Customer Portal, Play ones open Play's own subscription page,
+   * since Stripe has no idea a Play purchase exists.
+   */
+  provider: string;
   /** Stripe's own status: `active`, `trialing`, `past_due`, `canceled`… */
   status: string;
   /** When the paid-up period runs out — the renewal date, or the end date if cancelling. */

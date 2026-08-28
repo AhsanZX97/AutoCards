@@ -96,6 +96,18 @@ export async function refundUpload(
 /** What this app records about someone's subscription. */
 export interface SubscriptionRow {
   user_id: string;
+  /**
+   * `'stripe'` or `'google_play'`. Left unset by the Stripe writer, which
+   * relies on the column's own default rather than repeating it on every
+   * write — `verify-play-purchase` sets it explicitly since Play is never the
+   * default.
+   */
+  provider?: string;
+  /**
+   * Stripe's customer id, or — for a Play purchase — the purchase token that
+   * proved it. Play has no equivalent of a persistent customer id; the token
+   * only needs to be unique per row, which every purchase token is.
+   */
   customer_id: string;
   subscription_id: string | null;
   status: string;

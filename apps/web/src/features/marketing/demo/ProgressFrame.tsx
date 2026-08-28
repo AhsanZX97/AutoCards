@@ -31,7 +31,7 @@ export function ProgressFrame({
   return (
     <div className={cn('mx-auto max-w-4xl', compact ? 'space-y-4 p-4 pt-10' : 'space-y-6 p-8')}>
       <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('stats.title')}</h1>
+        <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('stats.title')}</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('stats.subtitle')}</p>
       </div>
 
@@ -39,7 +39,7 @@ export function ProgressFrame({
         <Card className={cn(!compact && 'col-span-2')}>
           <CardBody>
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-900 dark:text-white">{t('stats.level', { level: stats.level.level })}</h2>
+              <h3 className="font-semibold text-slate-900 dark:text-white">{t('stats.level', { level: stats.level.level })}</h3>
               <span className="text-xs text-slate-400">
                 {t('stats.xpProgress', { into: stats.level.xpIntoLevel, needed: stats.level.xpForNextLevel })}
               </span>
@@ -79,7 +79,7 @@ export function ProgressFrame({
 
       <Card>
         <CardBody>
-          <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.activity')}</h2>
+          <h3 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.activity')}</h3>
           <ActivityHeatmap activity={stats.activity} compact={compact} />
         </CardBody>
       </Card>
@@ -87,7 +87,7 @@ export function ProgressFrame({
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-2')}>
         <Card>
           <CardBody>
-            <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.performanceByDeck')}</h2>
+            <h3 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.performanceByDeck')}</h3>
             <div className="space-y-3">
               {stats.perDeck.map((deck) => (
                 <div key={deck.deckId} className="flex items-center justify-between gap-3">
@@ -109,7 +109,7 @@ export function ProgressFrame({
 
         <Card>
           <CardBody>
-            <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.achievements')}</h2>
+            <h3 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('stats.achievements')}</h3>
             <div className="grid grid-cols-2 gap-3">
               {achievements.map((achievement) => (
                 <div

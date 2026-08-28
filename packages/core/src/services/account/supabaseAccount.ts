@@ -4,6 +4,7 @@ import type { AccountBackend, AccountSubscription } from './types';
 
 interface SubscriptionRow {
   plan: string | null;
+  provider: string | null;
   status: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
@@ -28,7 +29,7 @@ export class SupabaseAccountBackend implements AccountBackend {
   async fetchSubscription(userId: string): Promise<AccountSubscription | null> {
     const { data, error } = await this.client
       .from('subscriptions')
-      .select('plan,status,current_period_end,cancel_at_period_end')
+      .select('plan,provider,status,current_period_end,cancel_at_period_end')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -37,6 +38,7 @@ export class SupabaseAccountBackend implements AccountBackend {
     const row = data as SubscriptionRow;
     return {
       plan: asPlan(row.plan),
+      provider: row.provider ?? 'stripe',
       status: row.status ?? 'unknown',
       ...(row.current_period_end ? { currentPeriodEnd: row.current_period_end } : {}),
       cancelAtPeriodEnd: row.cancel_at_period_end === true,

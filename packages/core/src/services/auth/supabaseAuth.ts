@@ -196,15 +196,26 @@ export class SupabaseAuthService implements AuthService {
   }
 
   /**
-   * Ignores the locally-cached session passed in — the Supabase client
-   * silently refreshes tokens in the background and is the source of truth
-   * for whether a session is still valid, not our own persisted copy.
+   * The Supabase client's live session is the source of truth for whether a
+   * session is still valid, not our own persisted copy — but the profile
+   * fetch that follows is a plain network call, and a blip there (no
+   * connection yet at cold start, a dropped request) is not the same thing as
+   * the session having expired. Falling back to the cached user for the same
+   * id keeps a real session alive through that blip instead of signing the
+   * user out — and wiping the persisted session — every time it happens.
    */
-  async restore(): Promise<Session | null> {
+  async restore(cached: Session | null = null): Promise<Session | null> {
     const { data, error } = await this.client.auth.getSession();
     if (error || !data.session) return null;
-    const profile = await this.fetchProfile(data.session.user.id);
-    return toSession(data.session, toUser(data.session.user, profile));
+    try {
+      const profile = await this.fetchProfile(data.session.user.id);
+      return toSession(data.session, toUser(data.session.user, profile));
+    } catch (err) {
+      if (cached && cached.user.id === data.session.user.id) {
+        return toSession(data.session, cached.user);
+      }
+      throw err;
+    }
   }
 
   async updateProfile(

@@ -155,6 +155,44 @@ describe('SupabaseAuthService.restore', () => {
     const session = await service.restore();
     expect(session?.user.id).toBe('user-1');
   });
+
+  it('falls back to the cached profile when the profile fetch fails but the session is valid', async () => {
+    const cachedUser = {
+      id: 'user-1',
+      email: 'ada@example.com',
+      username: 'ada_lovelace',
+      initials: 'AD',
+      plan: 'free' as const,
+      isAdmin: false,
+      createdAt: '2024-01-01T00:00:00.000Z',
+    };
+    const service = new SupabaseAuthService(
+      fakeClient({
+        getSession: async () => ({ data: { session: SUPABASE_SESSION }, error: null }),
+        profile: { data: null, error: { message: 'network request failed' } },
+      }),
+    );
+
+    const session = await service.restore({
+      user: cachedUser,
+      token: 'old-token',
+      expiresAt: '2024-01-01T00:00:00.000Z',
+    });
+
+    expect(session?.user).toEqual(cachedUser);
+    expect(session?.token).toBe('token-abc');
+  });
+
+  it('throws when the profile fetch fails and no cached profile matches', async () => {
+    const service = new SupabaseAuthService(
+      fakeClient({
+        getSession: async () => ({ data: { session: SUPABASE_SESSION }, error: null }),
+        profile: { data: null, error: { message: 'network request failed' } },
+      }),
+    );
+
+    await expect(service.restore(null)).rejects.toThrow(AuthError);
+  });
 });
 
 describe('SupabaseAuthService.startGoogleSignIn', () => {

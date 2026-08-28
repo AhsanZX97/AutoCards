@@ -25,6 +25,7 @@ describe('SupabaseAccountBackend.fetchSubscription', () => {
         subscriptions: {
           data: {
             plan: 'pro',
+            provider: 'google_play',
             status: 'active',
             current_period_end: '2026-09-09T00:00:00.000Z',
             cancel_at_period_end: false,
@@ -36,10 +37,23 @@ describe('SupabaseAccountBackend.fetchSubscription', () => {
 
     await expect(backend.fetchSubscription('user-1')).resolves.toEqual({
       plan: 'pro',
+      provider: 'google_play',
       status: 'active',
       currentPeriodEnd: '2026-09-09T00:00:00.000Z',
       cancelAtPeriodEnd: false,
     });
+  });
+
+  it('reads a row with no provider column yet as stripe', async () => {
+    const backend = new SupabaseAccountBackend(
+      fakeClient({
+        subscriptions: {
+          data: { plan: 'pro', provider: null, status: 'active', current_period_end: null, cancel_at_period_end: false },
+          error: null,
+        },
+      }),
+    );
+    expect((await backend.fetchSubscription('user-1'))?.provider).toBe('stripe');
   });
 
   it('reports a cancellation that has not taken effect yet', async () => {

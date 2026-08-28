@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Redirect, router, Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +11,7 @@ import { DecksIcon, HomeIcon, PlusIcon, SettingsIcon, StatsIcon } from '../../sr
 const TAB_BAR_HEIGHT = 64;
 const FAB_SIZE = 56;
 
-function TabIcon(icon: (props: { color: string; size?: number }) => JSX.Element) {
+function TabIcon(icon: (props: { color: string; size?: number }) => ReactElement) {
   return ({ color }: { focused: boolean; color: string }) => icon({ color });
 }
 

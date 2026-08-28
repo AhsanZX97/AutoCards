@@ -6,4 +6,5 @@ export * from './settingsStore';
 export * from './syncStore';
 export * from './usageStore';
 export * from './tourStore';
+export * from './onboardingStore';
 export * from './reminderStore';

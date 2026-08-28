@@ -28,7 +28,7 @@ export function DeckFrame({
         <div className="flex min-w-0 items-start gap-3">
           <span className="text-3xl">{deck.icon}</span>
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{deck.title}</h1>
+            <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{deck.title}</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{deck.description}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {deck.tags.map((tag) => (

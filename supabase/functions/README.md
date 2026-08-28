@@ -17,7 +17,8 @@ they could clear.
 | `suggest-choice` | One wrong answer for a multiple-choice card. Costs nothing. | User JWT |
 | `create-checkout-session` | Starts a Stripe Checkout for a plan. Grants nothing. | User JWT |
 | `create-portal-session` | Opens Stripe's Customer Portal for cancelling, card changes and invoices. | User JWT |
-| `stripe-webhook` | The only thing that can put an account on a paid plan. | Stripe signature |
+| `stripe-webhook` | The only thing that can put an account on a paid plan, on the web. | Stripe signature |
+| `verify-play-purchase` | Confirms a Google Play purchase and grants the plan it paid for, on Android. | User JWT |
 | `send-reminders` | Emails whoever is due a study reminder. Woken by cron every 5 minutes. | `x-cron-secret` |
 | `delete-account` | Deletes the caller's own auth user and everything cascading from it. | User JWT |
 
@@ -214,6 +215,51 @@ in `_shared/billing.ts`:
   `subscriptions` row per account, so a Pro subscription cancelled after buying
   lifetime would otherwise put a paying customer back on free.
 
+## Google Play setup
+
+Android cannot use Stripe from inside the app — Play's Payments policy
+requires its own billing for anything that unlocks in-app features, the same
+way Apple requires StoreKit. `verify-play-purchase` is the Play-side
+counterpart to `stripe-webhook`, except synchronous: the app calls it right
+after expo-iap reports a purchase, rather than Google pushing a
+webhook.
+
+1. In Play Console → your app → Monetize → Products, create:
+   - A **subscription** with product id `pro_monthly` and one base plan,
+     `monthly`.
+   - A **one-time product** with product id `lifetime`. Play refuses to create
+     the first one-time product for an app until a build carrying the
+     `com.android.vending.BILLING` permission has reached at least Internal
+     Testing — expo-iap adds that permission on its own, so ship a
+     build first if this fails.
+
+   Product ids are read from the environment, not hardcoded, the same way
+   Stripe's price ids are — see `PLAY_PRODUCT_IDS` in
+   `packages/core/src/services/billing/types.ts` for what the app asks
+   expo-iap to buy, and keep both id pairs in step if either changes.
+
+2. Create a Google Cloud service account with access to this Play Console
+   listing (Play Console → Users and permissions → invite the service
+   account's email, grant **Financial data** and **View app information**),
+   and download its JSON key. There is no API for this step — it is a
+   click-through in both consoles.
+
+3. Set the secrets:
+
+```bash
+npx supabase secrets set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="$(cat service-account.json)"
+npx supabase secrets set GOOGLE_PLAY_PRODUCT_PRO=pro_monthly
+npx supabase secrets set GOOGLE_PLAY_PRODUCT_LIFETIME=lifetime
+```
+
+A product whose env var is unset simply cannot be verified — `readPlayProductMap`
+leaves it out the same way `readPriceMap` does for an unset Stripe price.
+
+Google's own acknowledgement requirement (a purchase auto-refunds if nothing
+acknowledges it within 3 days) is satisfied client-side, by expo-iap's
+`finishTransaction` after this function confirms the plan — there is no
+server-side acknowledgement call here to keep in step with it.
+
 ## Deploying
 
 ```bash
@@ -231,6 +277,7 @@ npx supabase functions deploy suggest-choice
 npx supabase functions deploy create-checkout-session
 npx supabase functions deploy create-portal-session
 npx supabase functions deploy stripe-webhook
+npx supabase functions deploy verify-play-purchase
 npx supabase functions deploy send-reminders
 npx supabase functions deploy delete-account
 ```
@@ -292,4 +339,8 @@ until you also hold an active tax registration.
 The parts worth testing are pure and run under the repo's normal `npm test`:
 `_shared/__tests__/edgeContract.test.ts` covers the request clamping, and fails
 the build if the plan limits or model catalogue here drift from the app's own
-copies in `packages/core`.
+copies in `packages/core`. `_shared/__tests__/billing.test.ts` and
+`_shared/__tests__/playBilling.test.ts` cover what a Stripe or Play event
+means — the actual calls to Stripe and to the Android Publisher API
+(`_shared/stripe.ts`, `_shared/googlePlay.ts`) are thin, untested glue, the
+same way the Deno `index.ts` handlers are.

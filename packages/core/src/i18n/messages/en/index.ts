@@ -9,6 +9,7 @@ import { stats } from './stats';
 import { marketing } from './marketing';
 import { feedback } from './feedback';
 import { billing } from './billing';
+import { onboarding } from './onboarding';
 
 export const en = {
   ...common,
@@ -22,4 +23,5 @@ export const en = {
   ...marketing,
   ...feedback,
   ...billing,
+  ...onboarding,
 } as const;
