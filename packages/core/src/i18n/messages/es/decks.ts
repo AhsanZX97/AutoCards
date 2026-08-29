@@ -253,6 +253,12 @@ export const decks: Dict<typeof en> = {
   'mobileCreateDeck.chooseFile': 'Elige un archivo para crear las tarjetas',
   'mobileCreateDeck.autoCategorizeDescription': 'Agrupa las tarjetas por tema',
   'mobileCreateDeck.remove': 'Quitar',
+  'mobileCreateDeck.browseDocuments': 'Explorar archivos',
+  'mobileCreateDeck.choosePhoto': 'Elegir una foto',
+  'mobileCreateDeck.takePhoto': 'Tomar una foto',
+  'mobileCreateDeck.permissionNeededTitle': 'Permiso necesario',
+  'mobileCreateDeck.cameraPermissionDenied': 'Permite el acceso a la cámara en Ajustes para tomar una foto.',
+  'mobileCreateDeck.photoPermissionDenied': 'Permite el acceso a las fotos en Ajustes para elegir una imagen.',
 
   'mobileDeckDetail.back': 'Atrás',
   'mobileDeckDetail.deckActions': 'Acciones del mazo',

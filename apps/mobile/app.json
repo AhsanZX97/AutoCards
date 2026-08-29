@@ -40,6 +40,14 @@
         }
       ],
       "expo-iap",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Auto Cards needs access to your photos so you can add one as a source for a deck.",
+          "cameraPermission": "Auto Cards needs access to your camera so you can take a photo to add as a source for a deck.",
+          "microphonePermission": false
+        }
+      ],
       "./plugins/withMonorepoReactNativeDir",
       [
         "expo-build-properties",

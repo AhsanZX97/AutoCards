@@ -250,6 +250,12 @@ export const decks = {
   'mobileCreateDeck.chooseFile': 'Choose a file to build flashcards from',
   'mobileCreateDeck.autoCategorizeDescription': 'Group cards by topic',
   'mobileCreateDeck.remove': 'Remove',
+  'mobileCreateDeck.browseDocuments': 'Browse files',
+  'mobileCreateDeck.choosePhoto': 'Choose a photo',
+  'mobileCreateDeck.takePhoto': 'Take a photo',
+  'mobileCreateDeck.permissionNeededTitle': 'Permission needed',
+  'mobileCreateDeck.cameraPermissionDenied': 'Allow camera access in Settings to take a photo.',
+  'mobileCreateDeck.photoPermissionDenied': 'Allow photo access in Settings to choose a picture.',
 
   'mobileDeckDetail.back': 'Back',
   'mobileDeckDetail.deckActions': 'Deck actions',
