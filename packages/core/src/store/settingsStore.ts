@@ -56,8 +56,8 @@ export function createSettingsStore(storage: StorageAdapter) {
           cardTypes: DEFAULT_CARD_TYPES,
           difficulty: DEFAULT_DIFFICULTY,
           autoCategories: true,
-          includeHints: true,
-          includeExplanations: true,
+          includeHints: false,
+          includeExplanations: false,
           includeSourceQuotes: false,
           // Off by default: it needs a costlier model and buys nothing on the
           // text uploads that make up most of them.
