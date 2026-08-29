@@ -43,6 +43,11 @@ const KIND_BY_EXTENSION: Record<string, DocumentKind> = {
   txt: 'text',
   md: 'text',
   markdown: 'text',
+  jpg: 'image',
+  jpeg: 'image',
+  png: 'image',
+  webp: 'image',
+  gif: 'image',
 };
 
 /**
@@ -59,6 +64,11 @@ const UNSUPPORTED_EXTENSIONS: Record<string, string> = {
   ppt: 'PowerPoint’s older .ppt format cannot be read here. Open it and use Save As to make a .pptx, then upload that.',
   pages: 'Pages files cannot be read here. Export the document as a PDF or Word file and upload that.',
   key: 'Keynote files cannot be read here. Export the deck as a PDF or PowerPoint file and upload that.',
+  heic: 'iPhone photos in HEIC format cannot be read here. In Photos, use Share and pick JPEG, or set the camera to Most Compatible and take it again.',
+  heif: 'HEIF photos cannot be read here. Export the picture as a JPEG and upload that.',
+  tif: 'TIFF images cannot be read here. Save the picture as a JPEG or PNG and upload that.',
+  tiff: 'TIFF images cannot be read here. Save the picture as a JPEG or PNG and upload that.',
+  bmp: 'BMP images cannot be read here. Save the picture as a JPEG or PNG and upload that.',
 };
 
 /**
@@ -123,7 +133,7 @@ export function isSupportedDocument(filename: string): boolean {
 export function describeUnsupported(filename: string): string {
   const known = UNSUPPORTED_EXTENSIONS[extensionOf(filename)];
   if (known) return known;
-  return `${filename} is not a format we can read. Upload a PDF, Word document, PowerPoint deck, or a plain text file.`;
+  return `${filename} is not a format we can read. Upload a PDF, Word document, PowerPoint deck, a photo, or a plain text file.`;
 }
 
 /**
@@ -153,6 +163,47 @@ export const UPLOAD_ACCEPT = SUPPORTED_EXTENSIONS.join(',');
 
 /** Plain-English list for placeholder copy, e.g. "PDF, Word, PowerPoint or text". */
 export const SUPPORTED_FORMATS_LABEL = 'PDF, Word, PowerPoint, text and Markdown';
+
+/**
+ * Picture formats, kept apart from {@link SUPPORTED_EXTENSIONS} because they
+ * are picked from their own place in the app.
+ *
+ * A photograph is uploaded for a different reason than a document — there is
+ * no text in it to extract, and the run has to move onto a model that can see
+ * — so it is offered as its own thing rather than hidden inside a picker that
+ * says "document" on it. The two lists never overlap.
+ */
+export const SUPPORTED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'] as const;
+
+/** `accept` attribute for a picker that takes pictures only. */
+export const IMAGE_UPLOAD_ACCEPT = SUPPORTED_IMAGE_EXTENSIONS.join(',');
+
+/** Plain-English list for placeholder copy, e.g. "JPEG, PNG, WebP or GIF". */
+export const SUPPORTED_IMAGE_FORMATS_LABEL = 'JPEG, PNG, WebP and GIF';
+
+/** Whether this file is a picture rather than something with text in it. */
+export function isImageUpload(filename: string): boolean {
+  return documentKindOf(filename) === 'image';
+}
+
+/** Whether this file is a document — readable, and not a picture. */
+export function isDocumentUpload(filename: string): boolean {
+  const kind = documentKindOf(filename);
+  return kind !== undefined && kind !== 'image';
+}
+
+/**
+ * Why a file was turned away by the picker it was dropped on, when the other
+ * picker would have taken it.
+ *
+ * Worth its own message: "unsupported format" would be a lie about a file the
+ * app reads perfectly well, and the person is one click from the right place.
+ */
+export function describeMisplacedUpload(filename: string, wanted: 'document' | 'image'): string {
+  return wanted === 'image'
+    ? `${filename} is a document, not a picture. Add it under "Upload a document" instead.`
+    : `${filename} is a picture. Add it under "Upload an image" instead.`;
+}
 
 /**
  * Used where real extraction is not available (React Native has no pdf.js).

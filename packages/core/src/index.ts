@@ -6,6 +6,7 @@ export * from './lib/text';
 export * from './lib/theme';
 export * from './i18n';
 export * from './lib/deckTransfer';
+export * from './lib/quizletImport';
 export * from './lib/storage';
 export * from './domain';
 export * from './services';

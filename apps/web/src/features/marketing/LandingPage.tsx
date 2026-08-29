@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { PLAN_LIMITS, type Plan, type Translator } from '@autocards/core';
+import { pricingPlans, type Translator } from '@autocards/core';
 import { BrandButton } from '../../components/ui';
 import { useT } from '../../lib/i18n';
 
@@ -18,73 +18,6 @@ function steps(t: Translator) {
     { step: '01', title: t('landing.steps.upload.title'), description: t('landing.steps.upload.description') },
     { step: '02', title: t('landing.steps.build.title'), description: t('landing.steps.build.description') },
     { step: '03', title: t('landing.steps.study.title'), description: t('landing.steps.study.description') },
-  ];
-}
-
-function formatLimit(t: Translator, value: number): string {
-  return value === Number.POSITIVE_INFINITY ? t('landing.pricing.unlimited') : value.toLocaleString();
-}
-
-/**
- * The numbers on the pricing table, read from the limits the app actually
- * enforces.
- *
- * Written by hand until recently, and wrong — it advertised five decks and
- * fifty cards each while the code allowed three decks and five generations.
- * That was survivable while nothing was enforced. Now that the server turns
- * people away at these exact numbers, an inflated one here is a promise the
- * product visibly breaks, so there is only one place to change them.
- */
-function planFeatures(t: Translator, plan: Plan): string[] {
-  const limits = PLAN_LIMITS[plan];
-  return [
-    t('landing.pricing.generationsPerMonth', { count: formatLimit(t, limits.monthlyUploads) }),
-    t('landing.pricing.decksCount', { count: formatLimit(t, limits.maxDecks) }),
-    t('landing.pricing.pagesPerDocument', { count: formatLimit(t, limits.maxPagesPerPdf) }),
-  ];
-}
-
-/**
- * The lifetime tier's lines, minus anything Pro already advertises.
- *
- * "Everything in Pro" covers those, and a tier that repeats them reads as
- * padding rather than as an upgrade. Still derived from `PLAN_LIMITS` for the
- * reason above — the numbers are not written twice.
- */
-function lifetimeFeatures(t: Translator): string[] {
-  const pro = new Set(planFeatures(t, 'pro'));
-  return planFeatures(t, 'lifetime').filter((feature) => !pro.has(feature));
-}
-
-function plans(t: Translator) {
-  return [
-    {
-      name: 'Free',
-      price: '$0',
-      period: t('landing.pricing.forever'),
-      description: t('landing.pricing.free.description'),
-      features: [...planFeatures(t, 'free'), t('landing.pricing.mobileAppAccess')],
-      cta: t('landing.pricing.getStarted'),
-      highlight: false,
-    },
-    {
-      name: 'Pro',
-      price: '$4',
-      period: t('landing.pricing.perMonth'),
-      description: t('landing.pricing.pro.description'),
-      features: [...planFeatures(t, 'pro'), t('landing.pricing.advancedAnalytics'), t('landing.pricing.fileImports')],
-      cta: t('landing.pricing.getPro'),
-      highlight: true,
-    },
-    {
-      name: 'Lifetime',
-      price: '$39',
-      period: t('landing.pricing.oneTime'),
-      description: t('landing.pricing.lifetime.description'),
-      features: [t('landing.pricing.everythingInPro'), ...lifetimeFeatures(t), t('landing.pricing.everyFutureFeature')],
-      cta: t('landing.pricing.buyLifetime'),
-      highlight: false,
-    },
   ];
 }
 
@@ -385,7 +318,7 @@ export function LandingPage() {
         </div>
 
         <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-          {plans(t).map((plan) => (
+          {pricingPlans(t).map((plan) => (
             <div
               key={plan.name}
               className={

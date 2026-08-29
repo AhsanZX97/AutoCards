@@ -461,6 +461,163 @@ describe('OpenRouterLlmService', () => {
     });
   });
 
+  describe('generating from typed topics', () => {
+    function bodyOf(call = 0) {
+      return JSON.parse((fetchMock.mock.calls[call] as [string, RequestInit])[1].body as string);
+    }
+
+    it('sends the topic as the material when there is no document', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({ documents: [], topics: ['The Krebs cycle'], options: OPTIONS });
+
+      const body = bodyOf();
+      expect(body.messages[1].content).toContain('The Krebs cycle');
+      expect(body.messages[1].content).not.toMatch(/source document/i);
+    });
+
+    it('tells the model there is nothing to read and to answer from what it knows', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({ documents: [], topics: ['The Krebs cycle'], options: OPTIONS });
+
+      const system = bodyOf().messages[0].content as string;
+      expect(system).toMatch(/no document this time/i);
+      expect(system).toMatch(/your own knowledge/i);
+      // The rule written for an upload would have it be faithful to material
+      // that was never sent.
+      expect(system).not.toMatch(/document alone/i);
+    });
+
+    it('names the deck after the topic and says where the cards came from', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      const result = await service().generateDeck({
+        documents: [],
+        topics: ['The Krebs cycle'],
+        options: OPTIONS,
+      });
+
+      expect(result.deckTitle).toBe('The Krebs cycle');
+      expect(result.deckDescription).toContain('The Krebs cycle');
+      // Nothing was uploaded, so the deck has no source files to list.
+      expect(result.sources).toEqual([]);
+    });
+
+    it('tidies the whitespace a pasted topic arrives with', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      const result = await service().generateDeck({
+        documents: [],
+        topics: ['  The   Krebs\n cycle  '],
+        options: OPTIONS,
+      });
+
+      expect(result.deckTitle).toBe('The Krebs cycle');
+    });
+
+    it('still refuses when the topics are only whitespace', async () => {
+      await expect(
+        service().generateDeck({ documents: [], topics: ['   '], options: OPTIONS }),
+      ).rejects.toThrow(/no file/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('never moves a topic onto the vision model, since there are no pictures', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [],
+        topics: ['The Krebs cycle'],
+        options: { ...OPTIONS, readImages: true },
+      });
+
+      expect(bodyOf().model).toBe(OPTIONS.model);
+    });
+
+    it('spreads the deck across several topics rather than exhausting the first', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [],
+        topics: ['The Krebs cycle', 'Glycolysis'],
+        options: OPTIONS,
+      });
+
+      expect(bodyOf().messages[1].content).toContain('Glycolysis');
+      expect(bodyOf().messages[0].content as string).toMatch(/one body of material/i);
+    });
+
+    it('lists every topic in the description of a deck built from several', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      const result = await service().generateDeck({
+        documents: [],
+        topics: ['The Krebs cycle', 'Glycolysis'],
+        options: OPTIONS,
+      });
+
+      expect(result.deckDescription).toContain('The Krebs cycle');
+      expect(result.deckDescription).toContain('Glycolysis');
+    });
+  });
+
+  describe('generating from documents and topics together', () => {
+    function bodyOf(call = 0) {
+      return JSON.parse((fetchMock.mock.calls[call] as [string, RequestInit])[1].body as string);
+    }
+
+    it('sends both, so one deck covers the upload and the gaps beside it', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [DOCUMENT],
+        topics: ['Glycolysis'],
+        options: OPTIONS,
+      });
+
+      const user = bodyOf().messages[1].content as string;
+      expect(user).toContain('Chlorophyll absorbs light energy');
+      expect(user).toContain('Glycolysis');
+    });
+
+    it('says the topics are the exception to the closed-book rule, not a licence for everything', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [DOCUMENT],
+        topics: ['Glycolysis'],
+        options: OPTIONS,
+      });
+
+      const system = bodyOf().messages[0].content as string;
+      // The document rules still stand for the cards drawn from the document.
+      expect(system).toMatch(/document alone/i);
+      expect(system).toMatch(/nothing is written about it in the documents/i);
+      expect(system).toMatch(/only for these topics/i);
+    });
+
+    it('keeps naming the deck after the document, which is the bigger half', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      const result = await service().generateDeck({
+        documents: [DOCUMENT],
+        topics: ['Glycolysis'],
+        options: OPTIONS,
+      });
+
+      expect(result.deckTitle).toBe('Photosynthesis Notes');
+      expect(result.deckDescription).toContain('photosynthesis-notes.pdf');
+      expect(result.deckDescription).toContain('Glycolysis');
+      expect(result.sources).toHaveLength(1);
+    });
+
+    it('carries on with the topics when the only upload turned out to be a scan', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [{ ...DOCUMENT, synthetic: true }],
+        topics: ['Glycolysis'],
+        options: OPTIONS,
+      });
+
+      // The scan is dropped rather than failing the run, because there is
+      // still something real to write from.
+      const user = bodyOf().messages[1].content as string;
+      expect(user).toContain('Glycolysis');
+      expect(user).not.toContain('Chlorophyll absorbs light energy');
+    });
+  });
+
   describe('slide decks', () => {
     /** A deck of `slides` pages carrying `charsPerSlide` characters each. */
     function deck(filename: string, slides: number, charsPerSlide: number): ExtractedDocument {
@@ -621,6 +778,69 @@ describe('OpenRouterLlmService', () => {
       expect(bodyOf().model).toBe('deepseek/deepseek-v3.2');
       expect(typeof userContent()).toBe('string');
       expect(bodyOf().messages[0].content as string).not.toMatch(/image/i);
+    });
+
+    /** A photograph uploaded on its own, of the shape the image extractor returns. */
+    function photographed(filename = 'whiteboard.jpg'): ExtractedDocument {
+      return {
+        filename,
+        size: 900_000,
+        kind: 'image',
+        pageCount: 1,
+        pages: [''],
+        text: '',
+        images: [{ dataUrl: 'data:image/jpeg;base64,BBBB', bytes: 300_000 }],
+      };
+    }
+
+    it('sends an uploaded photograph even with the picture setting off', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      // The setting decides whether to look at pictures *inside* a document.
+      // A photograph is the document, so leaving it out would send nothing at
+      // all and bill for a deck written from an empty page.
+      await service().generateDeck({
+        documents: [photographed()],
+        options: { ...OPTIONS, readImages: false },
+      });
+
+      const parts = userContent() as Array<{ type: string }>;
+      expect(parts.some((part) => part.type === 'image_url')).toBe(true);
+    });
+
+    it('moves a photograph onto a model that can see, whatever the setting says', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [photographed()],
+        options: { ...OPTIONS, model: 'deepseek/deepseek-v3.2', readImages: false },
+      });
+
+      expect(bodyOf().model).not.toBe('deepseek/deepseek-v3.2');
+    });
+
+    it('leaves out the empty text of a photograph rather than sending a blank document', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      await service().generateDeck({
+        documents: [photographed()],
+        options: { ...OPTIONS, readImages: false },
+      });
+
+      const parts = userContent() as Array<{ type: string; text?: string }>;
+      const blank = parts.filter((part) => part.type === 'text' && !part.text?.trim());
+      expect(blank).toHaveLength(0);
+    });
+
+    it('still keeps a document’s own pictures behind the setting', async () => {
+      fetchMock.mockResolvedValue(completion(VALID_REPLY));
+      // A photograph in the same run must not switch the setting on for the
+      // slide deck beside it — that is the cost the checkbox exists to control.
+      await service().generateDeck({
+        documents: [photographed(), illustrated()],
+        options: { ...OPTIONS, readImages: false },
+      });
+
+      const parts = userContent() as Array<{ type: string; image_url?: { url: string } }>;
+      const urls = parts.filter((part) => part.type === 'image_url').map((part) => part.image_url?.url);
+      expect(urls).toEqual(['data:image/jpeg;base64,BBBB']);
     });
 
     it('bounds how many pictures one run can send', async () => {

@@ -14,9 +14,11 @@ export interface Category {
  *
  * `pdf` and `slides` paginate; `document` and `text` are flow formats where
  * pagination is decided by whatever renders them, so they have no page count
- * to report. Legacy `.doc` is deliberately absent — see `documentKindOf`.
+ * to report. `image` is a photograph, screenshot or scan, which counts as a
+ * single page and carries no text at all. Legacy `.doc` is deliberately
+ * absent — see `documentKindOf`.
  */
-export const DOCUMENT_KINDS = ['pdf', 'slides', 'document', 'text'] as const;
+export const DOCUMENT_KINDS = ['pdf', 'slides', 'document', 'text', 'image'] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 export const DOCUMENT_KIND_ICONS: Record<DocumentKind, string> = {
@@ -24,6 +26,7 @@ export const DOCUMENT_KIND_ICONS: Record<DocumentKind, string> = {
   slides: '📊',
   document: '📝',
   text: '🗒️',
+  image: '🖼️',
 };
 
 export interface SourceDocument {

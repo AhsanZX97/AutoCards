@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { promptRules, resolvePreset } from '../presets';
+import { promptRules, resolvePreset, type SourceStyle } from '../presets';
 import { CARD_TYPES, GENERATION_PRESETS } from '../../../types';
 
 /** Everything the preset tells the model, as one blob to search. */
-function rulesOf(id: Parameters<typeof resolvePreset>[0], terse = false): string {
-  return promptRules(resolvePreset(id), terse).join('\n');
+function rulesOf(id: Parameters<typeof resolvePreset>[0], style: SourceStyle = 'prose'): string {
+  return promptRules(resolvePreset(id), style).join('\n');
 }
 
 describe('resolvePreset', () => {
@@ -30,6 +30,7 @@ describe('resolvePreset', () => {
       expect(preset.persona.length).toBeGreaterThan(0);
       expect(preset.rules.length).toBeGreaterThan(0);
       expect(preset.sourceRule.length).toBeGreaterThan(0);
+      expect(preset.topicSourceRule.length).toBeGreaterThan(0);
       expect(preset.categoryHint.length).toBeGreaterThan(0);
     }
   });
@@ -70,22 +71,22 @@ describe('resolvePreset', () => {
   it('drops the closed-book rule for study when the sources are only headings', () => {
     // A slide reading "Ribosomes — site of protein synthesis" holds no answer
     // to be faithful to, so the rule is unfollowable and the model ignores it.
-    expect(rulesOf('study', true)).not.toMatch(/document alone/i);
-    expect(rulesOf('study', true)).toMatch(/headings/i);
+    expect(rulesOf('study', 'terse')).not.toMatch(/document alone/i);
+    expect(rulesOf('study', 'terse')).toMatch(/headings/i);
   });
 
   it('replaces it with a scope limit rather than nothing at all', () => {
     // Without this the model is free to wander off the syllabus entirely.
-    expect(rulesOf('study', true)).toMatch(/stay inside the topics/i);
+    expect(rulesOf('study', 'terse')).toMatch(/stay inside the topics/i);
   });
 
   it('still keeps study from writing cards about the document itself', () => {
-    expect(rulesOf('study', true)).toMatch(/never write a card about the document itself/i);
+    expect(rulesOf('study', 'terse')).toMatch(/never write a card about the document itself/i);
   });
 
   it('leaves presets that already allow outside knowledge unchanged', () => {
     for (const id of ['concepts', 'exam', 'interview'] as const) {
-      expect(rulesOf(id, true)).toBe(rulesOf(id, false));
+      expect(rulesOf(id, 'terse')).toBe(rulesOf(id, 'prose'));
     }
   });
 
@@ -93,6 +94,42 @@ describe('resolvePreset', () => {
     const study = resolvePreset('study').tokensPerCard;
     for (const id of ['concepts', 'exam', 'interview'] as const) {
       expect(resolvePreset(id).tokensPerCard).toBeGreaterThan(study);
+    }
+  });
+});
+
+describe('promptRules for a typed topic', () => {
+  it('tells every preset there is no document to work from', () => {
+    // The rules written for an upload point at material that was never sent,
+    // and a model asked to be faithful to a document it cannot see starts
+    // apologising instead of writing cards.
+    for (const id of GENERATION_PRESETS) {
+      expect(rulesOf(id, 'topic')).toMatch(/no (document|job specification) this time/i);
+    }
+  });
+
+  it('drops the closed-book rule that only makes sense with an upload', () => {
+    expect(rulesOf('study', 'topic')).not.toMatch(/document alone/i);
+  });
+
+  it('sends the model to its own knowledge instead', () => {
+    expect(rulesOf('study', 'topic')).toMatch(/your own knowledge/i);
+  });
+
+  it('keeps a scope limit so the deck stays on the topic asked for', () => {
+    // Without this the model wanders from "the Krebs cycle" to respiration in
+    // general, and half the deck is about something else.
+    expect(rulesOf('study', 'topic')).toMatch(/stay inside the topic/i);
+  });
+
+  it('still reads a topic as a syllabus for interview mode', () => {
+    expect(rulesOf('interview', 'topic')).toMatch(/interviewer/i);
+    expect(rulesOf('interview', 'topic')).toMatch(/professional knowledge/i);
+  });
+
+  it('differs from what the same preset says about an upload', () => {
+    for (const id of GENERATION_PRESETS) {
+      expect(rulesOf(id, 'topic')).not.toBe(rulesOf(id, 'prose'));
     }
   });
 });

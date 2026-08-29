@@ -18,6 +18,7 @@
 /** Every slug the app offers. A request naming anything else is refused. */
 export const ALLOWED_MODEL_IDS = [
   'deepseek/deepseek-v3.2',
+  'xiaomi/mimo-v2.5',
   'moonshotai/kimi-k2',
   'qwen/qwen3-max',
   'z-ai/glm-4.6',

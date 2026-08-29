@@ -20,6 +20,16 @@ export const MODEL_CATALOG: ModelInfo[] = [
     recommended: true,
   },
   {
+    id: 'xiaomi/mimo-v2.5',
+    name: 'MiMo-V2.5',
+    vendor: 'Xiaomi',
+    context: 1_000_000,
+    inputPrice: 0.12,
+    outputPrice: 0.28,
+    description: 'Reads photos, screenshots and scans for less than the text-only models cost.',
+    vision: true,
+  },
+  {
     id: 'moonshotai/kimi-k2',
     name: 'Kimi K2',
     vendor: 'Moonshot AI',
@@ -75,10 +85,11 @@ export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v3.2';
  * Used instead of {@link DEFAULT_MODEL_ID} when a run has to read pictures.
  *
  * The house default cannot see at all, so this is not a preference — a run
- * with images has to move to a model that accepts them. `google/gemini-2.5-flash-lite`
- * is cheap and reads diagrams well.
+ * with images has to move to a model that accepts them. `xiaomi/mimo-v2.5` is
+ * natively multimodal, reads photographed and scanned pages well, and costs
+ * less per token than the text-only default it stands in for.
  */
-export const DEFAULT_VISION_MODEL_ID = 'google/gemini-2.5-flash-lite';
+export const DEFAULT_VISION_MODEL_ID = 'xiaomi/mimo-v2.5';
 
 export function isVisionModel(id: string): boolean {
   return findModel(id)?.vision === true;

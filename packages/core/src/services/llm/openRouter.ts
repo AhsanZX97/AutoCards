@@ -17,7 +17,7 @@ import {
   categoryTargetFor,
   normalizeGeneratedCards,
 } from './normalizeCards';
-import { promptRules, resolvePreset } from './presets';
+import { promptRules, resolvePreset, type SourceStyle } from './presets';
 import { GenerationAbortedError } from './types';
 import type { GenerateArgs, LlmService, ModelInfo, SuggestChoiceArgs } from './types';
 import type {
@@ -214,21 +214,26 @@ export class ChatCompletionLlmService implements LlmService {
     return this.transport.listModels();
   }
 
-  async generateDeck({ documents, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
+  async generateDeck({ documents, topics, options, avoidPrompts, onProgress, signal }: GenerateArgs): Promise<GenerationResult> {
     const t = this.getT();
     const startedAt = Date.now();
     throwIfAborted(signal);
 
-    if (documents.length === 0) {
+    // Typed subjects are material of their own and can sit alongside uploads —
+    // see {@link GenerateArgs.topics}.
+    const subjects = (topics ?? []).map((subject) => subject.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+    if (documents.length === 0 && subjects.length === 0) {
       throw new Error(t('llmProgress.noFileUploaded'));
     }
 
     // A placeholder document would produce a deck of cards about the
     // placeholder, at full token cost. Ones that could not be read are dropped
-    // here and the rest carry on; only an upload with nothing readable in it
-    // fails, and it fails before spending anything.
+    // here and the rest carry on; only a run with nothing readable left in it
+    // fails, and it fails before spending anything. A topic is always
+    // readable, so a deck that has one never falls at this hurdle.
     const readable = documents.filter((document) => !document.synthetic);
-    if (readable.length === 0) {
+    if (readable.length === 0 && subjects.length === 0) {
       throw new Error(unreadableMessage(documents, t));
     }
 
@@ -237,21 +242,33 @@ export class ChatCompletionLlmService implements LlmService {
     report({
       stage: 'chunking',
       progress: 0.05,
-      message: describePreparing(readable, t),
+      message:
+        readable.length > 0
+          ? describePreparing(readable, t)
+          : t('llmProgress.preparingTopic', { topic: listOf(subjects, t) }),
       cardsGenerated: 0,
     });
 
-    // Pictures only reach the model when the user asked for it *and* the files
-    // actually contained some — an upload with none should not be quietly
-    // moved onto a model that costs ten times as much for nothing.
-    const pictures = options.readImages ? picturesIn(readable) : [];
+    // Pictures found inside a document only reach the model when the user
+    // asked for them *and* the files actually contained some — an upload with
+    // none should not be quietly moved onto a model that costs more for
+    // nothing. An uploaded photograph is exempt, because there the picture is
+    // the document. A topic has no files, so it never moves onto the pricier
+    // model.
+    const pictures = picturesIn(readable, options.readImages ?? false);
     const model = pictures.length > 0 ? visionModelFor(options.model) : options.model;
 
     const body: ChatRequestBody = {
       model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(options, avoidPrompts, readable, pictures.length) },
-        { role: 'user', content: buildUserContent(readable, pictures) },
+        {
+          role: 'system',
+          content: buildSystemPrompt(options, avoidPrompts, readable, pictures.length, subjects),
+        },
+        {
+          role: 'user',
+          content: buildUserContent(readable, pictures, subjects),
+        },
       ],
       response_format: { type: 'json_object' },
       max_tokens: outputBudget(options.cardCount, resolvePreset(options.preset).tokensPerCard),
@@ -290,15 +307,19 @@ export class ChatCompletionLlmService implements LlmService {
     const promptTokens = payload.usage?.prompt_tokens ?? 0;
     const completionTokens = payload.usage?.completion_tokens ?? 0;
 
-    const first = documents[0] as ExtractedDocument;
+    const first = documents[0];
     const uploadedAt = nowIso();
 
     return {
-      // Only a fallback now: both upload screens ask for a name up front. It
-      // still has to be something, for a caller that does not.
-      deckTitle: first.title?.trim() || titleFromFilename(first.filename),
-      deckDescription: describeGeneratedFrom(documents, t),
-      deckIcon: '📄',
+      // Only a fallback now: every create screen asks for a name up front. It
+      // still has to be something, for a caller that does not — and where the
+      // whole deck is one typed topic, the topic itself is the obvious name.
+      deckTitle: first
+        ? first.title?.trim() || titleFromFilename(first.filename)
+        : (subjects[0] as string),
+      deckDescription: describeSources(documents, subjects, t),
+      // A deck with no file behind it should not be filed under a page icon.
+      deckIcon: documents.length === 0 ? '💡' : '📄',
       categories,
       cards,
       // Every file the user handed over, readable or not — the deck should
@@ -364,10 +385,17 @@ export class OpenRouterLlmService extends ChatCompletionLlmService {
 }
 
 /** Comma-separated filenames, e.g. `a.pdf, b.docx and c.pptx`. */
+/** `a`, `a and b`, `a, b and c` — in whichever language the app is in. */
+function listOf(items: string[], t: Translator): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} ${t('llmProgress.listJoiner')} ${items[items.length - 1]}`;
+}
+
 function listFilenames(documents: ExtractedDocument[], t: Translator): string {
-  const names = documents.map((document) => document.filename);
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} ${t('llmProgress.listJoiner')} ${names[names.length - 1]}`;
+  return listOf(
+    documents.map((document) => document.filename),
+    t,
+  );
 }
 
 /** Said when nothing in the upload had readable text — usually all scans. */
@@ -383,8 +411,20 @@ function describePreparing(documents: ExtractedDocument[], t: Translator): strin
     : t('llmProgress.preparingMany', { count: documents.length });
 }
 
-function describeGeneratedFrom(documents: ExtractedDocument[], t: Translator): string {
-  return t('llmProgress.generatedFrom', { files: listFilenames(documents, t) });
+/**
+ * What the deck says it was made from, covering any mix of the two: files
+ * alone, topics alone, or a deck built out of both.
+ */
+function describeSources(documents: ExtractedDocument[], topics: string[], t: Translator): string {
+  const fromFiles =
+    documents.length > 0 ? t('llmProgress.generatedFrom', { files: listFilenames(documents, t) }) : '';
+  if (topics.length === 0) return fromFiles;
+
+  const listed = listOf(topics, t);
+  const fromTopics = fromFiles
+    ? t.plural('llmProgress.alsoCoveringTopics', topics.length, { topics: listed })
+    : t.plural('llmProgress.generatedFromTopics', topics.length, { topics: listed });
+  return [fromFiles, fromTopics].filter(Boolean).join(' ');
 }
 
 /** `lecture-notes-week-3.pdf` -> `Lecture Notes Week 3`. */
@@ -448,19 +488,26 @@ function buildSystemPrompt(
   avoidPrompts: string[] = [],
   documents: ExtractedDocument[] = [],
   imageCount = 0,
+  topics: string[] = [],
 ): string {
   const types = allowedCardTypes(options.cardTypes);
   const preset = resolvePreset(options.preset);
+  // Topics only set the tone of the whole prompt when they are all there is.
+  // Beside an upload, the document rules still hold and the topics get their
+  // own paragraph below saying they are the exception.
+  const style: SourceStyle =
+    documents.length === 0 ? 'topic' : isTerseSource(documents) ? 'terse' : 'prose';
   return [
     `${preset.persona} You reply with JSON only.`,
     '',
     `Write at most ${options.cardCount} cards, pitched at "${options.difficulty}" difficulty.`,
     `Use only these card types: ${types.join(', ')}.`,
-    ...promptRules(preset, isTerseSource(documents)),
+    ...promptRules(preset, style),
     SOURCE_IS_NOT_INSTRUCTIONS,
     describeLanguage(options.language),
     describeImages(imageCount),
     describeMultipleDocuments(documents.length),
+    describeTopics(topics, documents.length > 0),
     options.instructions ? `\nThe user asked specifically: ${options.instructions}\n` : '',
     'Reply with a JSON object of this exact shape:',
     options.autoCategories
@@ -635,6 +682,35 @@ function describeMultipleDocuments(count: number): string {
 }
 
 /**
+ * The typed subjects, and where their answers may come from.
+ *
+ * Silent when there are none. Alongside an upload this is the one place the
+ * closed-book rule has to bend: there is nothing written about these subjects
+ * in the documents, so a model told to stay faithful to the material would
+ * either skip them or invent a passage to cite. Saying which cards may leave
+ * the documents, and which may not, is what keeps both halves honest.
+ */
+function describeTopics(topics: string[], withDocuments: boolean): string {
+  if (topics.length === 0) return '';
+  const listed = topics.map((topic) => `  - ${topic}`).join('\n');
+  if (!withDocuments) {
+    return topics.length === 1
+      ? ''
+      : ['', `The ${topics.length} topics below are one body of material, not ${topics.length} separate jobs. Spread the cards across all of them rather than working through the first and stopping.`].join('\n');
+  }
+  return [
+    '',
+    `Alongside the source material you have been given ${
+      topics.length === 1 ? 'a topic' : `${topics.length} topics`
+    } to cover as well:`,
+    listed,
+    `Nothing is written about ${
+      topics.length === 1 ? 'it' : 'them'
+    } in the documents, so write those cards from your own knowledge of the subject. That licence is only for these topics — cards drawn from the documents follow the rules above. Split the deck between the material and the topics rather than spending it all on either.`,
+  ].join('\n');
+}
+
+/**
  * Pictures across every uploaded file, capped for the whole run.
  *
  * Each extractor already limits its own file, but five illustrated decks at
@@ -648,9 +724,16 @@ interface LabelledImage {
   filename: string;
 }
 
-function picturesIn(documents: ExtractedDocument[]): LabelledImage[] {
+/**
+ * @param readImages the user's setting, which governs pictures found *inside*
+ *   a document. An uploaded photograph ignores it: there the picture is the
+ *   material rather than an illustration beside it, so dropping it would send
+ *   an empty document and bill for whatever the model invented.
+ */
+function picturesIn(documents: ExtractedDocument[], readImages: boolean): LabelledImage[] {
   const all: LabelledImage[] = [];
   for (const document of documents) {
+    if (!readImages && document.kind !== 'image') continue;
     for (const image of document.images ?? []) {
       all.push({ image, filename: document.filename });
     }
@@ -686,11 +769,16 @@ function interleaveByDocument(images: LabelledImage[]): LabelledImage[] {
 function buildUserContent(
   documents: ExtractedDocument[],
   pictures: LabelledImage[],
+  topics: string[] = [],
 ): string | ContentPart[] {
-  const text = buildUserPrompt(documents);
+  const text = [buildUserPrompt(documents), buildTopicPrompt(topics, documents.length > 0)]
+    .filter(Boolean)
+    .join('\n\n');
   if (pictures.length === 0) return text;
 
-  const parts: ContentPart[] = [{ type: 'text', text }];
+  // Empty when every upload was a photograph — the pictures below are then
+  // the whole user turn, and a blank leading part would only muddy it.
+  const parts: ContentPart[] = text ? [{ type: 'text', text }] : [];
   for (const { image, filename } of pictures) {
     const where = image.page === undefined ? filename : `${filename}, slide ${image.page}`;
     parts.push({ type: 'text', text: `Image from ${where}:` });
@@ -704,20 +792,56 @@ function visionModelFor(requested: string): string {
   return isVisionModel(requested) ? requested : DEFAULT_VISION_MODEL_ID;
 }
 
+/**
+ * Defensive ceiling on a typed topic. The screen caps it far shorter — this
+ * is only so a caller that skipped validation cannot paste a chapter into the
+ * topic field and have it read as one.
+ */
+const MAX_TOPIC_PROMPT_CHARS = 400;
+
+/**
+ * The typed subjects as they appear in the user turn.
+ *
+ * Labelled as topics rather than dressed up as a source document, because the
+ * system prompt has already said there is nothing written about them. The two
+ * halves have to agree, or the model starts apologising for material it was
+ * never sent.
+ */
+function buildTopicPrompt(topics: string[], withDocuments: boolean): string {
+  if (topics.length === 0) return '';
+  const heading = withDocuments
+    ? topics.length === 1
+      ? 'Topic to cover as well:'
+      : 'Topics to cover as well:'
+    : topics.length === 1
+      ? 'Topic:'
+      : 'Topics:';
+  const body =
+    topics.length === 1
+      ? truncate(topics[0] as string, MAX_TOPIC_PROMPT_CHARS)
+      : topics.map((topic) => `- ${truncate(topic, MAX_TOPIC_PROMPT_CHARS)}`).join('\n');
+  return `${heading}\n\n${body}`;
+}
+
 function buildUserPrompt(documents: ExtractedDocument[]): string {
+  // A photograph carries no text, and a heading over nothing reads to the
+  // model as a document that failed to arrive.
+  const written = documents.filter((document) => document.text.trim().length > 0);
+  if (written.length === 0) return '';
+
   const budgets = shareBudget(
-    documents.map((document) => document.text.length),
+    written.map((document) => document.text.length),
     MAX_CONTEXT_CHARS,
   );
 
-  if (documents.length === 1) {
-    const only = documents[0] as ExtractedDocument;
+  if (written.length === 1) {
+    const only = written[0] as ExtractedDocument;
     return `Source document:\n\n${truncate(only.text, budgets[0] as number)}`;
   }
 
-  return documents
+  return written
     .map((document, index) => {
-      const heading = `=== Document ${index + 1} of ${documents.length}: ${document.filename} ===`;
+      const heading = `=== Document ${index + 1} of ${written.length}: ${document.filename} ===`;
       return `${heading}\n\n${truncate(document.text, budgets[index] as number)}`;
     })
     .join('\n\n');

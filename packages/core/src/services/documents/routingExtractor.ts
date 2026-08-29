@@ -1,4 +1,5 @@
 import type { ExtractedDocument } from '../../types';
+import { ImageExtractor } from './imageExtractor';
 import { OfficeExtractor } from './officeExtractor';
 import { TextExtractor } from './textExtractor';
 import {
@@ -26,6 +27,7 @@ export class RoutingDocumentExtractor implements DocumentExtractor {
 
   private readonly office = new OfficeExtractor();
   private readonly text = new TextExtractor();
+  private readonly image = new ImageExtractor();
 
   constructor(private readonly pdf: DocumentExtractor) {}
 
@@ -38,6 +40,8 @@ export class RoutingDocumentExtractor implements DocumentExtractor {
         return this.office.extract(source);
       case 'text':
         return this.text.extract(source);
+      case 'image':
+        return this.image.extract(source);
       default:
         // Reached when a file slips past the picker's `accept` filter — a
         // drag-and-drop, or a browser that ignores it.

@@ -14,6 +14,8 @@ import type { AnalyticsBackend } from './services/analytics';
 import { SupabaseReminderBackend } from './services/reminders';
 import type { ReminderBackend } from './services/reminders';
 import type { DocumentExtractor } from './services/documents';
+import { EdgeQuizletImporter } from './services/quizlet';
+import type { QuizletImporter } from './services/quizlet';
 import { SupabaseAuthService } from './services/auth/supabaseAuth';
 import { SupabaseSyncBackend } from './services/sync/supabaseSyncBackend';
 import { SyncEngine } from './services/sync/syncEngine';
@@ -119,6 +121,11 @@ export function createApp(options: CreateAppOptions) {
   // Same reasoning as billing: sending mail needs a credential only the
   // server holds, so this only exists where the functions are deployed.
   const feedback: FeedbackService | null = options.edge ? new EdgeFeedbackService(options.edge) : null;
+
+  // A browser cannot fetch a Quizlet set at all — no CORS headers, and the set
+  // pages turn away anything that is not a browser — so this is server-only
+  // too, and the create screen hides the option where it is missing.
+  const quizlet: QuizletImporter | null = options.edge ? new EdgeQuizletImporter(options.edge) : null;
 
   // Plan and allowance as the server holds them. Read straight from Postgres:
   // both tables are owner-readable under RLS and neither needs a secret.
@@ -231,7 +238,7 @@ export function createApp(options: CreateAppOptions) {
   }
 
   return {
-    services: { auth, llm, billing, playBilling, feedback, account, analytics, documents: options.documentExtractor },
+    services: { auth, llm, billing, playBilling, feedback, quizlet, account, analytics, documents: options.documentExtractor },
     authStore,
     deckStore,
     studyStore,

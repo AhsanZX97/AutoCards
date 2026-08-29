@@ -60,6 +60,48 @@ afterwards.
   repair what they can and demote or drop the rest; malformed input must degrade into a plainer
   deck, never a crash or an unrenderable card.
 
+## UI copy
+
+Any user-facing text in the web app (and its Spanish counterpart in
+`packages/core/src/i18n/messages/`) follows these rules:
+
+- **No em dashes.** Use a period, a comma, or a colon instead. Same for en dashes in prose.
+- **No AI slop.** Cut "seamlessly", "effortlessly", "unlock", "supercharge", "elevate",
+  "revolutionize", "in today's fast-paced world", "the power of", and any sentence that could sit
+  on any other product's landing page unchanged.
+- **No rule-of-three lists** used as filler ("faster, smarter, better"), no "It's not just X, it's
+  Y", no rhetorical questions as headings.
+- Say the concrete thing. "Upload a PDF, get 40 cards in about a minute" beats "Transform your
+  study materials into powerful learning tools".
+- Short sentences. Plain words. Write it the way you would say it to a student who is about to sit
+  an exam tomorrow.
+- Sentence case for headings and buttons, not Title Case. No exclamation marks outside genuine
+  celebration copy (a finished streak, a perfect round).
+- **Never paste my prompt into the UI.** What I ask for is a brief, not copy. Don't repeat my
+  wording, my internal names for things, or implementation detail I mentioned while describing the
+  task.
+- **Write to the person using the app**, a student, a learner, someone studying casually on their
+  phone. Second person ("your decks", "you'll see"), no dev vocabulary (extractor, prompt, token,
+  payload, sync engine, edge function), no mention of the model or the pipeline unless the user
+  genuinely needs to know.
+
+## Supabase
+
+The CLI is available (`npx supabase`, v2) and the project is configured in
+[supabase/config.toml](supabase/config.toml). Do Supabase work yourself with it rather than handing
+me a list of dashboard clicks: migrations (`supabase migration new`, `supabase db push`), Edge
+Function deploys (`supabase functions deploy <name>`), secrets (`supabase secrets set`), type
+generation, local stack (`supabase start`, `supabase db reset`).
+
+Come to me only when the CLI genuinely can't do it or is blocked: a missing login or link, a secret
+value I hold, something the dashboard alone exposes (auth providers, billing, project settings), or
+a destructive change on the production database. When that happens, say exactly what you tried,
+what failed, and the precise steps for me to do it by hand.
+
+Schema changes go in a migration under [supabase/migrations/](supabase/migrations/), never as an
+ad-hoc statement against the remote database. Keep [supabase/schema.sql](supabase/schema.sql) in
+step with them.
+
 ## Secrets
 
 The OpenRouter key and the Stripe secret key belong in Supabase project secrets, read only by Edge

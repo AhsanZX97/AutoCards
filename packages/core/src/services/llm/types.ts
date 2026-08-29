@@ -31,6 +31,20 @@ export interface GenerateArgs {
    * slides and the handout both make, and draw a line between the two.
    */
   documents: ExtractedDocument[];
+  /**
+   * Subjects to write cards about with no file behind them — "the Krebs
+   * cycle", "React hooks", "Spanish subjunctive".
+   *
+   * A topic is material in its own right, not steering for an upload: the
+   * model is told there is nothing written to be faithful to and answers from
+   * its own knowledge of the subject. Steering an upload is what
+   * {@link GenerationOptions.instructions} is for.
+   *
+   * Topics and documents can arrive together — one deck built from the lecture
+   * slides plus the two things the lecturer never covered. With no documents
+   * at all, the topics are the whole job.
+   */
+  topics?: string[];
   options: GenerationOptions;
   /**
    * Question sides already in the deck being added to. The model is told not to

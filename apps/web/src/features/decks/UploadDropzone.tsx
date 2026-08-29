@@ -1,11 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   DOCUMENT_KIND_ICONS,
+  IMAGE_UPLOAD_ACCEPT,
   UPLOAD_ACCEPT,
+  describeMisplacedUpload,
   describeOversized,
   describeUnsupported,
   documentKindOf,
   formatFileSize,
+  isDocumentUpload,
+  isImageUpload,
   isOversizedUpload,
   isSupportedDocument,
 } from '@autocards/core';
@@ -20,13 +24,34 @@ import { useT } from '../../lib/i18n';
  */
 export const MAX_UPLOAD_FILES = 5;
 
+/**
+ * Which picker this is.
+ *
+ * A photograph and a chapter are picked from different places on the
+ * create-deck screen, so each dropzone takes only its own half and says where
+ * the other one is rather than calling a perfectly readable file unsupported.
+ */
+export type UploadKind = 'document' | 'image';
+
 interface UploadDropzoneProps {
   files: File[];
   onChange: (files: File[]) => void;
   /** Copy under the prompt, e.g. what kind of material suits this deck. */
   hint: string;
+  /** What this dropzone accepts. Documents unless it says otherwise. */
+  variant?: UploadKind;
   /** Shorter padding for the version that sits inside a modal. */
   compact?: boolean;
+  /**
+   * Whether to list the files picked so far.
+   *
+   * Off where the caller shows them itself — the create-deck screen lists
+   * every file beside the topics and pastes in one list, and a second copy of
+   * the files inside the dropzone would be the same rows twice with two
+   * different remove buttons. The files are still passed in either way, so
+   * the limit and the duplicate check keep working.
+   */
+  showList?: boolean;
 }
 
 /**
@@ -37,7 +62,14 @@ interface UploadDropzoneProps {
  * go up in a single model call, so the cards are written knowing about all of
  * them rather than one batch per file that repeat each other.
  */
-export function UploadDropzone({ files, onChange, hint, compact = false }: UploadDropzoneProps) {
+export function UploadDropzone({
+  files,
+  onChange,
+  hint,
+  variant = 'document',
+  compact = false,
+  showList = true,
+}: UploadDropzoneProps) {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -48,12 +80,18 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
 
       const accepted: File[] = [];
       const rejected: string[] = [];
+      const misplaced: string[] = [];
       const oversized: File[] = [];
       let duplicates = 0;
 
+      const wanted = variant === 'image' ? isImageUpload : isDocumentUpload;
+
       for (const file of Array.from(incoming)) {
-        if (!isSupportedDocument(file.name)) {
-          rejected.push(file.name);
+        if (!wanted(file.name)) {
+          // Readable, but dropped on the wrong picker — worth saying so,
+          // because "unsupported" would be untrue and unhelpful.
+          if (isSupportedDocument(file.name)) misplaced.push(file.name);
+          else rejected.push(file.name);
           continue;
         }
         // Turned away here rather than at extraction time: reading one of
@@ -78,6 +116,13 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
 
       for (const name of rejected) {
         toast({ variant: 'error', title: t('uploadDropzone.cannotReadTitle'), description: describeUnsupported(name) });
+      }
+      for (const name of misplaced) {
+        toast({
+          variant: 'info',
+          title: t('uploadDropzone.wrongPlaceTitle'),
+          description: describeMisplacedUpload(name, variant),
+        });
       }
       for (const file of oversized) {
         toast({
@@ -105,7 +150,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
       if (room <= 0) return;
       onChange([...files, ...accepted.slice(0, room)]);
     },
-    [files, onChange],
+    [files, onChange, variant, t],
   );
 
   function removeAt(index: number) {
@@ -116,7 +161,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
 
   return (
     <div className="space-y-3">
-      {files.length > 0 && (
+      {showList && files.length > 0 && (
         <ul className="space-y-2">
           {files.map((file, index) => (
             <li
@@ -160,7 +205,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
               : 'cursor-pointer border-slate-300 hover:border-brand-400 dark:border-slate-700'
         }`}
       >
-        <span className="text-3xl">{files.length > 0 ? '➕' : '📄'}</span>
+        <span className="text-3xl">{files.length > 0 ? '➕' : variant === 'image' ? '🖼️' : '📄'}</span>
         <p className="mt-3 font-semibold text-slate-800 dark:text-slate-200">
           {full
             ? t('uploadDropzone.atLimit', { max: MAX_UPLOAD_FILES })
@@ -175,7 +220,7 @@ export function UploadDropzone({ files, onChange, hint, compact = false }: Uploa
         ref={inputRef}
         type="file"
         multiple
-        accept={UPLOAD_ACCEPT}
+        accept={variant === 'image' ? IMAGE_UPLOAD_ACCEPT : UPLOAD_ACCEPT}
         className="hidden"
         onChange={(e) => {
           addFiles(e.target.files);

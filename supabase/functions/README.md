@@ -14,6 +14,7 @@ they could clear.
 | --- | --- | --- |
 | `generate-deck` | Writes a deck from an uploaded document. Costs one upload. | User JWT |
 | `extract-document` | Reads the text out of a PDF for mobile, which cannot run pdf.js. Costs nothing. | User JWT |
+| `import-quizlet` | Fetches a shared Quizlet set and returns its terms. Costs nothing. | User JWT |
 | `suggest-choice` | One wrong answer for a multiple-choice card. Costs nothing. | User JWT |
 | `create-checkout-session` | Starts a Stripe Checkout for a plan. Grants nothing. | User JWT |
 | `create-portal-session` | Opens Stripe's Customer Portal for cancelling, card changes and invoices. | User JWT |
@@ -273,6 +274,7 @@ npx supabase secrets set APP_URL=https://your-app-url   # optional, attribution 
 
 npx supabase functions deploy generate-deck
 npx supabase functions deploy extract-document
+npx supabase functions deploy import-quizlet
 npx supabase functions deploy suggest-choice
 npx supabase functions deploy create-checkout-session
 npx supabase functions deploy create-portal-session

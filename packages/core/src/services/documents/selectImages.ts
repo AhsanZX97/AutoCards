@@ -101,7 +101,7 @@ interface NodeBufferCtor {
   from(bytes: Uint8Array): { toString(encoding: string): string };
 }
 
-function toBase64(bytes: Uint8Array): string {
+export function toBase64(bytes: Uint8Array): string {
   // `btoa` is browser-only and `Buffer` is Node-only; the extractors run in
   // both, so prefer whichever exists.
   if (typeof btoa === 'function') {

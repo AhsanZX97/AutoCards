@@ -1,6 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RoutingDocumentExtractor } from '../routingExtractor';
-import { DocumentExtractionError, documentKindOf, isSupportedDocument, describeUnsupported } from '../types';
+import {
+  DocumentExtractionError,
+  IMAGE_UPLOAD_ACCEPT,
+  SUPPORTED_EXTENSIONS,
+  SUPPORTED_IMAGE_EXTENSIONS,
+  UPLOAD_ACCEPT,
+  describeMisplacedUpload,
+  describeUnsupported,
+  documentKindOf,
+  isDocumentUpload,
+  isImageUpload,
+  isSupportedDocument,
+} from '../types';
 import type { DocumentExtractor } from '../types';
 import { docxFile, pptxFile, sourceFromString } from './documentFixtures';
 
@@ -38,6 +50,8 @@ describe('documentKindOf', () => {
     ['lecture.pptm', 'slides'],
     ['lecture.ppsm', 'slides'],
     ['handout.docm', 'document'],
+    ['whiteboard.jpg', 'image'],
+    ['diagram.png', 'image'],
   ])('reads %s as %s', (filename, kind) => {
     expect(documentKindOf(filename)).toBe(kind);
   });
@@ -56,8 +70,39 @@ describe('documentKindOf', () => {
   it('does not claim to read formats it cannot', () => {
     expect(isSupportedDocument('old.doc')).toBe(false);
     expect(isSupportedDocument('slides.ppt')).toBe(false);
-    expect(isSupportedDocument('photo.png')).toBe(false);
+    // Readable image formats are supported; the ones no model decodes are not.
+    expect(isSupportedDocument('photo.heic')).toBe(false);
+    expect(isSupportedDocument('scan.tiff')).toBe(false);
     expect(isSupportedDocument('noextension')).toBe(false);
+  });
+});
+
+describe('documents and pictures are picked apart', () => {
+  it('sorts a file into exactly one of the two pickers', () => {
+    expect(isDocumentUpload('chapter.pdf')).toBe(true);
+    expect(isImageUpload('chapter.pdf')).toBe(false);
+
+    expect(isImageUpload('whiteboard.jpg')).toBe(true);
+    expect(isDocumentUpload('whiteboard.jpg')).toBe(false);
+  });
+
+  it('claims nothing it cannot read', () => {
+    expect(isDocumentUpload('old.doc')).toBe(false);
+    expect(isImageUpload('photo.heic')).toBe(false);
+  });
+
+  it('offers the two file pickers non-overlapping lists', () => {
+    const shared = SUPPORTED_EXTENSIONS.filter((extension) =>
+      (SUPPORTED_IMAGE_EXTENSIONS as readonly string[]).includes(extension),
+    );
+    expect(shared).toEqual([]);
+    expect(IMAGE_UPLOAD_ACCEPT).toContain('.png');
+    expect(UPLOAD_ACCEPT).not.toContain('.png');
+  });
+
+  it('points a misplaced file at the picker that wants it', () => {
+    expect(describeMisplacedUpload('whiteboard.jpg', 'document')).toMatch(/Upload an image/);
+    expect(describeMisplacedUpload('chapter.pdf', 'image')).toMatch(/Upload a document/);
   });
 });
 
@@ -68,7 +113,11 @@ describe('describeUnsupported', () => {
   });
 
   it('lists what does work for a format it has no advice for', () => {
-    expect(describeUnsupported('photo.png')).toMatch(/PDF/);
+    expect(describeUnsupported('notes.rtf')).toMatch(/PDF/);
+  });
+
+  it('tells someone with an iPhone photo how to get a readable one', () => {
+    expect(describeUnsupported('IMG_0421.heic')).toMatch(/JPEG/);
   });
 });
 
@@ -103,7 +152,7 @@ describe('RoutingDocumentExtractor', () => {
 
   it('refuses a format it has never heard of', async () => {
     const { extractor } = router();
-    await expect(extractor.extract(sourceFromString('photo.png', 'whatever'))).rejects.toBeInstanceOf(
+    await expect(extractor.extract(sourceFromString('notes.rtf', 'whatever'))).rejects.toBeInstanceOf(
       DocumentExtractionError,
     );
   });

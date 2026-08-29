@@ -35,6 +35,19 @@ export interface GenerationPrompt {
    * knowledge, where there is nothing to relax.
    */
   terseSourceRule?: string;
+  /**
+   * Used instead of {@link sourceRule} when there is no document at all —
+   * only a topic someone typed.
+   *
+   * Every source rule above is written against material that exists: "the
+   * document alone", "where the document assumes". With nothing uploaded
+   * those sentences point at nothing, and a prompt that refers to a document
+   * that was never sent is how a model talks itself into refusing. This says
+   * plainly that the topic is the syllabus and the answers come from the
+   * model's own knowledge — and puts back the scope limit that the document
+   * was providing.
+   */
+  topicSourceRule: string;
   /** What `"category"` should name, when auto-categorize is on. */
   categoryHint: string;
   /**
@@ -66,6 +79,8 @@ const PROMPTS: Record<GenerationPresetId, GenerationPrompt> = {
       'If it is study material — notes, a chapter, a handout — write recall questions that cover it evenly and are answerable from the document alone.',
     terseSourceRule:
       'If it is study material, note that these sources are headings and bullet points rather than prose. Treat them as the list of topics to cover, and write the full answer a good tutor would give — but stay inside the topics the sources actually raise.',
+    topicSourceRule:
+      'There is no document this time — only a topic someone typed. Work out what someone learning that topic needs, and write those cards from your own knowledge of the subject. Cover it the way a course on it would, and stay inside the topic as given rather than drifting into neighbouring ones.',
     categoryHint: 'the topic the card belongs to',
     tokensPerCard: 320,
     suggestedCardTypes: ALL_CARD_TYPES,
@@ -81,6 +96,8 @@ const PROMPTS: Record<GenerationPresetId, GenerationPrompt> = {
     sourceRule: 'Each card must ask exactly one thing, and must be answerable from the document alone.',
     terseSourceRule:
       'Each card must ask exactly one thing. These sources are headings and bullet points rather than prose, so there is no full answer written in them: take them as the list of topics to cover, and write the answer a good tutor would give. Stay inside the topics the sources actually raise — do not bring in material they never mention.',
+    topicSourceRule:
+      'There is no document this time — only a topic someone typed. Each card must ask exactly one thing, answered from your own knowledge of the subject. Cover the topic evenly, from the foundations someone would meet first through to what a course on it would actually examine, and stay inside the topic as given.',
     categoryHint: 'a section name drawn from the document',
     tokensPerCard: 220,
     suggestedCardTypes: ALL_CARD_TYPES,
@@ -97,6 +114,8 @@ const PROMPTS: Record<GenerationPresetId, GenerationPrompt> = {
     ],
     sourceRule:
       'You may draw a connection the document leaves implicit, so long as both halves of it are in the document.',
+    topicSourceRule:
+      'There is no document this time — only a topic someone typed. Answer from your own knowledge of the subject, and keep every card on the ideas that topic is actually made of rather than its neighbours.',
     categoryHint: 'the concept or theme the card belongs to',
     tokensPerCard: 320,
     suggestedCardTypes: OPEN_ANSWER_TYPES,
@@ -113,6 +132,8 @@ const PROMPTS: Record<GenerationPresetId, GenerationPrompt> = {
     ],
     sourceRule:
       'You may use standard knowledge of the subject where the document assumes the reader already has it.',
+    topicSourceRule:
+      'There is no document this time — only a topic someone typed. Treat it as the syllabus and set the questions an examiner would set on it, answered from standard knowledge of the subject. Stay inside the topic as given.',
     categoryHint: 'the topic the question examines',
     tokensPerCard: 380,
     suggestedCardTypes: ['basic', 'multiple-choice'],
@@ -131,6 +152,8 @@ const PROMPTS: Record<GenerationPresetId, GenerationPrompt> = {
     ],
     sourceRule:
       'Answer from general professional knowledge, not from the document. The document decides only what is worth asking about.',
+    topicSourceRule:
+      'There is no job specification this time — only a role or skill area someone typed. Take that as the syllabus and write the questions an interviewer for it would actually ask, answered from general professional knowledge.',
     categoryHint: 'the skill area the question belongs to, for example "API testing" or "CI/CD"',
     tokensPerCard: 420,
     suggestedCardTypes: OPEN_ANSWER_TYPES,
@@ -147,10 +170,25 @@ export function resolvePreset(id: GenerationPresetId | undefined): GenerationPro
 }
 
 /**
- * A preset's rules in prompt order, with the source rule chosen to match the
- * material. `terse` is for uploads that are headings rather than prose.
+ * How the material reaching the model is shaped, which decides which source
+ * rule a preset uses.
+ *
+ * `prose` is the ordinary case — a chapter, a handout, a passage someone
+ * pasted. `terse` is an upload of headings rather than sentences, i.e. slides.
+ * `topic` is no material at all, only a subject someone typed.
  */
-export function promptRules(preset: GenerationPrompt, terse = false): string[] {
-  const source = terse ? (preset.terseSourceRule ?? preset.sourceRule) : preset.sourceRule;
+export type SourceStyle = 'prose' | 'terse' | 'topic';
+
+/**
+ * A preset's rules in prompt order, with the source rule chosen to match the
+ * material.
+ */
+export function promptRules(preset: GenerationPrompt, style: SourceStyle = 'prose'): string[] {
+  const source =
+    style === 'topic'
+      ? preset.topicSourceRule
+      : style === 'terse'
+        ? (preset.terseSourceRule ?? preset.sourceRule)
+        : preset.sourceRule;
   return [...preset.rules, source];
 }
