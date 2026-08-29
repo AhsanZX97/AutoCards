@@ -43,7 +43,7 @@ export interface Series {
  * axis labels end up wider on a wide screen and unreadable on a narrow one. The
  * charts are laid out in real pixels instead, so text stays text.
  */
-export function useMeasuredWidth<T extends HTMLElement>(): [RefObject<T>, number] {
+export function useMeasuredWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
 
