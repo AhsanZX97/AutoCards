@@ -57,6 +57,13 @@ export const auth: Dict<typeof en> = {
   'auth.layout.heroTitle': 'Convierte tus diapositivas y apuntes en un mazo de tarjetas listo para estudiar',
   'auth.layout.heroBody': 'Sube apuntes de clase, libros de texto o informes y obtén tarjetas de estudio personalizables y gamificadas en segundos.',
 
+  'auth.layout.headline': 'Tarjetas a partir de',
+  'auth.layout.headlineAccent': 'tus apuntes.',
+  'auth.layout.description': 'Sube un PDF, un documento de Word o una presentación para crear tus tarjetas.',
+  'auth.layout.subject': 'Aprendizaje y memoria',
+  'auth.layout.question': '¿Por qué ponerte a prueba te ayuda a recordar?',
+  'auth.layout.answer': 'Recordar una respuesta refuerza tu memoria más que volver a leerla.',
+
   'auth.emailPlaceholder': 'tu@ejemplo.com',
 
   'auth.forgotPassword.mobileTitle': '¿Olvidaste tu contraseña?',

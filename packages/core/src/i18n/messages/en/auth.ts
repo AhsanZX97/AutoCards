@@ -54,6 +54,13 @@ export const auth = {
   'auth.layout.heroTitle': 'Turn your slides and notes into a study-ready flashcard deck',
   'auth.layout.heroBody': 'Upload lecture notes, textbooks, or reports and get customizable, gamified flashcards in seconds.',
 
+  'auth.layout.headline': 'Flashcards from',
+  'auth.layout.headlineAccent': 'your notes.',
+  'auth.layout.description': 'Upload a PDF, Word document or slide deck to create your flashcards.',
+  'auth.layout.subject': 'Learning & memory',
+  'auth.layout.question': 'Why does testing yourself help you remember?',
+  'auth.layout.answer': 'Recalling an answer strengthens your memory more than reading it again.',
+
   'auth.emailPlaceholder': 'you@example.com',
 
   'auth.forgotPassword.mobileTitle': 'Forgot your password?',

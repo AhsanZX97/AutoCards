@@ -69,6 +69,10 @@ Any user-facing text in the web app (and its Spanish counterpart in
 - **No AI slop.** Cut "seamlessly", "effortlessly", "unlock", "supercharge", "elevate",
   "revolutionize", "in today's fast-paced world", "the power of", and any sentence that could sit
   on any other product's landing page unchanged.
+- **No decorative hint text or motivational slogans.** Do not add lines such as "Less rereading.
+  More remembering", "A little study goes a long way", or similar filler in headers, footers,
+  captions, or around forms. Leave the space empty. Keep helper text only when it explains an
+  action, requirement, error, or state the person needs to understand.
 - **No rule-of-three lists** used as filler ("faster, smarter, better"), no "It's not just X, it's
   Y", no rhetorical questions as headings.
 - Say the concrete thing. "Upload a PDF, get 40 cards in about a minute" beats "Transform your
@@ -84,6 +88,16 @@ Any user-facing text in the web app (and its Spanish counterpart in
   phone. Second person ("your decks", "you'll see"), no dev vocabulary (extractor, prompt, token,
   payload, sync engine, edge function), no mention of the model or the pipeline unless the user
   genuinely needs to know.
+
+## Visual consistency
+
+- Reuse the existing palette in `apps/web/tailwind.config.js`, the shared UI components, and
+  `apps/web/src/app.css`. The brand uses a cyan-to-blue gradient with slate surfaces and text.
+  Use the established accent colors where appropriate; do not invent a separate page palette
+  such as a green or sage theme during a redesign.
+- Keep shared button colors, focus states, and dark-mode tokens consistent. Use theme tokens
+  rather than hardcoded replacement colors. A student-focused design should still look like
+  the same application.
 
 ## Supabase
 
