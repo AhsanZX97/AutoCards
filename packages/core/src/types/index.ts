@@ -9,4 +9,3 @@ export * from './sync';
 export * from './usage';
 export * from './tour';
 export * from './reminder';
-export * from './analytics';

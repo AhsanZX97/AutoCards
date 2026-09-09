@@ -3,7 +3,6 @@ import { Route, Routes } from 'react-router-dom';
 import { useThemeEffect } from './lib/useTheme';
 import { useLocaleEffect, useT } from './lib/i18n';
 import { RequireAuth } from './components/layout/RequireAuth';
-import { RequireAdmin } from './components/layout/RequireAdmin';
 import { AppLayout } from './components/layout/AppLayout';
 import { MarketingLayout } from './components/layout/MarketingLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
@@ -31,7 +30,6 @@ const StudyRunnerPage = lazy(() => import('./features/study/StudyRunnerPage').th
 const StudyResultsPage = lazy(() => import('./features/study/StudyResultsPage').then((m) => ({ default: m.StudyResultsPage })));
 const StatsPage = lazy(() => import('./features/stats/StatsPage').then((m) => ({ default: m.StatsPage })));
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const AnalyticsPage = lazy(() => import('./features/admin/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 
 export default function App() {
   useThemeEffect();
@@ -190,23 +188,6 @@ export default function App() {
                   <SettingsPage />
                 </Suspense>
               </AppLayout>
-            </RequireAuth>
-          }
-        />
-        {/* Owner only. The gate that matters is server-side — `admin_analytics`
-            checks `is_admin` itself — so this guard only spares everyone else a
-            page that would refuse to load. */}
-        <Route
-          path="/app/analytics"
-          element={
-            <RequireAuth>
-              <RequireAdmin>
-                <AppLayout>
-                  <Suspense fallback={null}>
-                    <AnalyticsPage />
-                  </Suspense>
-                </AppLayout>
-              </RequireAdmin>
             </RequireAuth>
           }
         />

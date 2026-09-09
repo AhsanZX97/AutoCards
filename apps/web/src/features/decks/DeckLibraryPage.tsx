@@ -6,6 +6,7 @@ import { useT } from '../../lib/i18n';
 import { Badge, Button, Card, CardBody, Input, Progress } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
 import { toast } from '../../components/ui/toastStore';
+import './deck-library.css';
 
 type FilterMode = 'active' | 'archived';
 
@@ -64,11 +65,11 @@ export function DeckLibraryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+    <div className="deck-library">
+      <div className="deck-library-header">
         <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('deckLibrary.title')}</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="deck-library-title">{t('deckLibrary.title')}</h1>
+          <p className="deck-library-subtitle">
             {t.plural('deckLibrary.deckCount', decks.length, { count: decks.length })}
           </p>
         </div>
@@ -92,20 +93,16 @@ export function DeckLibraryPage() {
         }}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="max-w-xs flex-1">
+      <div className="deck-library-controls">
+        <div className="deck-library-search">
           <Input placeholder={t('deckLibrary.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/60">
+        <div className="deck-library-filter-tabs">
           {(['active', 'archived'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setFilter(mode)}
-              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                filter === mode
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-              }`}
+              className={`deck-library-filter-tab ${filter === mode ? 'active' : ''}`}
             >
               {mode === 'active' ? t('deckLibrary.active') : t('deckLibrary.archived')}
             </button>
@@ -114,74 +111,70 @@ export function DeckLibraryPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <Card>
-          <CardBody className="flex flex-col items-center py-14 text-center">
-            <span className="text-4xl">🗂️</span>
-            <p className="mt-3 font-medium text-slate-700 dark:text-slate-300">{t('deckLibrary.noDecksFound')}</p>
-            <p className="mt-1 text-sm text-slate-400">
-              {filter === 'archived' ? t('deckLibrary.nothingArchived') : t('deckLibrary.emptyPrompt')}
-            </p>
-            {filter === 'active' && (
-              <div className="mt-4 flex gap-2">
-                <Link to="/app/decks/new">
-                  <Button size="sm" variant="outline">{t('deckLibrary.createDeckShort')}</Button>
-                </Link>
-                <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                  {t('deckLibrary.importDeck')}
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
+        <div className="deck-library-empty">
+          <span className="deck-library-empty-icon" aria-hidden="true">🗂️</span>
+          <p className="deck-library-empty-title">{t('deckLibrary.noDecksFound')}</p>
+          <p className="deck-library-empty-description">
+            {filter === 'archived' ? t('deckLibrary.nothingArchived') : t('deckLibrary.emptyPrompt')}
+          </p>
+          {filter === 'active' && (
+            <div className="deck-library-empty-actions">
+              <Link to="/app/decks/new">
+                <Button size="sm" variant="outline">{t('deckLibrary.createDeckShort')}</Button>
+              </Link>
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                {t('deckLibrary.importDeck')}
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="deck-library-grid">
           {filtered.map((deck) => {
             const stats = computeDeckStats(cardsByDeck[deck.id] ?? []);
             const accent = accentOf(deck.accent);
             return (
-              <Card key={deck.id} className="group relative flex flex-col">
-                <CardBody className="flex flex-1 flex-col">
-                  <div className="flex items-start justify-between">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${accent.bgSoft}`}>
-                      {deck.icon}
-                    </div>
-                    <DeckMenu
-                      t={t}
-                      archived={deck.archived}
-                      onArchive={() => archiveDeck(deck.id, !deck.archived)}
-                      onDelete={() => {
-                        if (confirm(t('deckLibrary.confirmDelete', { title: deck.title }))) {
-                          deleteDeck(deck.id);
-                          // Otherwise the schedule outlives the deck.
-                          clearReminders(deck.id);
-                        }
-                      }}
-                    />
+              <div key={deck.id} className="deck-library-card">
+                <div className="deck-library-card-header">
+                  <div className={`deck-library-card-icon ${accent.bgSoft}`}>
+                    {deck.icon}
                   </div>
-                  <Link to={`/app/decks/${deck.id}`} className="mt-3 flex-1">
-                    <h3 className="font-semibold text-slate-900 hover:text-brand-700 dark:text-white dark:hover:text-brand-400">
-                      {deck.title}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{deck.description}</p>
-                  </Link>
-                  <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-                    <span>{t.plural('deckLibrary.cardCount', stats.total, { count: stats.total })}</span>
-                    <span>{t('deckLibrary.percentMastered', { percent: stats.averageMastery })}</span>
+                  <DeckMenu
+                    t={t}
+                    archived={deck.archived}
+                    onArchive={() => archiveDeck(deck.id, !deck.archived)}
+                    onDelete={() => {
+                      if (confirm(t('deckLibrary.confirmDelete', { title: deck.title }))) {
+                        deleteDeck(deck.id);
+                        // Otherwise the schedule outlives the deck.
+                        clearReminders(deck.id);
+                      }
+                    }}
+                  />
+                </div>
+                <Link to={`/app/decks/${deck.id}`} className="flex-1">
+                  <h3 className="deck-library-card-title">{deck.title}</h3>
+                  <p className="deck-library-card-description">{deck.description}</p>
+                </Link>
+                <div className="deck-library-card-stats">
+                  <span>{t.plural('deckLibrary.cardCount', stats.total, { count: stats.total })}</span>
+                  <span>{t('deckLibrary.percentMastered', { percent: stats.averageMastery })}</span>
+                </div>
+                <Progress value={stats.averageMastery} max={100} className="mt-3" />
+                {stats.starred > 0 && (
+                  <div className="mt-3">
+                    <Badge variant="info">{stats.starred} ⭐</Badge>
                   </div>
-                  <Progress value={stats.averageMastery} max={100} className="mt-2" />
-                  <div className="mt-4 flex items-center gap-2">
-                    {stats.starred > 0 && <Badge variant="info">{stats.starred} ⭐</Badge>}
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate(`/app/decks/${deck.id}`)}>
-                      {t('deckLibrary.manage')}
-                    </Button>
-                    <Button size="sm" className="flex-1" onClick={() => navigate(`/app/study/${deck.id}`)} disabled={stats.total === 0}>
-                      {t('deckLibrary.study')}
-                    </Button>
-                  </div>
-                </CardBody>
-              </Card>
+                )}
+                <div className="deck-library-card-actions">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate(`/app/decks/${deck.id}`)}>
+                    {t('deckLibrary.manage')}
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={() => navigate(`/app/study/${deck.id}`)} disabled={stats.total === 0}>
+                    {t('deckLibrary.study')}
+                  </Button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -206,7 +199,7 @@ function DeckMenu({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="rounded-lg p-1.5 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-slate-800"
+        className="deck-library-menu-button"
         aria-label={t('deckLibrary.deckOptions')}
       >
         ⋯

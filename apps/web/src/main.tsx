@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { Analytics } from '@vercel/analytics/react';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { AppProvider } from './lib/appContext';
 import App from './App';
@@ -15,8 +14,6 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AppProvider>
           <App />
-          {/* Inside the router so route changes are tracked as pageviews. */}
-          <Analytics />
         </AppProvider>
       </BrowserRouter>
     </ErrorBoundary>
