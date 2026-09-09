@@ -12,3 +12,4 @@ export * from './domain';
 export * from './services';
 export * from './store';
 export * from './createApp';
+export * from './lib/dashboardDeckPage';

@@ -1,4 +1,6 @@
 export const dashboard = {
+  'dashboard.previous': 'Previous',
+  'dashboard.page': 'Page {page} of {count}',
   'dashboard.welcome': 'Welcome back, {name} 👋',
   'dashboard.guestName': 'there',
   'dashboard.decksReady_one': 'You have {count} deck ready to study.',

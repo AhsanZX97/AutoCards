@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { computeDeckStats, computeOverallStats, formatRelative, type Translator } from '@autocards/core';
+import { computeDeckStats, computeOverallStats, dashboardDeckPage, type Translator } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { useT } from '../../lib/i18n';
-import { Badge, Button, Card, CardBody, Progress } from '../../components/ui';
+import { Button, Progress } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
 import { ActivityHeatmap } from '../stats/ActivityHeatmap';
+import './dashboard.css';
 
 export function DashboardPage() {
   const app = useApp();
@@ -23,15 +24,16 @@ export function DashboardPage() {
     () => activeDecks.map((deck) => ({ deck, stats: computeDeckStats(cardsByDeck[deck.id] ?? []) })),
     [activeDecks, cardsByDeck],
   );
-  const deckSummaries = allDeckStats.slice(0, 6);
+  const [requestedPage, setPage] = useState(0);
+  const { items: deckSummaries, page, pageCount } = dashboardDeckPage(allDeckStats, requestedPage);
   const totalCards = allDeckStats.reduce((sum, d) => sum + d.stats.total, 0);
   const firstName = user?.username ?? t('dashboard.guestName');
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+    <div className="dashboard">
+      <div className="dashboard-welcome">
+        <div className="dashboard-welcome-copy">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             {t('dashboard.welcome', { name: firstName })}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -40,13 +42,13 @@ export function DashboardPage() {
               : t('dashboard.noDecksYetPrompt')}
           </p>
         </div>
-        <Link to="/app/decks/new">
+        <Link to="/app/decks/new" className="dashboard-create">
           <Button size="lg">{t('dashboard.createDeck')}</Button>
         </Link>
       </div>
 
-      {/* Stat tiles */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* A compact progress strip leaves the decks as the main focus. */}
+      <div className="dashboard-progress-strip">
         <StatTile
           icon="🔥"
           label={t('dashboard.stat.dayStreak')}
@@ -73,9 +75,9 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardBody>
+      <div className="dashboard-study-area">
+        <section className="dashboard-decks">
+          <div>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-semibold text-slate-900 dark:text-white">{t('dashboard.yourDecks')}</h2>
               <Link to="/app/decks" className="text-sm font-medium text-brand-700 hover:text-brand-600 dark:text-brand-400">
@@ -85,22 +87,24 @@ export function DashboardPage() {
             {deckSummaries.length === 0 ? (
               <EmptyDeckState t={t} />
             ) : (
-              <div className="space-y-3">
+              <div className="dashboard-deck-grid">
                 {deckSummaries.map(({ deck, stats: deckStats }) => {
                   const accent = accentOf(deck.accent);
                   return (
                     <Link
                       key={deck.id}
                       to={`/app/decks/${deck.id}`}
-                      className="flex items-center gap-4 rounded-xl border border-slate-100 p-3 transition-colors hover:border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-800/50"
+                      className="dashboard-deck"
+                      title={deck.title}
                     >
                       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${accent.bgSoft}`}>
                         {deck.icon}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{deck.title}</p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <Progress value={deckStats.averageMastery} max={100} className="h-1.5 w-24" />
+                        <p className="dashboard-deck-title text-base font-semibold text-slate-900 dark:text-white">{deck.title}</p>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('dashboard.stat.cardsTotal', { count: deckStats.total })}</p>
+                        <div className="dashboard-deck-progress">
+                          <Progress value={deckStats.averageMastery} max={100} className="h-1.5 flex-1" />
                           <span className="text-xs text-slate-400">
                             {t('dashboard.percentMastered', { percent: deckStats.averageMastery })}
                           </span>
@@ -111,11 +115,22 @@ export function DashboardPage() {
                 })}
               </div>
             )}
-          </CardBody>
-        </Card>
+            {pageCount > 1 && (
+              <div className="dashboard-pagination">
+                <Button size="sm" variant="primary" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                  {t('dashboard.previous')}
+                </Button>
+                <span aria-live="polite">{t('dashboard.page', { page: page + 1, count: pageCount })}</span>
+                <Button size="sm" variant="primary" disabled={page === pageCount - 1} onClick={() => setPage(page + 1)}>
+                  {t('common.next')}
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
 
-        <Card>
-          <CardBody>
+        <section className="dashboard-activity">
+          <div>
             <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('dashboard.activity')}</h2>
             <ActivityHeatmap activity={stats.activity} compact />
             <div className="mt-4 grid grid-cols-2 gap-3 text-center">
@@ -128,58 +143,34 @@ export function DashboardPage() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.totalXp')}</p>
               </div>
             </div>
-          </CardBody>
-        </Card>
+          </div>
+        </section>
       </div>
 
-      {history.length > 0 && (
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t('dashboard.recentSessions')}</h2>
-            <div className="space-y-2">
-              {history.slice(0, 5).map((session) => (
-                <div key={session.id} className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{session.deckTitle}</p>
-                    <p className="text-xs text-slate-400">{formatRelative(session.endedAt)}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {t('dashboard.correctOf', { correct: session.correct, answered: session.answered })}
-                    </span>
-                    <Badge variant={session.letter === 'F' ? 'danger' : session.letter === 'S' || session.letter === 'A' ? 'success' : 'info'}>
-                      {session.letter}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-      )}
+
     </div>
   );
 }
 
 function StatTile({ icon, label, value, sublabel }: { icon: string; label: string; value: string | number; sublabel: string }) {
   return (
-    <Card>
-      <CardBody className="p-4">
+    <div className="dashboard-stat">
+      <div>
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
           <span>{icon}</span>
-          <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+          <span className="text-xs font-medium">{label}</span>
         </div>
         <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
         <p className="mt-0.5 text-xs text-slate-400">{sublabel}</p>
-      </CardBody>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 function EmptyDeckState({ t }: { t: Translator }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-10 text-center dark:border-slate-800">
-      <span className="text-3xl">📄</span>
+    <div className="dashboard-empty flex flex-col items-center justify-center py-10 text-center">
+      <span className="dashboard-card-mark" aria-hidden="true">▱<span>▱</span></span>
       <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">{t('dashboard.emptyDecks.title')}</p>
       <p className="mt-1 max-w-xs text-xs text-slate-400">{t('dashboard.emptyDecks.body')}</p>
       <Link to="/app/decks/new" className="mt-4">

@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useMatch } from 'react-router-dom';
 import { useApp } from '../../lib/appContext';
 import { useT } from '../../lib/i18n';
 import { isAdmin, type Translator } from '@autocards/core';
 import { FeedbackModal } from '../../features/feedback/FeedbackModal';
 import { Avatar, Button, Modal, ThemeToggle, Wordmark } from '../ui';
 import { cn } from '../../lib/cn';
+import './dashboard-shell.css';
 
 function navItems(t: Translator, admin: boolean) {
   return [
@@ -22,6 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const app = useApp();
   const t = useT();
   const navigate = useNavigate();
+  const dashboard = useMatch({ path: '/app', end: true }) !== null;
   const user = app.authStore((s) => s.session?.user);
   const admin = isAdmin(user);
   const signOut = app.authStore((s) => s.signOut);
@@ -58,14 +60,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className={dashboard ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
+      {!dashboard && <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
         <SidebarContent t={t} admin={admin} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
-      </aside>
+      </aside>}
 
       {/* Mobile sidebar */}
-      {mobileNavOpen && (
+      {!dashboard && mobileNavOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
@@ -82,9 +84,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className="flex min-h-screen flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8">
-          <button
+      <div className={dashboard ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
+        <header className={dashboard ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
+          {dashboard && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
+          {!dashboard && <button
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileNavOpen(true)}
             aria-label={t('nav.openMenu')}
@@ -96,8 +99,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 clipRule="evenodd"
               />
             </svg>
-          </button>
-          <div className="hidden lg:block" />
+          </button>}
+          {dashboard ? (
+            <nav className="dashboard-shell-nav">
+              {navItems(t, admin).map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end}
+                  className={({ isActive }) => cn('dashboard-shell-tab', isActive && 'dashboard-shell-tab-active')}>
+                  {item.label}
+                </NavLink>
+              ))}
+              <button className="dashboard-shell-tab" onClick={() => setFeedbackOpen(true)}>{t('nav.feedback')}</button>
+            </nav>
+          ) : <div className="hidden lg:block" />}
           <ThemeToggle className="ml-auto mr-1" />
           <div className="relative">
             <button
@@ -132,7 +145,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+        <main className={dashboard ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
       </div>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

@@ -2,6 +2,8 @@ import type { dashboard as en } from '../en/dashboard';
 import type { Dict } from '../shape';
 
 export const dashboard: Dict<typeof en> = {
+  'dashboard.previous': 'Anterior',
+  'dashboard.page': 'Página {page} de {count}',
   'dashboard.welcome': '¡Bienvenido de nuevo, {name}! 👋',
   'dashboard.guestName': 'amigo',
   'dashboard.decksReady_one': 'Tienes {count} mazo listo para estudiar.',
