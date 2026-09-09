@@ -17,6 +17,8 @@ export const stats: Dict<typeof en> = {
   'stats.noSessionsYet': 'Aún no hay sesiones de estudio.',
   'stats.sessionsAndAccuracy': '{sessions} sesiones · {accuracy}% de precisión',
   'stats.achievements': 'Logros',
+  'stats.accuracy': 'Precisión',
+  'stats.unlocked': 'Desbloqueado',
   'stats.heatmap.tooltip': '{date}: {cards} tarjetas, {sessions} sesiones',
   'stats.heatmap.less': 'Menos',
   'stats.heatmap.more': 'Más',

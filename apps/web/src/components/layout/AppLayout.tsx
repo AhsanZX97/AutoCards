@@ -23,6 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const dashboard = useMatch({ path: '/app', end: true }) !== null;
   const deckLibrary = useMatch({ path: '/app/decks', end: true }) !== null;
+  const stats = useMatch({ path: '/app/stats', end: true }) !== null;
   const user = app.authStore((s) => s.session?.user);
   const admin = isAdmin(user);
   const signOut = app.authStore((s) => s.signOut);
@@ -59,14 +60,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={dashboard || deckLibrary ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
+    <div className={dashboard || deckLibrary || stats ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
       {/* Desktop sidebar */}
-      {!(dashboard || deckLibrary) && <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
+      {!(dashboard || deckLibrary || stats) && <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
         <SidebarContent t={t} admin={admin} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
       </aside>}
 
       {/* Mobile sidebar */}
-      {!(dashboard || deckLibrary) && mobileNavOpen && (
+      {!(dashboard || deckLibrary || stats) && mobileNavOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
@@ -83,10 +84,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className={dashboard || deckLibrary ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
-        <header className={dashboard || deckLibrary ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
-          {(dashboard || deckLibrary) && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
-          {!(dashboard || deckLibrary) && <button
+      <div className={dashboard || deckLibrary || stats ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
+        <header className={dashboard || deckLibrary || stats ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
+          {(dashboard || deckLibrary || stats) && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
+          {!(dashboard || deckLibrary || stats) && <button
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileNavOpen(true)}
             aria-label={t('nav.openMenu')}
@@ -99,7 +100,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               />
             </svg>
           </button>}
-          {(dashboard || deckLibrary) ? (
+          {(dashboard || deckLibrary || stats) ? (
             <nav className="dashboard-shell-nav">
               {navItems(t, admin).map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.end}
@@ -144,7 +145,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className={dashboard || deckLibrary ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
+        <main className={dashboard || deckLibrary || stats ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
       </div>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

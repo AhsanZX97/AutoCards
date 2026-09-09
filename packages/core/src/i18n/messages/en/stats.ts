@@ -14,6 +14,8 @@ export const stats = {
   'stats.noSessionsYet': 'No study sessions yet.',
   'stats.sessionsAndAccuracy': '{sessions} sessions · {accuracy}% accuracy',
   'stats.achievements': 'Achievements',
+  'stats.accuracy': 'Accuracy',
+  'stats.unlocked': 'Unlocked',
   'stats.heatmap.tooltip': '{date}: {cards} cards, {sessions} sessions',
   'stats.heatmap.less': 'Less',
   'stats.heatmap.more': 'More',
