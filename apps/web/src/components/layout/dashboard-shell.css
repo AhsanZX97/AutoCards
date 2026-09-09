@@ -5,6 +5,8 @@
   --sheet-accent: theme('colors.brand.700');
   --sheet-back: theme('colors.brand.100');
   --sheet-back-blue: theme('colors.blue.100');
+  display: flex;
+  flex-direction: column;
   min-height: 100svh;
   padding: 24px 32px;
   background: theme('colors.slate.100');
@@ -26,7 +28,8 @@
   display: flex;
   flex-direction: column;
   max-width: 1440px;
-  margin-inline: auto;
+  width: 100%;
+  margin: auto;
   border: 1px solid var(--sheet-line);
   border-radius: 28px;
   background: var(--sheet);
