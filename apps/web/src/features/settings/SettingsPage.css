@@ -1,14 +1,11 @@
-.dashboard-shell-card:has(.settings-page) {
-  min-height: 0;
-  max-width: 1120px;
-}
-
 .settings-page {
   min-width: 0;
 }
 
 .settings-header {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed var(--sheet-line);
 }
 
 .settings-title {
@@ -33,7 +30,7 @@
 .settings-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   padding: 4px;
   background: theme('colors.slate.100');
   border-radius: 12px;
@@ -69,21 +66,20 @@
 }
 
 .settings-section {
-  border: 1px solid var(--sheet-line);
-  border-radius: 16px;
-  background: var(--sheet);
+  min-width: 0;
 }
 
 .settings-section + .settings-section {
-  margin-top: 20px;
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 1px dashed var(--sheet-line);
 }
 
 .settings-section-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--sheet-line);
+  padding-bottom: 16px;
 }
 
 .settings-section-icon {
@@ -111,7 +107,7 @@
 }
 
 .settings-section-body {
-  padding: 24px;
+  padding: 4px 0 0;
 }
 
 .settings-grid {
@@ -140,7 +136,7 @@
 @media (max-width: 479px) {
   .settings-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-tab { padding: 10px 8px; }
-  .settings-section-header, .settings-section-body { padding: 16px; }
+  .settings-section + .settings-section { margin-top: 24px; padding-top: 24px; }
 }
 
 .settings-option {

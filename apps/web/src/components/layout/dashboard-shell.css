@@ -25,7 +25,6 @@
   isolation: isolate;
   display: flex;
   flex-direction: column;
-  min-height: calc(100svh - 48px);
   max-width: 1440px;
   margin-inline: auto;
   border: 1px solid var(--sheet-line);
@@ -95,7 +94,6 @@
 
 @media (max-width: 1199px) {
   .dashboard-shell { padding: 28px; }
-  .dashboard-shell-card { min-height: calc(100svh - 56px); }
   .dashboard-shell-header { flex-wrap: wrap; gap: 12px; padding: 20px 28px 0; }
   .dashboard-shell-nav {
     order: 3;
@@ -111,7 +109,7 @@
 
 @media (max-width: 639px) {
   .dashboard-shell { padding: 16px 12px 24px; }
-  .dashboard-shell-card { border-radius: 20px; min-height: calc(100svh - 40px); }
+  .dashboard-shell-card { border-radius: 20px; }
   .dashboard-shell-header { padding: 16px 20px 0; }
   .dashboard-shell-nav { gap: 20px; }
   .dashboard-shell-content { padding: 24px 20px; }
