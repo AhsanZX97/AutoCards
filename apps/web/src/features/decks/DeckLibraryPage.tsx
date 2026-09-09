@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { computeDeckStats, parseDeckExport, type Translator } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
 import { useT } from '../../lib/i18n';
-import { Badge, Button, Card, CardBody, Input, Progress } from '../../components/ui';
+import { Badge, Button, Input, Progress } from '../../components/ui';
 import { accentOf } from '../../lib/accent';
 import { toast } from '../../components/ui/toastStore';
 import './deck-library.css';
@@ -95,13 +95,14 @@ export function DeckLibraryPage() {
 
       <div className="deck-library-controls">
         <div className="deck-library-search">
-          <Input placeholder={t('deckLibrary.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input aria-label={t('deckLibrary.searchPlaceholder')} placeholder={t('deckLibrary.searchPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <div className="deck-library-filter-tabs">
           {(['active', 'archived'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setFilter(mode)}
+              aria-pressed={filter === mode}
               className={`deck-library-filter-tab ${filter === mode ? 'active' : ''}`}
             >
               {mode === 'active' ? t('deckLibrary.active') : t('deckLibrary.archived')}

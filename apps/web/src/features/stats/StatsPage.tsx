@@ -31,21 +31,21 @@ export function StatsPage() {
         />
         <StatTile
           icon="⭐"
-          label={t('stats.level', { level: stats.level.level })}
-          value={`${stats.level.xpIntoLevel} / ${stats.level.xpForNextLevel}`}
+          label={t('dashboard.stat.level')}
+          value={stats.level.level}
           sublabel={t('stats.xpProgress', { into: stats.level.xpIntoLevel, needed: stats.level.xpForNextLevel })}
         />
         <StatTile
           icon="🎯"
           label={t('stats.accuracy')}
           value={`${Math.round(stats.accuracy * 100)}%`}
-          sublabel={t('stats.sessions', { count: stats.totalSessions })}
+          sublabel={`${stats.totalSessions} ${t('stats.sessions')}`}
         />
         <StatTile
           icon="🏆"
           label={t('stats.totalXp')}
           value={stats.totalXp}
-          sublabel={t('stats.minutes', { count: stats.totalMinutes })}
+          sublabel={`${stats.totalMinutes} ${t('stats.minutes')}`}
         />
       </div>
 
@@ -93,7 +93,7 @@ export function StatsPage() {
                     key={achievement.id}
                     className={`stats-achievement ${!achievement.unlocked ? 'locked' : ''}`}
                   >
-                    <span className="text-2xl">{achievement.icon}</span>
+                    <span className="stats-achievement-icon text-2xl" aria-hidden="true">{achievement.icon}</span>
                     <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                       {t(`achievement.${achievement.id}` as MessageKey)}
                     </p>
@@ -106,24 +106,6 @@ export function StatsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="stats-card">
-                <p className="text-lg font-bold text-slate-900 dark:text-white">{stats.totalMinutes}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t('stats.minutes')}</p>
-              </div>
-              <div className="stats-card">
-                <p className="text-lg font-bold text-slate-900 dark:text-white">{stats.totalSessions}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t('stats.sessions')}</p>
-              </div>
-            </div>
-
-            <div className="stats-card text-center">
-              <span className="text-4xl">🔥</span>
-              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{stats.streak.current}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{t('stats.dayStreak')}</p>
-              <p className="mt-1 text-xs text-slate-400">{t('stats.best', { count: stats.streak.longest })}</p>
-              {stats.streak.atRisk && <Badge variant="warning" className="mt-2">{t('stats.studyTodayToKeep')}</Badge>}
-            </div>
           </div>
         </section>
       </div>

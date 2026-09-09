@@ -24,6 +24,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const dashboard = useMatch({ path: '/app', end: true }) !== null;
   const deckLibrary = useMatch({ path: '/app/decks', end: true }) !== null;
   const stats = useMatch({ path: '/app/stats', end: true }) !== null;
+  const settings = useMatch({ path: '/app/settings', end: true }) !== null;
   const user = app.authStore((s) => s.session?.user);
   const admin = isAdmin(user);
   const signOut = app.authStore((s) => s.signOut);
@@ -59,15 +60,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
     navigate('/');
   }
 
+  const inFlashcardShell = dashboard || deckLibrary || stats || settings;
+
   return (
-    <div className={dashboard || deckLibrary || stats ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
+    <div className={inFlashcardShell ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
       {/* Desktop sidebar */}
-      {!(dashboard || deckLibrary || stats) && <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
+      {!inFlashcardShell && <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:flex">
         <SidebarContent t={t} admin={admin} onNavigate={() => {}} onFeedback={() => setFeedbackOpen(true)} />
       </aside>}
 
       {/* Mobile sidebar */}
-      {!(dashboard || deckLibrary || stats) && mobileNavOpen && (
+      {!inFlashcardShell && mobileNavOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-10 flex h-full w-64 flex-col bg-white dark:bg-slate-900">
@@ -84,10 +87,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className={dashboard || deckLibrary || stats ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
-        <header className={dashboard || deckLibrary || stats ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
-          {(dashboard || deckLibrary || stats) && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
-          {!(dashboard || deckLibrary || stats) && <button
+      <div className={inFlashcardShell ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
+        <header className={inFlashcardShell ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
+          {inFlashcardShell && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
+          {!inFlashcardShell && <button
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
             onClick={() => setMobileNavOpen(true)}
             aria-label={t('nav.openMenu')}
@@ -100,7 +103,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               />
             </svg>
           </button>}
-          {(dashboard || deckLibrary || stats) ? (
+          {inFlashcardShell ? (
             <nav className="dashboard-shell-nav">
               {navItems(t, admin).map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.end}
@@ -145,7 +148,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className={dashboard || deckLibrary || stats ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
+        <main className={inFlashcardShell ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
       </div>
 
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

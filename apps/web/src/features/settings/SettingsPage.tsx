@@ -16,9 +16,10 @@ import {
 import { FunctionsFetchError } from '@supabase/supabase-js';
 import { useApp, getSupabaseClient } from '../../lib/appContext';
 import { useLocale, useT } from '../../lib/i18n';
-import { Avatar, Badge, Button, Card, CardBody, Field, Input, Modal, Progress, Select, Switch, Tabs } from '../../components/ui';
+import { Avatar, Badge, Button, Field, Input, Modal, Progress, Switch } from '../../components/ui';
 import { toast } from '../../components/ui/toastStore';
 import { useUploadQuota } from '../../lib/useUploadQuota';
+import './SettingsPage.css';
 
 export function SettingsPage() {
   const t = useT();
@@ -36,13 +37,25 @@ export function SettingsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">{t('settings.title')}</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.subtitle')}</p>
+    <div className="settings-page">
+      <div className="settings-header">
+        <h1 className="settings-title">{t('settings.title')}</h1>
+        <p className="settings-subtitle">{t('settings.subtitle')}</p>
       </div>
 
-      <Tabs items={TABS} active={tab} onChange={setTab} />
+      <div className="settings-tabs">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setTab(item.id)}
+            aria-pressed={tab === item.id}
+            className={`settings-tab ${tab === item.id ? 'settings-tab-active' : ''}`}
+          >
+            <span aria-hidden="true">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </div>
 
       {tab === 'profile' && <ProfileTab />}
       {tab === 'appearance' && <AppearanceTab />}
@@ -74,11 +87,6 @@ function ProfileTab() {
       window.location.href = '/';
     } catch (err) {
       if (err instanceof FunctionsFetchError) {
-        // The browser failed to read the response rather than the request
-        // failing to send — seen in practice with browser tracking
-        // prevention blocking `/functions/` URLs. The delete call still
-        // reaches the server either way, so treat this as a done deal rather
-        // than leaving the account looking alive when it may already be gone.
         await signOut({ force: true });
         window.location.href = '/';
         return;
@@ -96,27 +104,35 @@ function ProfileTab() {
   if (!user) return null;
 
   return (
-    <Card>
-      <CardBody className="space-y-5">
-        <div className="flex items-center gap-4">
-          <Avatar name={user.username} initials={user.initials} avatarUrl={user.avatarUrl} size="lg" />
-          <div>
-            <p className="font-semibold text-slate-900 dark:text-white">@{user.username}</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
-          </div>
+    <>
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon">👤</div>
+          <h2 className="settings-section-title">{t('settings.tab.profile')}</h2>
         </div>
-        <Field label={t('common.username')}>
-          <Input value={user.username} disabled />
-        </Field>
-        <Field label={t('common.email')}>
-          <Input value={user.email} disabled />
-        </Field>
-        <div className="pt-2">
+        <div className="settings-section-body">
+          <div className="flex items-center gap-4">
+            <Avatar name={user.username} initials={user.initials} avatarUrl={user.avatarUrl} size="lg" />
+            <div>
+              <p className="font-semibold text-slate-900 dark:text-white">@{user.username}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
+            </div>
+          </div>
+          <hr className="settings-divider" />
+          <div className="settings-grid settings-profile-fields">
+            <Field label={t('common.username')}>
+              <Input value={user.username} disabled />
+            </Field>
+            <Field label={t('common.email')}>
+              <Input value={user.email} disabled />
+            </Field>
+          </div>
+          <hr className="settings-divider" />
           <Button variant="danger" onClick={() => setConfirmOpen(true)}>
             {t('settings.profile.deleteAccount')}
           </Button>
         </div>
-      </CardBody>
+      </section>
 
       <Modal
         open={confirmOpen}
@@ -137,7 +153,7 @@ function ProfileTab() {
       >
         <p className="text-sm text-slate-600 dark:text-slate-300">{t('settings.profile.deleteWarning')}</p>
       </Modal>
-    </Card>
+    </>
   );
 }
 
@@ -167,63 +183,67 @@ function AppearanceTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.theme')}</h3>
-          <div className="grid grid-cols-3 gap-3">
+    <>
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon">🎨</div>
+          <h3 className="settings-section-title">{t('settings.appearance.theme')}</h3>
+        </div>
+        <div className="settings-section-body">
+          <div className="settings-grid settings-grid-cols-3">
             {(['light', 'dark', 'system'] as const).map((option) => (
               <button
                 key={option}
                 onClick={() => setTheme(option)}
-                className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
-                  theme === option
-                    ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
-                }`}
+                aria-pressed={theme === option}
+                className={`settings-option ${theme === option ? 'settings-option-selected' : ''}`}
               >
-                <span className="mb-2 block text-xl">{THEME_ICONS[option]}</span>
-                {themeLabel(t, option)}
+                <span className="settings-option-icon" aria-hidden="true">{THEME_ICONS[option]}</span>
+                <span className="settings-option-label">{themeLabel(t, option)}</span>
               </button>
             ))}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.language')}</h3>
-          <div className="grid grid-cols-3 gap-3">
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon">🌐</div>
+          <h3 className="settings-section-title">{t('settings.appearance.language')}</h3>
+        </div>
+        <div className="settings-section-body">
+          <div className="settings-grid settings-grid-cols-3">
             {(['system', ...SUPPORTED_LOCALES] as LanguagePreference[]).map((option) => (
               <button
                 key={option}
                 onClick={() => setLanguage(option)}
-                className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
-                  language === option
-                    ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:text-slate-300'
-                }`}
+                aria-pressed={language === option}
+                className={`settings-option ${language === option ? 'settings-option-selected' : ''}`}
               >
-                {option === 'system' ? t('settings.appearance.language.system') : LOCALE_LABELS[option]}
+                <span className="settings-option-label">
+                  {option === 'system' ? t('settings.appearance.language.system') : LOCALE_LABELS[option]}
+                </span>
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-400">{t('settings.appearance.language.hint')}</p>
-        </CardBody>
-      </Card>
+          <p className="settings-usage-hint">{t('settings.appearance.language.hint')}</p>
+        </div>
+      </section>
 
-      <Card>
-        <CardBody className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.appearance.tours')}</h3>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('settings.appearance.toursBody')}</p>
+      <section className="settings-section">
+        <div className="settings-section-body">
+          <div className="settings-row">
+            <div className="settings-row-info">
+              <h4>{t('settings.appearance.tours')}</h4>
+              <p>{t('settings.appearance.toursBody')}</p>
+            </div>
+            <Button variant="outline" onClick={replayTours} disabled={completedTours.length === 0}>
+              {completedTours.length === 0 ? t('settings.appearance.toursNotSeen') : t('settings.appearance.toursReplay')}
+            </Button>
           </div>
-          <Button variant="outline" onClick={replayTours} disabled={completedTours.length === 0}>
-            {completedTours.length === 0 ? t('settings.appearance.toursNotSeen') : t('settings.appearance.toursReplay')}
-          </Button>
-        </CardBody>
-      </Card>
-    </div>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -234,19 +254,23 @@ function GenerationTab() {
   const updateDefaults = app.settingsStore((s) => s.updateGenerationDefaults);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardBody className="space-y-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.generation.title')}</h3>
-          <Field label={t('settings.generation.cardCount')}>
-            <Input
-              type="number"
-              min={5}
-              max={100}
-              value={defaults.cardCount}
-              onChange={(e) => updateDefaults({ cardCount: Number(e.target.value) })}
-            />
-          </Field>
+    <section className="settings-section">
+      <div className="settings-section-header">
+        <div className="settings-section-icon">🧠</div>
+        <h3 className="settings-section-title">{t('settings.generation.title')}</h3>
+      </div>
+      <div className="settings-section-body">
+        <Field label={t('settings.generation.cardCount')}>
+          <Input
+            type="number"
+            min={5}
+            max={100}
+            value={defaults.cardCount}
+            onChange={(e) => updateDefaults({ cardCount: Number(e.target.value) })}
+          />
+        </Field>
+        <hr className="settings-divider" />
+        <div className="settings-grid" style={{ gap: '12px' }}>
           <Switch
             checked={defaults.autoCategories}
             onChange={(v) => updateDefaults({ autoCategories: v })}
@@ -262,9 +286,9 @@ function GenerationTab() {
             onChange={(v) => updateDefaults({ includeExplanations: v })}
             label={t('settings.generation.includeExplanations')}
           />
-        </CardBody>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -441,42 +465,45 @@ function BillingTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <>
       {activating && (
-        <Card>
-          <CardBody className="text-sm text-slate-500 dark:text-slate-400">
+        <section className="settings-section">
+          <div className="settings-section-body text-sm text-slate-500 dark:text-slate-400">
             {t('settings.billing.activating')}
-          </CardBody>
-        </Card>
+          </div>
+        </section>
       )}
 
       {subscription && (
-        <Card>
-          <CardBody className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-slate-900 dark:text-white">
-                  {ownsOutright ? t('settings.billing.yourPlan') : t('settings.billing.yourSubscription')}
-                </h3>
-                {subscription.status === 'past_due' && <Badge variant="warning">{t('settings.billing.paymentFailed')}</Badge>}
-                {subscription.cancelAtPeriodEnd && <Badge variant="info">{t('settings.billing.cancelling')}</Badge>}
+        <section className="settings-section">
+          <div className="settings-section-body">
+            <div className="settings-row">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 dark:text-white">
+                    {ownsOutright ? t('settings.billing.yourPlan') : t('settings.billing.yourSubscription')}
+                  </h3>
+                  {subscription.status === 'past_due' && <Badge variant="warning">{t('settings.billing.paymentFailed')}</Badge>}
+                  {subscription.cancelAtPeriodEnd && <Badge variant="info">{t('settings.billing.cancelling')}</Badge>}
+                </div>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                  {describeSubscription(t, locale, subscription)}
+                </p>
               </div>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                {describeSubscription(t, locale, subscription)}
-              </p>
+              <Button variant="outline" onClick={() => void manageBilling()} disabled={openingPortal}>
+                {openingPortal
+                  ? t('settings.billing.opening')
+                  : ownsOutright
+                    ? t('settings.billing.receipts')
+                    : t('settings.billing.manageBilling')}
+              </Button>
             </div>
-            <Button variant="outline" onClick={() => void manageBilling()} disabled={openingPortal}>
-              {openingPortal
-                ? t('settings.billing.opening')
-                : ownsOutright
-                  ? t('settings.billing.receipts')
-                  : t('settings.billing.manageBilling')}
-            </Button>
-          </CardBody>
-        </Card>
+          </div>
+        </section>
       )}
-      <Card>
-        <CardBody className="space-y-2">
+
+      <section className="settings-section">
+        <div className="settings-section-body">
           <div className="flex items-baseline justify-between">
             <h3 className="font-semibold text-slate-900 dark:text-white">{t('settings.billing.uploadsThisMonth')}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -484,64 +511,66 @@ function BillingTab() {
             </p>
           </div>
           {quota.limit !== Number.POSITIVE_INFINITY && (
-            <Progress value={quota.used} max={quota.limit} />
+            <div className="settings-usage-bar">
+              <Progress value={quota.used} max={quota.limit} />
+            </div>
           )}
-          <p className="text-xs text-slate-400">{t('settings.billing.uploadsHint')}</p>
-        </CardBody>
-      </Card>
+          <p className="settings-usage-hint">{t('settings.billing.uploadsHint')}</p>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="settings-grid settings-grid-cols-3">
         {PLANS.map((plan) => {
           const limits = PLAN_LIMITS[plan];
           const isCurrent = user.plan === plan;
           const forSale = billing && PURCHASABLE_PLANS.includes(plan) && !ownsOutright;
           return (
-            <Card key={plan} className={isCurrent ? 'border-2 border-brand-600 dark:border-brand-500' : undefined}>
-              <CardBody>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold capitalize text-slate-900 dark:text-white">{plan}</h3>
-                  {isCurrent && <Badge variant="info">{t('settings.billing.current')}</Badge>}
+            <div key={plan} className={`settings-plan-card ${isCurrent ? 'settings-plan-card-current' : ''}`}>
+              <div className="settings-plan-header">
+                <div>
+                  <h3 className="settings-plan-name">{plan}</h3>
+                  <p className="settings-plan-price">{planPrice(t, plan)}</p>
                 </div>
-                <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{planPrice(t, plan)}</p>
-                <ul className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <li>{t('settings.billing.uploadsPerMonth', { count: formatLimit(t, limits.monthlyUploads) })}</li>
-                  <li>{t('settings.billing.decksCount', { count: formatLimit(t, limits.maxDecks) })}</li>
-                  <li>{t('settings.billing.pagesPerDoc', { count: formatLimit(t, limits.maxPagesPerPdf) })}</li>
-                </ul>
-                {!isCurrent && forSale && (
-                  <Button
-                    size="sm"
-                    className="mt-4 w-full"
-                    disabled={starting !== null}
-                    onClick={() => void upgrade(plan)}
-                  >
-                    {starting === plan
-                      ? t('settings.billing.openingCheckout')
-                      : ONE_TIME_PLANS.includes(plan)
-                        ? t('settings.billing.buyLifetime')
-                        : t('settings.billing.upgradeTo', { plan })}
-                  </Button>
-                )}
-                {!isCurrent && canSwitchPlans && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full"
-                    onClick={() => void comp(plan)}
-                  >
-                    {t('settings.billing.switchTo', { plan })}
-                  </Button>
-                )}
-              </CardBody>
-            </Card>
+                {isCurrent && <Badge variant="info">{t('settings.billing.current')}</Badge>}
+              </div>
+              <ul className="settings-plan-features">
+                <li>✓ {t('settings.billing.uploadsPerMonth', { count: formatLimit(t, limits.monthlyUploads) })}</li>
+                <li>✓ {t('settings.billing.decksCount', { count: formatLimit(t, limits.maxDecks) })}</li>
+                <li>✓ {t('settings.billing.pagesPerDoc', { count: formatLimit(t, limits.maxPagesPerPdf) })}</li>
+              </ul>
+              {!isCurrent && forSale && (
+                <Button
+                  size="sm"
+                  className="mt-4 w-full"
+                  disabled={starting !== null}
+                  onClick={() => void upgrade(plan)}
+                >
+                  {starting === plan
+                    ? t('settings.billing.openingCheckout')
+                    : ONE_TIME_PLANS.includes(plan)
+                      ? t('settings.billing.buyLifetime')
+                      : t('settings.billing.upgradeTo', { plan })}
+                </Button>
+              )}
+              {!isCurrent && canSwitchPlans && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => void comp(plan)}
+                >
+                  {t('settings.billing.switchTo', { plan })}
+                </Button>
+              )}
+            </div>
           );
         })}
       </div>
 
       {!billing && (
-        <p className="text-xs text-slate-400">{t('settings.billing.checkoutOff')}</p>
+        <p className="settings-usage-hint">{t('settings.billing.checkoutOff')}</p>
       )}
-    </div>
+    </>
   );
 }
 
