@@ -84,6 +84,8 @@
     background-image: linear-gradient(135deg, theme('colors.cyan.500') 0%, theme('colors.blue.500') 100%);
     -webkit-background-clip: text;
     background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
   }
 
   /* Soft tinted fill for badges, icon tiles and the highlighted pricing card. */
