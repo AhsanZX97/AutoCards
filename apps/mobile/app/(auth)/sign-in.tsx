@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useApp } from '../../src/lib/appContext';
+import { posthog } from '../../src/lib/posthog';
 import { useGoogleSignIn } from '../../src/lib/useGoogleSignIn';
 import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
@@ -24,7 +25,10 @@ export default function SignInScreen() {
     const ok = await signIn({ email, password });
     // Through `/` rather than straight to `/(app)` so the root redirect gets
     // a chance to send a first-time sign-in to onboarding first.
-    if (ok) router.replace('/');
+    if (ok) {
+      posthog?.capture('signed_in', { method: 'password' });
+      router.replace('/');
+    }
   }
 
   return (

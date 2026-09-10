@@ -12,6 +12,7 @@ import {
 } from 'expo-iap';
 import { PLAY_PRODUCT_IDS, type Plan, type PurchasablePlan } from '@autocards/core';
 import { useApp } from './appContext';
+import { posthog } from './posthog';
 
 let connecting: Promise<boolean> | null = null;
 
@@ -106,6 +107,7 @@ export function useGooglePlayPurchase() {
         purchaseToken: purchase.purchaseToken ?? '',
       });
       await finishTransaction({ purchase, isConsumable: false });
+      posthog?.capture('purchase_completed', { plan });
       return granted;
     } finally {
       setLoading(false);

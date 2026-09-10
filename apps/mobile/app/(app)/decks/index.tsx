@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { computeDeckStats, parseDeckExport } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { posthog } from '../../../src/lib/posthog';
 import { useT } from '../../../src/lib/i18n';
 import { useTheme, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
@@ -100,6 +101,7 @@ export default function DeckLibraryScreen() {
           text: t('mobileDeckLibrary.importButton'),
           onPress: () => {
             const deck = importDeck(payload, userId);
+            posthog?.capture('deck_imported', { card_count: payload.cards.length, category_count: payload.categories.length });
             toast({ variant: 'success', title: t('mobileDeckLibrary.importedTitle'), description: t('mobileDeckLibrary.importedBody', { title: deck.title }) });
             router.push(`/(app)/decks/${deck.id}`);
           },

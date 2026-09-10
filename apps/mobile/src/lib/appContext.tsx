@@ -20,6 +20,7 @@ import {
 import * as Localization from 'expo-localization';
 import { toByteArray } from 'base64-js';
 import { createMobileStorage } from './storage';
+import { posthog } from './posthog';
 import { configureNotificationHandler, syncScheduledNotifications } from './reminderNotifications';
 
 /** Decodes a JWT's payload for diagnostics — no signature check, just a look. */
@@ -166,6 +167,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.remove();
   }, []);
+
+  // Identity belongs at the auth boundary: it covers password, Google, deep-link,
+  // and persisted-session sign-ins, while reset prevents account switching from
+  // attributing the next user's activity to the previous person.
+  useEffect(() => {
+    if (!app) return;
+    let identifiedUserId: string | undefined;
+
+    const syncPostHogIdentity = () => {
+      const user = app.authStore.getState().session?.user;
+      if (!user) {
+        if (identifiedUserId) posthog?.reset();
+        identifiedUserId = undefined;
+        return;
+      }
+      if (user.id === identifiedUserId) return;
+
+      if (identifiedUserId) posthog?.reset();
+      posthog?.identify(user.id, {
+        email: user.email,
+        username: user.username,
+        plan: user.plan,
+      });
+      identifiedUserId = user.id;
+    };
+
+    syncPostHogIdentity();
+    return app.authStore.subscribe(syncPostHogIdentity);
+  }, [app]);
 
   // Local push for the study reminders. Every scheduled notification is only
   // the next occurrence of its reminder, so the whole set is rebuilt whenever

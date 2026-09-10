@@ -30,6 +30,7 @@ import {
   type Locale,
 } from '@autocards/core';
 import { useApp } from '../../lib/appContext';
+import { posthog } from '../../lib/posthog';
 import { useLocale, useT } from '../../lib/i18n';
 import { documentSourceFromUri } from '../../lib/pdfSource';
 import { toast } from '../../lib/toastStore';
@@ -173,6 +174,12 @@ export function GenerateCardsModal({ open, onClose, deck, cards }: GenerateCards
         return;
       }
 
+      posthog?.capture('cards_generated', {
+        card_count: added.length,
+        duplicate_count: duplicates,
+        preset,
+        auto_categorized: autoCategories,
+      });
       toast({
         variant: 'success',
         title: t.plural('addCards.cardsAdded', added.length, { count: added.length }),

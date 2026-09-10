@@ -11,6 +11,7 @@ import {
   type Grade,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { posthog } from '../../../src/lib/posthog';
 import { useT } from '../../../src/lib/i18n';
 import { useTheme, useDifficultyColors, radius, spacing } from '../../../src/lib/theme';
 import { Badge, Button, Card, ProgressBar, Screen } from '../../../src/components';
@@ -87,9 +88,17 @@ export default function StudyRunnerScreen() {
 
   useEffect(() => {
     if (session?.status === 'completed') {
+      posthog?.capture('study_session_completed', {
+        answered_count: session.score.answered,
+        correct_count: session.score.correct,
+        accuracy: session.score.accuracy,
+        score: session.score.finalScore,
+        duration_ms: session.durationMs,
+        grade: session.score.letter,
+      });
       router.replace(`/study/${deckId}/results/${session.id}`);
     }
-  }, [session?.status, session?.id, deckId]);
+  }, [session?.status, session?.id, session?.score, session?.durationMs, deckId]);
 
   // The countdown is for producing an answer, so it stops as soon as one
   // exists: `revealed` for auto-graded cards, `flipped` for self-graded ones.

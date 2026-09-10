@@ -4,6 +4,7 @@ import { Link, router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { MIN_PASSWORD_LENGTH } from '@autocards/core';
 import { useApp } from '../../src/lib/appContext';
+import { posthog } from '../../src/lib/posthog';
 import { useGoogleSignIn } from '../../src/lib/useGoogleSignIn';
 import { useT } from '../../src/lib/i18n';
 import { useTheme, spacing } from '../../src/lib/theme';
@@ -32,7 +33,10 @@ export default function SignUpScreen() {
     const ok = await signUp({ username, email, password }, Linking.createURL('callback'));
     // Through `/` rather than straight to `/(app)` so the root redirect gets
     // a chance to send a first-time sign-up to onboarding first.
-    if (ok) router.replace('/');
+    if (ok) {
+      posthog?.capture('sign_up_requested', { method: 'password' });
+      router.replace('/');
+    }
   }
 
   if (pendingEmail) {

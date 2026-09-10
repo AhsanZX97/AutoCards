@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 import { useApp } from '../../lib/appContext';
+import { posthog } from '../../lib/posthog';
 import { useT } from '../../lib/i18n';
 import { useTheme, spacing } from '../../lib/theme';
 import { toast } from '../../lib/toastStore';
@@ -38,6 +39,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps) {
     setError(undefined);
     try {
       await feedback.send(trimmed);
+      posthog?.capture('feedback_sent');
       toast({ variant: 'success', title: t('feedback.sentTitle') });
       onClose();
     } catch (err) {

@@ -1,10 +1,12 @@
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { PostHogProvider } from 'posthog-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { Toaster } from '../src/components/Toaster';
 import { AppProvider } from '../src/lib/appContext';
+import { posthog } from '../src/lib/posthog';
 import { ThemeProvider, useResolvedScheme, useTheme } from '../src/lib/theme';
 
 function ThemedNavigator() {
@@ -27,7 +29,7 @@ function ThemedNavigator() {
 }
 
 export default function RootLayout() {
-  return (
+  const app = (
     <SafeAreaProvider>
       {/* Outside AppProvider so it still catches a failure in the provider
           itself, which is exactly when the screen would otherwise be blank. */}
@@ -40,4 +42,6 @@ export default function RootLayout() {
       </ErrorBoundary>
     </SafeAreaProvider>
   );
+
+  return posthog ? <PostHogProvider client={posthog}>{app}</PostHogProvider> : app;
 }

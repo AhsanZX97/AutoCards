@@ -13,6 +13,7 @@ import {
   type StudySettings,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { posthog } from '../../../src/lib/posthog';
 import { useT } from '../../../src/lib/i18n';
 import { useTheme, spacing, radius } from '../../../src/lib/theme';
 import { Button, Card, Chip, Notice, Screen, Stepper, SwitchRow } from '../../../src/components';
@@ -260,6 +261,12 @@ export default function StudySetupScreen() {
         style={{ marginTop: spacing.lg }}
         onPress={() => {
           startSession(deck, cards, settings);
+          posthog?.capture('study_session_started', {
+            study_mode: settings.mode,
+            card_count: matchingCount,
+            timer_enabled: settings.timer.enabled,
+            reversed: settings.reversed,
+          });
           router.push(`/study/${deckId}/run`);
         }}
       />

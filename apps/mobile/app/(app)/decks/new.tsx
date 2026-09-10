@@ -52,6 +52,7 @@ import {
   type Locale,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { posthog } from '../../../src/lib/posthog';
 import { useLocale, useT } from '../../../src/lib/i18n';
 import { documentSourceFromUri } from '../../../src/lib/pdfSource';
 import { toast } from '../../../src/lib/toastStore';
@@ -408,6 +409,7 @@ export default function CreateDeckScreen() {
           description.trim() ||
           t.plural('createDeck.importedDescription', added.length, { count: added.length }),
       });
+      posthog?.capture('deck_created', { source_type: 'quizlet', card_count: added.length });
       toast({
         variant: 'success',
         title: t('createDeck.deckCreatedTitle'),
@@ -478,6 +480,12 @@ export default function CreateDeckScreen() {
       const imported = importedCards.length > 0 ? addGeneratedCards(deck.id, importedCards).added.length : 0;
       quota.record(result.quota);
       const total = result.cards.length + imported;
+      posthog?.capture('deck_created', {
+        source_type: allFromTopics ? 'topic' : 'generated',
+        card_count: total,
+        source_count: sources.length,
+        preset,
+      });
       toast({
         variant: 'success',
         title: t('createDeck.deckCreatedTitle'),
@@ -506,6 +514,7 @@ export default function CreateDeckScreen() {
     if (!name || !userId || !hasDeckRoom) return;
     const deck = createBlankDeck(userId, name);
     if (description.trim()) updateDeck(deck.id, { description: description.trim() });
+    posthog?.capture('deck_created', { source_type: 'manual', card_count: 0 });
     router.replace(`/(app)/decks/${deck.id}`);
   }
 

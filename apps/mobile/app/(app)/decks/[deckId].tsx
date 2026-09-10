@@ -21,6 +21,7 @@ import {
   type Translator,
 } from '@autocards/core';
 import { useApp } from '../../../src/lib/appContext';
+import { posthog } from '../../../src/lib/posthog';
 import { useT } from '../../../src/lib/i18n';
 import { useTheme, useDifficultyColors, usePriorityColors, BRAND_GRADIENT, cardShadow, glowShadow, radius, spacing } from '../../../src/lib/theme';
 import { toast } from '../../../src/lib/toastStore';
@@ -164,9 +165,11 @@ export default function DeckDetailScreen() {
   function handleSaveCard(draft: CardDraft) {
     if (editingCard) {
       updateCard(deckId!, editingCard.id, draft);
+      posthog?.capture('card_saved', { action: 'updated', card_type: draft.type });
       toast({ variant: 'success', title: t('deckDetail.cardUpdated') });
     } else {
       addCard(deckId!, draft);
+      posthog?.capture('card_saved', { action: 'created', card_type: draft.type });
       toast({ variant: 'success', title: t('deckDetail.cardAdded') });
     }
     setEditorOpen(false);
@@ -203,6 +206,7 @@ export default function DeckDetailScreen() {
     if (categoryFilter && !keptIds.has(categoryFilter)) setCategoryFilter(null);
 
     setDeckEditorOpen(false);
+    posthog?.capture('deck_updated', { category_count: edits.categories.length, tag_count: edits.tags.length });
     toast({ variant: 'success', title: t('deckDetail.deckUpdated') });
   }
 
@@ -217,6 +221,7 @@ export default function DeckDetailScreen() {
     const next = !currentDeck.archived;
     archiveDeck(deckId!, next);
     setDeckEditorOpen(false);
+    posthog?.capture('deck_archived', { archived: next });
     toast({ variant: 'success', title: next ? t('deckDetail.deckArchived') : t('deckDetail.deckRestored') });
   }
 
@@ -232,6 +237,7 @@ export default function DeckDetailScreen() {
           onPress: () => {
             deleteDeck(deckId!);
             clearReminders(deckId!);
+            posthog?.capture('deck_deleted', { card_count: cards.length });
             setDeckEditorOpen(false);
             toast({ variant: 'success', title: t('deckDetail.deckDeleted') });
             router.back();

@@ -3,6 +3,7 @@ import { Pressable, Text, useColorScheme, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Localization from 'expo-localization';
 import { createTranslator, resolveLocale } from '@autocards/core';
+import { posthog } from '../lib/posthog';
 
 interface Props {
   children: ReactNode;
@@ -30,6 +31,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
+    posthog?.captureException(error, {
+      ...(info.componentStack ? { component_stack: info.componentStack } : {}),
+    });
     console.error('[autocards] a screen failed to render', error, info.componentStack);
   }
 
