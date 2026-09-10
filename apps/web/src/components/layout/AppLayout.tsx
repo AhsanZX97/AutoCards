@@ -60,7 +60,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
     navigate('/');
   }
 
-  const inFlashcardShell = dashboard || deckLibrary || stats || settings;
+  const createDeck = useMatch({ path: '/app/decks/new', end: true }) !== null;
+  const deckDetail = useMatch({ path: '/app/decks/:deckId', end: true }) !== null;
+  const studySetup = useMatch({ path: '/app/study/:deckId', end: true }) !== null;
+  const studyResults = useMatch({ path: '/app/study/:deckId/results/:sessionId', end: true }) !== null;
+  const inFlashcardShell = dashboard || deckLibrary || createDeck || deckDetail || studySetup || studyResults || stats || settings;
 
   return (
     <div className={inFlashcardShell ? 'dashboard-shell' : 'flex min-h-screen bg-slate-50 dark:bg-slate-950'}>
@@ -87,6 +91,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      <div className={inFlashcardShell ? 'dashboard-shell-stack' : 'contents'}>
+      {inFlashcardShell && <div className="dashboard-shell-backing" aria-hidden="true" />}
       <div className={inFlashcardShell ? 'dashboard-shell-card' : 'flex min-h-screen flex-1 flex-col'}>
         <header className={inFlashcardShell ? 'dashboard-shell-header' : 'flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 lg:px-8'}>
           {inFlashcardShell && <NavLink to="/app" className="dashboard-shell-brand"><Wordmark className="text-xl" /></NavLink>}
@@ -111,7 +117,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   {item.label}
                 </NavLink>
               ))}
-              <button className="dashboard-shell-tab" onClick={() => setFeedbackOpen(true)}>{t('nav.feedback')}</button>
             </nav>
           ) : <div className="hidden lg:block" />}
           <ThemeToggle className="ml-auto mr-1" />
@@ -151,6 +156,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <main className={inFlashcardShell ? 'dashboard-shell-content' : 'flex-1 px-4 py-6 lg:px-8 lg:py-8'}>{children}</main>
       </div>
 
+      {inFlashcardShell && (
+        <div className="dashboard-shell-actions">
+          <NavLink to="/app/decks/new" className="brand-gradient text-white transition-opacity hover:opacity-90">
+            {t('createDeck.title')}
+          </NavLink>
+          <button type="button" onClick={() => setFeedbackOpen(true)}>
+            {t('nav.feedback')}
+          </button>
+        </div>
+      )}
+
+      </div>
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       <Modal

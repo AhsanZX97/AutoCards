@@ -7,6 +7,7 @@
   --sheet-back-blue: theme('colors.blue.100');
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 100svh;
   padding: 24px 32px;
   background: theme('colors.slate.100');
@@ -22,6 +23,42 @@
   background: theme('colors.slate.950');
 }
 
+.dashboard-shell-stack {
+  --shell-radius: 28px;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto 16px;
+}
+
+/* One silhouette keeps the backing continuous at both button joins. */
+.dashboard-shell-backing {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 0 var(--sheet-back-blue)) drop-shadow(7px 7px 0 var(--sheet-back));
+}
+.dashboard-shell-backing::before,
+.dashboard-shell-backing::after {
+  content: '';
+  position: absolute;
+  background: var(--sheet);
+}
+.dashboard-shell-backing::before {
+  inset: 0 0 44px;
+  border-radius: var(--shell-radius);
+}
+.dashboard-shell-backing::after {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(320px, 100%);
+  height: 45px;
+  border-radius: 0 0 16px 16px;
+}
+
 .dashboard-shell-card {
   position: relative;
   isolation: isolate;
@@ -29,31 +66,13 @@
   flex-direction: column;
   max-width: 1440px;
   width: 100%;
-  margin: auto;
+  min-height: 0;
+  margin: 0 auto;
+  flex: none;
   border: 1px solid var(--sheet-line);
-  border-radius: 28px;
+  border-radius: var(--shell-radius);
   background: var(--sheet);
-  box-shadow: theme('boxShadow.soft');
 }
-
-.dashboard-shell-card::before,
-.dashboard-shell-card::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  inset: 0;
-  border: 1px solid var(--sheet-line);
-  border-radius: inherit;
-  z-index: -1;
-}
-
-.dashboard-shell-card::before {
-  background: var(--sheet-back-blue);
-  transform: rotate(-.65deg) translateY(10px);
-  box-shadow: 7px 7px 0 var(--sheet-back);
-}
-
-.dashboard-shell-card::after { background: var(--sheet); }
 
 .dashboard-shell-header {
   display: flex;
@@ -94,6 +113,42 @@
   outline-offset: 4px;
 }
 .dashboard-shell-content { min-width: 0; flex: 1; padding: 28px 36px; }
+.dashboard-shell-actions {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 320px;
+  max-width: 100%;
+  margin: -1px auto 0;
+  border: 1px solid var(--sheet-line);
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
+  background: var(--sheet);
+}
+.dashboard-shell-actions > a,
+.dashboard-shell-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dashboard-shell-actions > a {
+  border-radius: 0 0 0 15px;
+}
+.dashboard-shell-actions > button {
+  border-radius: 0 0 15px 0;
+  color: var(--sheet-muted);
+}
+.dashboard-shell-actions > button:hover {
+  color: var(--sheet-accent);
+  background: var(--sheet-back);
+}
 
 @media (max-width: 1199px) {
   .dashboard-shell { padding: 28px; }
@@ -112,8 +167,10 @@
 
 @media (max-width: 639px) {
   .dashboard-shell { padding: 16px 12px 24px; }
-  .dashboard-shell-card { border-radius: 20px; }
+  .dashboard-shell-stack { --shell-radius: 20px; }
   .dashboard-shell-header { padding: 16px 20px 0; }
   .dashboard-shell-nav { gap: 20px; }
   .dashboard-shell-content { padding: 24px 20px; }
+  .dashboard-shell-actions > a,
+  .dashboard-shell-actions > button { padding-inline: 16px; }
 }

@@ -50,7 +50,7 @@ export function StudyResultsPage() {
   const deckTitle = fullSession?.deckTitle ?? summary?.deckTitle ?? t('results.deck');
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-4 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-10">
       <div className="text-center">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{deckTitle}</p>
         <h1 className={`font-display mt-2 text-7xl font-extrabold ${LETTER_COLORS[letter] ?? 'text-slate-500'}`}>{letter}</h1>

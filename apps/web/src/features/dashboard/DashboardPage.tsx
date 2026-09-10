@@ -42,9 +42,6 @@ export function DashboardPage() {
               : t('dashboard.noDecksYetPrompt')}
           </p>
         </div>
-        <Link to="/app/decks/new" className="dashboard-create">
-          <Button size="lg">{t('dashboard.createDeck')}</Button>
-        </Link>
       </div>
 
       {/* A compact progress strip leaves the decks as the main focus. */}
