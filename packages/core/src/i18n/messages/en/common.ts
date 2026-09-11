@@ -1,4 +1,4 @@
-/** Buttons, statuses and words reused across every feature — nav, actions, states. */
+/** Buttons, statuses and words reused across every feature: nav, actions and states. */
 export const common = {
   'common.cancel': 'Cancel',
   'common.save': 'Save',
@@ -69,9 +69,9 @@ export const common = {
   'quota.remainingOfLimit': '{remaining} of {limit} uploads left this month',
 
   'storage.fullTitle': 'This browser is out of storage space',
-  'storage.fullBody': "Auto Cards can't save anything else locally. Your synced decks are safe — delete a deck you no longer study to make room.",
+  'storage.fullBody': "Auto Cards can't save anything else locally. Your synced decks are safe. Delete a deck you no longer study to make room.",
   'storage.unavailableTitle': "This browser isn't saving anything locally",
-  'storage.unavailableBody': "Private browsing or blocked site data. Signed in, your decks still sync — signed out, nothing on this device will be kept.",
+  'storage.unavailableBody': 'Private browsing or blocked site data. Your decks still sync while you are signed in. Nothing on this device will be kept if you are signed out.',
 
   'config.notConnectedTitle': "Auto Cards isn't connected to its database",
   'config.notConnectedBefore': 'This build is missing',

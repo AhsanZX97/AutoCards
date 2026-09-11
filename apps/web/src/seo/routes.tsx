@@ -39,7 +39,7 @@ const baseRoutes: PublicRoute[] = [
         <LandingPage />
       </MarketingLayout>
     ),
-    title: 'Auto Cards — Turn your notes into flashcards',
+    title: 'Auto Cards: Turn your notes into flashcards',
     description:
       'Upload your slides, notes or a chapter and get a study-ready, gamified flashcard deck in seconds.',
     changefreq: 'weekly',
@@ -51,9 +51,9 @@ const baseRoutes: PublicRoute[] = [
         <DemoPage />
       </MarketingLayout>
     ),
-    title: 'Live demo — Auto Cards',
+    title: 'Live demo: Auto Cards',
     description:
-      'Walk through uploading a document, generating a deck and studying it with spaced repetition — no account needed.',
+      'Walk through uploading a document, generating a deck and studying it with spaced repetition. No account needed.',
     changefreq: 'monthly',
   },
   {
@@ -63,7 +63,7 @@ const baseRoutes: PublicRoute[] = [
         <PrivacyPage />
       </MarketingLayout>
     ),
-    title: 'Privacy Policy — Auto Cards',
+    title: 'Privacy Policy: Auto Cards',
     description: 'How Auto Cards collects, stores and protects your data.',
     changefreq: 'yearly',
   },
@@ -74,14 +74,14 @@ const baseRoutes: PublicRoute[] = [
         <TermsPage />
       </MarketingLayout>
     ),
-    title: 'Terms of Service — Auto Cards',
+    title: 'Terms of Service: Auto Cards',
     description: 'The terms that govern your use of Auto Cards.',
     changefreq: 'yearly',
   },
   {
     path: '/sign-up',
     element: <SignUpRoute />,
-    title: 'Sign up — Auto Cards',
+    title: 'Sign up: Auto Cards',
     description: 'Create a free Auto Cards account and start turning your notes into flashcards.',
     changefreq: 'yearly',
   },

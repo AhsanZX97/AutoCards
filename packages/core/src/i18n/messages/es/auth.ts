@@ -14,7 +14,7 @@ export const auth: Dict<typeof en> = {
   'auth.signUp.subtitle': 'Gratis para empezar. No se necesita tarjeta de crédito.',
   'auth.signUp.submit': 'Crear cuenta',
   'auth.signUp.google': 'Registrarse con Google',
-  'auth.signUp.usernameHint': '3–20 caracteres, minúsculas, a–z, 0–9, _',
+  'auth.signUp.usernameHint': 'De 3 a 20 caracteres. Usa minúsculas, letras de la a a la z, dígitos o _.',
   'auth.signUp.passwordHint': '{min}+ caracteres',
   'auth.signUp.hasAccount': '¿Ya tienes una cuenta?',
   'auth.signUp.signInLink': 'Inicia sesión',

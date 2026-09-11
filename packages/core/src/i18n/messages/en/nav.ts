@@ -11,7 +11,7 @@ export const nav = {
   'nav.savingWork': 'Saving your work…',
   'nav.unsyncedTitle': "Some changes haven't saved yet",
   'nav.unsyncedBody': "We couldn't reach the server to save your most recent work.",
-  'nav.unsyncedBodyDetail': "Signing out clears this device, so anything not yet saved to your account would be lost. Staying signed in until you're back online is usually what you want — it saves on its own once the connection returns.",
+  'nav.unsyncedBodyDetail': "Signing out clears this device, so anything not yet saved to your account would be lost. Stay signed in until you are back online. It saves on its own once the connection returns.",
   'nav.staySignedIn': 'Stay signed in',
   'nav.signOutAndLose': 'Sign out and lose them',
 
@@ -36,8 +36,8 @@ export const nav = {
   'nav.marketing.vsKnowt': 'Auto Cards vs Knowt',
 
   'nav.errorBoundary.title': 'Something went wrong on this screen',
-  'nav.errorBoundary.body': "Your decks are safe. Reloading usually clears it — if it keeps happening, send us the details below and we'll fix it.",
-  'nav.errorBoundary.bodyMobile': "Your decks are safe. Trying again usually clears it — if it keeps happening, send us the details below and we'll fix it.",
+  'nav.errorBoundary.body': "Your decks are safe. Reloading usually clears it. If it keeps happening, send us the details below and we'll fix it.",
+  'nav.errorBoundary.bodyMobile': "Your decks are safe. Trying again usually clears it. If it keeps happening, send us the details below and we'll fix it.",
   'nav.errorBoundary.reload': 'Reload',
   'nav.errorBoundary.tryAgain': 'Try again',
   'nav.errorBoundary.backToDecks': 'Back to my decks',

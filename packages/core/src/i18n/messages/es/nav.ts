@@ -39,8 +39,8 @@ export const nav: Dict<typeof en> = {
   'nav.marketing.vsKnowt': 'Auto Cards frente a Knowt',
 
   'nav.errorBoundary.title': 'Algo salió mal en esta pantalla',
-  'nav.errorBoundary.body': 'Tus mazos están a salvo. Recargar suele solucionarlo — si sigue pasando, envíanos los detalles de abajo y lo arreglaremos.',
-  'nav.errorBoundary.bodyMobile': 'Tus mazos están a salvo. Intentarlo de nuevo suele solucionarlo — si sigue pasando, envíanos los detalles de abajo y lo arreglaremos.',
+  'nav.errorBoundary.body': 'Tus mazos están a salvo. Recargar suele solucionarlo. Si sigue pasando, envíanos los detalles de abajo y lo arreglaremos.',
+  'nav.errorBoundary.bodyMobile': 'Tus mazos están a salvo. Intentarlo de nuevo suele solucionarlo. Si sigue pasando, envíanos los detalles de abajo y lo arreglaremos.',
   'nav.errorBoundary.reload': 'Recargar',
   'nav.errorBoundary.tryAgain': 'Intentar de nuevo',
   'nav.errorBoundary.backToDecks': 'Volver a mis mazos',

@@ -48,7 +48,7 @@ export const dashboard = {
   'mobileDashboard.accuracy': 'Accuracy',
   'mobileDashboard.decks': 'Decks',
   'mobileDashboard.yourDecks': 'Your decks',
-  'mobileDashboard.noDecksYet': 'No decks yet — create your first one.',
+  'mobileDashboard.noDecksYet': 'No decks yet. Create your first one.',
   'mobileDashboard.recentSessions': 'Recent sessions',
   'mobileDashboard.correctOf': '{correct}/{answered} correct',
   'mobileDashboard.openDeck': 'Open {deckTitle}',

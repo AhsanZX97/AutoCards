@@ -51,7 +51,7 @@ export const dashboard: Dict<typeof en> = {
   'mobileDashboard.accuracy': 'Precisión',
   'mobileDashboard.decks': 'Mazos',
   'mobileDashboard.yourDecks': 'Tus mazos',
-  'mobileDashboard.noDecksYet': 'Aún no hay mazos — crea el primero.',
+  'mobileDashboard.noDecksYet': 'Aún no hay mazos. Crea el primero.',
   'mobileDashboard.recentSessions': 'Sesiones recientes',
   'mobileDashboard.correctOf': '{correct}/{answered} correctas',
   'mobileDashboard.openDeck': 'Abrir {deckTitle}',

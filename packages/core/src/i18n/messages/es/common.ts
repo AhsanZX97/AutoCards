@@ -71,9 +71,9 @@ export const common: Dict<typeof en> = {
   'quota.remainingOfLimit': '{remaining} de {limit} subidas restantes este mes',
 
   'storage.fullTitle': 'Este navegador se quedó sin espacio de almacenamiento',
-  'storage.fullBody': 'Auto Cards no puede guardar nada más localmente. Tus mazos sincronizados están a salvo — elimina un mazo que ya no estudies para hacer espacio.',
+  'storage.fullBody': 'Auto Cards no puede guardar nada más localmente. Tus mazos sincronizados están a salvo. Elimina un mazo que ya no estudies para hacer espacio.',
   'storage.unavailableTitle': 'Este navegador no está guardando nada localmente',
-  'storage.unavailableBody': 'Navegación privada o datos del sitio bloqueados. Con sesión iniciada, tus mazos siguen sincronizándose — sin sesión, nada se conservará en este dispositivo.',
+  'storage.unavailableBody': 'Navegación privada o datos del sitio bloqueados. Con sesión iniciada, tus mazos siguen sincronizándose. Sin sesión, nada se conservará en este dispositivo.',
 
   'config.notConnectedTitle': 'Auto Cards no está conectado a su base de datos',
   'config.notConnectedBefore': 'A esta compilación le falta',

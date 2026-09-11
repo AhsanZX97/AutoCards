@@ -11,7 +11,7 @@ export const auth = {
   'auth.signUp.subtitle': 'Free to start. No credit card required.',
   'auth.signUp.submit': 'Create account',
   'auth.signUp.google': 'Sign up with Google',
-  'auth.signUp.usernameHint': '3–20 chars, lowercase, a–z, 0–9, _',
+  'auth.signUp.usernameHint': '3 to 20 characters. Use lowercase letters, a to z, digits, or _.',
   'auth.signUp.passwordHint': '{min}+ characters',
   'auth.signUp.hasAccount': 'Already have an account?',
   'auth.signUp.signInLink': 'Sign in',
