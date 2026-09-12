@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { PostHogIdentity } from './components/layout/PostHogIdentity';
 import { AppProvider } from './lib/appContext';
 import App from './App';
 import './app.css';
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <AppProvider>
+          <PostHogIdentity />
           <App />
         </AppProvider>
       </BrowserRouter>
