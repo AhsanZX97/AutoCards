@@ -1,4 +1,5 @@
 import type { Flashcard } from '@autocards/core';
+import { FlashcardText } from '../../components/FlashcardText';
 import { DIFFICULTY_BADGE } from '../../lib/badges';
 import { useT } from '../../lib/i18n';
 
@@ -29,7 +30,7 @@ export function CardFace({ card, flipped, promptText, answerText, onFlip }: Card
           <span className={`mb-4 rounded-full px-2.5 py-1 text-xs font-medium ${DIFFICULTY_BADGE[card.difficulty].classes}`}>
             {t(`difficulty.${card.difficulty}` as const)}
           </span>
-          <p className="text-lg font-semibold leading-snug text-white sm:text-xl">{promptText}</p>
+          <FlashcardText text={promptText} className="text-lg font-semibold leading-snug text-white sm:text-xl" />
           <p className="mt-6 text-xs text-slate-500">{t('cardFace.flipHint')}</p>
         </div>
 
@@ -39,7 +40,7 @@ export function CardFace({ card, flipped, promptText, answerText, onFlip }: Card
           style={{ transform: 'rotateY(180deg)' }}
         >
           <span className="mb-4 text-xs font-medium uppercase tracking-wide text-brand-400">{t('cardFace.answer')}</span>
-          <p className="text-lg font-semibold leading-snug text-white sm:text-xl">{answerText}</p>
+          <FlashcardText text={answerText} className="text-lg font-semibold leading-snug text-white sm:text-xl" />
         </div>
       </div>
     </div>

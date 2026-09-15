@@ -19,6 +19,7 @@ import { useT } from '../../lib/i18n';
 import type { Translator } from '@autocards/core';
 import { cardTypeLabelT } from '../../lib/cardTypeLabel';
 import { useTour } from '../../lib/useTour';
+import { FlashcardText } from '../../components/FlashcardText';
 import { Badge, Button, Card, CardBody, Chip, InfoButton, Input, Modal, Progress, Select } from '../../components/ui';
 import { TourOverlay } from '../../components/tour';
 import { deckTourSteps } from './deckTourSteps';
@@ -847,13 +848,13 @@ function CardRow({
         {answerShown && (
           <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-500/30 dark:bg-brand-500/10">
             <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{t('cardRow.answer')}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
-              {displayBack || <span className="italic text-slate-400">{t('cardRow.noAnswerSet')}</span>}
-            </p>
+            {displayBack ? (
+              <FlashcardText text={displayBack} className="mt-1 text-sm text-slate-700 dark:text-slate-200" />
+            ) : (
+              <p className="mt-1 italic text-slate-400">{t('cardRow.noAnswerSet')}</p>
+            )}
             {card.explanation && (
-              <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-500 dark:text-slate-400">
-                {card.explanation}
-              </p>
+              <FlashcardText text={card.explanation} className="mt-2 text-xs text-slate-500 dark:text-slate-400" />
             )}
           </div>
         )}

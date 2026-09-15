@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getAnswerText, getPromptText, type Flashcard } from '@autocards/core';
+import { FlashcardText } from '../../components/FlashcardText';
 import { Badge, Button, Card, CardBody, Progress } from '../../components/ui';
 import { useT } from '../../lib/i18n';
 import { cardTypeLabelT } from '../../lib/cardTypeLabel';
@@ -161,20 +162,21 @@ export function DeckFlashcardView({
             {card.suspended && <Badge variant="warning">{t('flashcardView.suspended')}</Badge>}
           </div>
 
-          <p className="max-w-2xl whitespace-pre-wrap break-words text-lg font-semibold leading-snug text-slate-900 dark:text-white sm:text-xl">
-            {getPromptText(card)}
-          </p>
+          <FlashcardText
+            text={getPromptText(card)}
+            className="max-w-2xl text-lg font-semibold leading-snug text-slate-900 dark:text-white sm:text-xl"
+          />
 
           {revealed ? (
             <div className="w-full max-w-2xl border-t border-slate-200 pt-5 dark:border-slate-800">
               <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{t('flashcardView.answer')}</p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-base text-slate-800 dark:text-slate-100 sm:text-lg">
-                {answer || <span className="italic text-slate-400">{t('flashcardView.noAnswerSet')}</span>}
-              </p>
+              {answer ? (
+                <FlashcardText text={answer} className="mt-2 text-base text-slate-800 dark:text-slate-100 sm:text-lg" />
+              ) : (
+                <p className="mt-2 italic text-slate-400">{t('flashcardView.noAnswerSet')}</p>
+              )}
               {card.explanation && (
-                <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-500 dark:text-slate-400">
-                  {card.explanation}
-                </p>
+                <FlashcardText text={card.explanation} className="mt-3 text-sm text-slate-500 dark:text-slate-400" />
               )}
             </div>
           ) : (

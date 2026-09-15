@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkTypeIn, hasCloze, normalizeAnswer, parseCloze, slugify, textSimilarity } from '../text';
+import { checkTypeIn, hasCloze, normalizeAnswer, parseCloze, parseFlashcardText, slugify, textSimilarity } from '../text';
 
 describe('textSimilarity', () => {
   it('scores identical strings 1', () => {
@@ -99,5 +99,33 @@ describe('hasCloze', () => {
 describe('slugify', () => {
   it('produces url-safe slugs', () => {
     expect(slugify('Hello, World!')).toBe('hello-world');
+  });
+});
+
+describe('parseFlashcardText', () => {
+  it('keeps prose and turns consecutive symbol bullets into a list', () => {
+    expect(parseFlashcardText('Remember these:\n• First point\n• Second point\nReview them tonight.')).toEqual([
+      { kind: 'paragraph', text: 'Remember these:' },
+      { kind: 'unordered-list', items: ['First point', 'Second point'] },
+      { kind: 'paragraph', text: 'Review them tonight.' },
+    ]);
+  });
+
+  it('recognizes Markdown unordered and ordered list markers', () => {
+    expect(parseFlashcardText('- One\n* Two\n\n1. First\n2) Second')).toEqual([
+      { kind: 'unordered-list', items: ['One', 'Two'] },
+      { kind: 'ordered-list', items: ['First', 'Second'] },
+    ]);
+  });
+
+  it('splits symbol bullets that were saved on one line', () => {
+    expect(parseFlashcardText('Key ideas: • First point • Second point')).toEqual([
+      { kind: 'paragraph', text: 'Key ideas:' },
+      { kind: 'unordered-list', items: ['First point', 'Second point'] },
+    ]);
+  });
+
+  it('does not treat an ordinary hyphenated sentence as a list', () => {
+    expect(parseFlashcardText('A well-known fact.')).toEqual([{ kind: 'paragraph', text: 'A well-known fact.' }]);
   });
 });

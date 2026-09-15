@@ -13,6 +13,7 @@ import { useApp } from '../../lib/appContext';
 import { useT } from '../../lib/i18n';
 import type { Translator } from '@autocards/core';
 import { Button, Progress } from '../../components/ui';
+import { FlashcardText } from '../../components/FlashcardText';
 import { cn } from '../../lib/cn';
 import { EMPTY_ARRAY } from '../../lib/empty';
 import { CardFace } from './CardFace';
@@ -342,7 +343,7 @@ function AutoGradedCard({
 }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center shadow-glow">
-      <p className="text-lg font-semibold text-white sm:text-xl">{card.front}</p>
+      <FlashcardText text={card.front} className="text-lg font-semibold text-white sm:text-xl" />
 
       {card.hint && !hintRevealed && !revealed && (
         <button onClick={onRevealHint} className="mt-3 text-sm font-medium text-slate-400 hover:text-slate-200">
@@ -412,7 +413,7 @@ function AutoGradedCard({
           <p className={cn('mb-3 text-sm font-semibold', revealed.correct ? 'text-emerald-400' : 'text-rose-400')}>
             {revealed.correct ? t('runner.correctBang') : t('runner.notQuite')}
           </p>
-          {card.explanation && <p className="mb-4 text-sm text-slate-400">{card.explanation}</p>}
+          {card.explanation && <FlashcardText text={card.explanation} className="mb-4 text-sm text-slate-400" />}
           <Button size="lg" className="w-full" onClick={onNext}>
             {t('runner.nextCard')}
           </Button>

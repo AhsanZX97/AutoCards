@@ -115,6 +115,65 @@ export function hasCloze(text: string): boolean {
   return CLOZE_PATTERN.test(text);
 }
 
+export type FlashcardTextBlock =
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'unordered-list'; items: string[] }
+  | { kind: 'ordered-list'; items: string[] };
+
+/**
+ * Splits saved card text into display blocks. Card text remains a plain string
+ * in storage, while clients can render familiar Markdown and symbol bullets as
+ * actual lists instead of a single paragraph.
+ */
+export function parseFlashcardText(text: string): FlashcardTextBlock[] {
+  const blocks: FlashcardTextBlock[] = [];
+  let paragraphLines: string[] = [];
+  let activeList: Extract<FlashcardTextBlock, { kind: 'unordered-list' | 'ordered-list' }> | null = null;
+
+  function flushParagraph() {
+    const value = paragraphLines.join('\n').trim();
+    if (value) blocks.push({ kind: 'paragraph', text: value });
+    paragraphLines = [];
+  }
+
+  function flushList() {
+    if (activeList) blocks.push(activeList);
+    activeList = null;
+  }
+
+  // Some older generated cards used symbol bullets without line breaks. A
+  // symbol preceded by whitespace is still an unambiguous list boundary.
+  const lines = text.replace(/\r\n?/g, '\n').replace(/[ \t]+([•◦‣])\s+/g, '\n$1 ').split('\n');
+
+  for (const line of lines) {
+    const unordered = line.match(/^\s*(?:[-*+]\s+|[•◦‣]\s+)(.+?)\s*$/);
+    const ordered = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/);
+    const list = unordered
+      ? { kind: 'unordered-list' as const, item: unordered[1]! }
+      : ordered
+        ? { kind: 'ordered-list' as const, item: ordered[1]! }
+        : null;
+
+    if (list) {
+      flushParagraph();
+      if (!activeList || activeList.kind !== list.kind) {
+        flushList();
+        activeList = { kind: list.kind, items: [] };
+      }
+      activeList!.items.push(list.item);
+      continue;
+    }
+
+    flushList();
+    if (line.trim()) paragraphLines.push(line.trim());
+    else flushParagraph();
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
 export function truncate(value: string, max: number): string {
   if (value.length <= max) return value;
   return `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
